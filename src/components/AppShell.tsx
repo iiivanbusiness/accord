@@ -19,22 +19,15 @@ export default function AppShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="relative min-h-screen">
-      <div className="mesh-bg" aria-hidden="true">
-        <span className="blob blob-a" />
-        <span className="blob blob-b" />
-        <span className="blob blob-c" />
-      </div>
-
-      <div className="relative z-10 grid min-h-screen" style={{ gridTemplateColumns: "76px 1fr" }}>
-        <nav className="glass m-3.5 flex flex-col items-center gap-2 rounded-[20px] py-[18px]">
+    <div className="min-h-screen" style={{ background: "var(--canvas)" }}>
+      <div className="grid min-h-screen" style={{ gridTemplateColumns: "76px 1fr" }}>
+        <nav
+          className="m-3.5 flex flex-col items-center gap-2 rounded-[20px] py-[18px]"
+          style={{ background: "var(--surface-1)", border: "1px solid var(--hairline)" }}
+        >
           <div
-            className="mb-4 flex h-[34px] w-[34px] items-center justify-center rounded-[11px] font-display text-[15px] font-bold"
-            style={{
-              background: "linear-gradient(160deg, var(--accent), var(--accent-strong))",
-              color: "var(--accent-ink)",
-              boxShadow: "0 4px 16px rgba(79,227,190,.4)",
-            }}
+            className="mb-4 flex h-[34px] w-[34px] items-center justify-center rounded-[10px] font-display text-[15px] font-semibold"
+            style={{ background: "var(--primary)", color: "var(--on-primary)" }}
           >
             A
           </div>
@@ -46,11 +39,11 @@ export default function AppShell({
                 key={item.href}
                 href={item.href}
                 title={item.label}
-                className="flex h-[42px] w-[42px] items-center justify-center rounded-[9px] border transition-colors"
+                className="flex h-[42px] w-[42px] items-center justify-center rounded-[10px] transition-colors"
                 style={
                   isActive
-                    ? { background: "var(--glass-strong)", borderColor: "var(--glass-border)", color: "var(--accent)" }
-                    : { borderColor: "transparent", color: "var(--ink-faint)" }
+                    ? { background: "var(--surface-2)", color: "var(--ink)" }
+                    : { color: "var(--ink-muted)" }
                 }
               >
                 <Icon />
@@ -60,15 +53,18 @@ export default function AppShell({
         </nav>
 
         <div className="flex min-w-0 flex-col">
-          <header className="glass m-3.5 flex items-center justify-between rounded-[20px] px-[22px] py-[13px]">
-            <div className="flex items-center gap-2.5 text-[14px]">
-              <span className="font-semibold">Horizon Media</span>
-              <span style={{ color: "var(--ink-faint)" }}>·</span>
+          <header
+            className="m-3.5 flex items-center justify-between rounded-[20px] px-[22px] py-[13px]"
+            style={{ background: "var(--surface-1)", border: "1px solid var(--hairline)" }}
+          >
+            <div className="flex items-center gap-2.5 text-[14px] font-medium" style={{ letterSpacing: "-0.14px" }}>
+              <span style={{ color: "var(--ink)" }}>Horizon Media</span>
+              <span style={{ color: "var(--ink-muted)" }}>·</span>
               <span style={{ color: "var(--ink-muted)" }}>{screenLabel}</span>
             </div>
             <div
-              className="flex h-[29px] w-[29px] items-center justify-center rounded-full border font-display text-[12px] font-bold"
-              style={{ background: "var(--glass-strong)", color: "var(--accent)", borderColor: "var(--glass-border)" }}
+              className="flex h-[29px] w-[29px] items-center justify-center rounded-full font-display text-[12px] font-semibold"
+              style={{ background: "var(--surface-2)", color: "var(--ink)" }}
             >
               HM
             </div>

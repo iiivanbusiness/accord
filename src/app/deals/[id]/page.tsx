@@ -12,6 +12,14 @@ const STATUS_LABEL: Record<string, string> = {
   signed: "Signed",
 };
 
+const STATUS_CHIP: Record<string, string> = {
+  processing: "chip-neutral chip-live",
+  missing_info: "chip-warn",
+  ready: "chip-active",
+  sent: "chip-neutral",
+  signed: "chip-success",
+};
+
 export default async function DealDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const deal = await prisma.deal.findUnique({
@@ -29,44 +37,44 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <AppShell active="/deals" screenLabel="Deal">
-      <Link href="/deals" className="mb-3.5 inline-flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: "var(--ink-muted)" }}>
+      <Link href="/deals" className="mb-3.5 inline-flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "var(--ink-muted)" }}>
         ← Deals
       </Link>
 
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-[23px] font-bold">{deal.client.name}</h1>
+          <h1 className="text-[23px] font-medium" style={{ letterSpacing: "-0.6px" }}>{deal.client.name}</h1>
           <div className="mt-1 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
             {deal.service}
             {deal.callLength ? ` · from a ${deal.callLength}` : ""}
           </div>
         </div>
-        <span className={`pill pill-${deal.status}`}>
-          <span className="pill-dot" />
+        <span className={`chip ${STATUS_CHIP[deal.status] ?? "chip-neutral"}`}>
+          <span className="chip-dot" />
           {STATUS_LABEL[deal.status] ?? deal.status}
         </span>
       </div>
 
       <div className="grid gap-[18px]" style={{ gridTemplateColumns: "1fr 300px" }}>
-        <div className="glass rounded-[20px]">
-          <div className="border-b px-5 py-4" style={{ borderColor: "var(--glass-border-soft)" }}>
-            <h2 className="text-[15px] font-bold">Deal terms</h2>
+        <div className="card">
+          <div className="border-b px-5 py-4" style={{ borderColor: "var(--hairline)" }}>
+            <h2 className="text-[15px] font-medium">Deal terms</h2>
           </div>
           <div className="px-5 py-1.5">
             {[...groups.entries()]
               .filter(([label]) => label !== "Missing")
               .map(([label, rows]) => (
-                <div key={label} className="border-b py-3 last:border-b-0" style={{ borderColor: "var(--glass-border-soft)" }}>
-                  <div className="pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--ink-faint)" }}>
+                <div key={label} className="border-b py-3 last:border-b-0" style={{ borderColor: "var(--hairline-soft)" }}>
+                  <div className="pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
                     {label}
                   </div>
                   {rows.map((row) => (
                     <div key={row.id} className="flex items-center justify-between gap-3 py-2">
                       <span className="text-[13.5px]" style={{ color: "var(--ink-muted)" }}>{row.label}</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-[13.5px] font-semibold">{row.value}</span>
+                        <span className="text-[13.5px] font-medium">{row.value}</span>
                         {row.sourceQuote && (
-                          <span title={row.sourceQuote} className="cursor-help text-[11px]" style={{ color: "var(--ink-faint)" }}>
+                          <span title={row.sourceQuote} className="cursor-help text-[11px]" style={{ color: "var(--ink-muted)" }}>
                             ⓘ
                           </span>
                         )}
@@ -80,50 +88,38 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
 
         <div className="flex flex-col gap-4">
           {missing.length > 0 ? (
-            <div className="glass rounded-[20px]" style={{ borderColor: "rgba(245,185,77,.28)" }}>
+            <div className="card" style={{ borderColor: "rgba(245,185,77,.28)" }}>
               <div className="rounded-t-[20px] border-b px-5 py-4" style={{ background: "var(--warn-soft)", borderColor: "rgba(245,185,77,.2)" }}>
-                <h2 className="text-[15px] font-bold" style={{ color: "var(--warn)" }}>Missing information</h2>
+                <h2 className="text-[15px] font-medium" style={{ color: "var(--warn)" }}>Missing information</h2>
               </div>
               <div className="px-5 py-3">
                 {missing.map((m) => (
-                  <div key={m.id} className="border-b py-3 last:border-b-0" style={{ borderColor: "var(--glass-border-soft)" }}>
-                    <div className="text-[13px] font-semibold">{m.label}</div>
-                    <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-faint)" }}>Not mentioned in the call — add it during review.</div>
+                  <div key={m.id} className="border-b py-3 last:border-b-0" style={{ borderColor: "var(--hairline-soft)" }}>
+                    <div className="text-[13px] font-medium">{m.label}</div>
+                    <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>Not mentioned in the call — add it during review.</div>
                   </div>
                 ))}
               </div>
             </div>
           ) : (
-            <div className="glass flex items-center gap-2 rounded-[20px] px-5 py-4 text-[13.5px] font-semibold" style={{ color: "var(--accent)" }}>
+            <div className="card flex items-center gap-2 px-5 py-4 text-[13.5px] font-medium" style={{ color: "var(--success)" }}>
               ✓ All required information captured
             </div>
           )}
 
-          <div className="glass flex flex-col gap-2.5 rounded-[20px] p-5">
+          <div className="card flex flex-col gap-2.5 p-5">
             {deal.contract ? (
-              <Link
-                href={`/deals/${deal.id}/contract`}
-                className="w-full rounded-full py-2.5 text-center text-[13.5px] font-semibold"
-                style={{ background: "linear-gradient(160deg, var(--accent), var(--accent-strong))", color: "var(--accent-ink)" }}
-              >
+              <Link href={`/deals/${deal.id}/contract`} className="btn btn-primary w-full justify-center">
                 View contract
               </Link>
             ) : (
               <form action={generateContract.bind(null, deal.id)}>
-                <button
-                  disabled={missing.length > 0}
-                  className="w-full rounded-full py-2.5 text-[13.5px] font-semibold disabled:cursor-not-allowed"
-                  style={
-                    missing.length > 0
-                      ? { background: "var(--glass)", color: "var(--ink-faint)" }
-                      : { background: "linear-gradient(160deg, var(--accent), var(--accent-strong))", color: "var(--accent-ink)" }
-                  }
-                >
+                <button type="submit" disabled={missing.length > 0} className="btn btn-primary w-full justify-center">
                   Generate contract
                 </button>
               </form>
             )}
-            <span className="text-center text-[12px]" style={{ color: "var(--ink-faint)" }}>
+            <span className="text-center text-[12px]" style={{ color: "var(--ink-muted)" }}>
               Uses the {deal.template?.name ?? "default"} template
             </span>
           </div>

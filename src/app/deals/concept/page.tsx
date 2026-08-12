@@ -5,19 +5,16 @@ import CompanionPreview from "@/components/CompanionPreview";
 export default function ConceptPage() {
   return (
     <AppShell active="/deals" screenLabel="Zoom concept">
-      <Link href="/deals" className="mb-3.5 inline-flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: "var(--ink-muted)" }}>
+      <Link href="/deals" className="mb-3.5 inline-flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "var(--ink-muted)" }}>
         ← Deals
       </Link>
 
-      <div
-        className="mb-3.5 inline-flex items-center gap-1.5 rounded-full px-[11px] py-[5px] text-[11px] font-bold uppercase tracking-wide"
-        style={{ background: "var(--warn-soft)", color: "var(--warn)" }}
-      >
+      <div className="chip chip-warn mb-3.5 uppercase tracking-wide" style={{ fontSize: "11px", fontWeight: 600 }}>
         Concept — not a working feature yet
       </div>
 
       <div className="mb-6">
-        <h1 className="text-[25px] font-bold">Accord, next to a real Zoom call</h1>
+        <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Accord, next to a real Zoom call</h1>
         <div className="mt-1 max-w-[620px] text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
           Zoom keeps running exactly as it does today. Accord opens as a separate companion window beside it — it never joins the meeting.
         </div>

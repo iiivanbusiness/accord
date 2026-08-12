@@ -28,60 +28,51 @@ export default async function CalendarPage() {
     <AppShell active="/calendar" screenLabel="Calendar">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-4">
         <div>
-          <h1 className="text-[25px] font-bold">Calendar</h1>
-          <div className="mt-1 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+          <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Calendar</h1>
+          <div className="mt-1 text-[14px]" style={{ color: "var(--ink-muted)" }}>
             Upcoming calls Accord will pick up automatically
           </div>
         </div>
       </div>
 
       <div className="mb-5 flex items-center gap-1.5 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-        <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--accent)" }} />
+        <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--success)" }} />
         Connected to Google Calendar — calls with a Zoom or Meet link are matched to a client automatically
       </div>
 
       {events.length === 0 ? (
-        <div className="glass rounded-[20px] px-6 py-10 text-center text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+        <div className="card px-6 py-10 text-center text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
           Nothing on the calendar yet.
         </div>
       ) : (
         <div className="flex flex-col gap-6">
           {[...groups.entries()].map(([day, dayEvents]) => (
             <div key={day}>
-              <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--ink-faint)" }}>
+              <div className="mb-2.5 text-[11px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
                 {day}
               </div>
-              <div className="glass overflow-hidden rounded-[20px]">
+              <div className="card overflow-hidden">
                 {dayEvents.map((event, i) => (
                   <div
                     key={event.id}
                     className="flex items-center justify-between gap-4 px-5 py-4"
-                    style={i < dayEvents.length - 1 ? { borderBottom: "1px solid var(--glass-border-soft)" } : undefined}
+                    style={i < dayEvents.length - 1 ? { borderBottom: "1px solid var(--hairline-soft)" } : undefined}
                   >
                     <div className="flex items-center gap-4">
                       <div
-                        className="font-mono-tab flex w-[68px] flex-none flex-col items-start rounded-[10px] px-2.5 py-1.5 text-[12.5px] font-semibold"
-                        style={{ background: "var(--glass-strong)", border: "1px solid var(--glass-border)" }}
+                        className="font-mono-tab flex w-[68px] flex-none flex-col items-start rounded-[10px] px-2.5 py-1.5 text-[12.5px] font-medium"
+                        style={{ background: "var(--surface-2)" }}
                       >
                         {formatTime(event.startTime)}
                       </div>
                       <div>
-                        <div className="text-[14px] font-semibold">{event.title}</div>
-                        <div className="text-[12.5px]" style={{ color: "var(--ink-faint)" }}>
+                        <div className="text-[14px] font-medium">{event.title}</div>
+                        <div className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
                           {event.clientName ?? "No client matched yet"} · {event.durationMinutes} min
                         </div>
                       </div>
                     </div>
-                    <span
-                      className="rounded-full border px-2.5 py-1 text-[11px] font-semibold capitalize"
-                      style={{
-                        borderColor: "var(--glass-border)",
-                        color: event.platform === "zoom" ? "#8FB8F0" : "#7FDB9A",
-                        background: event.platform === "zoom" ? "rgba(74,144,226,.14)" : "rgba(52,168,83,.14)",
-                      }}
-                    >
-                      {event.platform}
-                    </span>
+                    <span className="chip chip-neutral capitalize">{event.platform}</span>
                   </div>
                 ))}
               </div>

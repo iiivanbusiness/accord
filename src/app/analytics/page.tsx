@@ -8,11 +8,11 @@ function parseFee(feeDisplay: string): number {
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="glass rounded-[20px] p-5">
-      <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--ink-faint)" }}>
+    <div className="card p-5">
+      <div className="text-[11px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
         {label}
       </div>
-      <div className="font-mono-tab mt-2 text-[28px] font-bold">{value}</div>
+      <div className="font-mono-tab mt-2 text-[28px] font-medium">{value}</div>
       {sub && (
         <div className="mt-1 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
           {sub}
@@ -29,13 +29,10 @@ function BarRow({ label, count, max }: { label: string; count: number; max: numb
       <span className="w-[150px] flex-none truncate text-[13px]" style={{ color: "var(--ink-muted)" }}>
         {label}
       </span>
-      <div className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,.06)" }}>
-        <div
-          className="h-full rounded-full"
-          style={{ width: `${pct}%`, background: "linear-gradient(90deg, var(--accent), var(--accent-strong))" }}
-        />
+      <div className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: "var(--surface-2)" }}>
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "var(--primary)" }} />
       </div>
-      <span className="font-mono-tab w-[24px] flex-none text-right text-[13px] font-semibold">{count}</span>
+      <span className="font-mono-tab w-[24px] flex-none text-right text-[13px] font-medium">{count}</span>
     </div>
   );
 }
@@ -76,8 +73,8 @@ export default async function AnalyticsPage() {
   return (
     <AppShell active="/analytics" screenLabel="Analytics">
       <div className="mb-6">
-        <h1 className="text-[25px] font-bold">Analytics</h1>
-        <div className="mt-1 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+        <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Analytics</h1>
+        <div className="mt-1 text-[14px]" style={{ color: "var(--ink-muted)" }}>
           How your deals are moving from call to signature
         </div>
       </div>
@@ -90,9 +87,9 @@ export default async function AnalyticsPage() {
       </div>
 
       <div className="grid gap-[18px]" style={{ gridTemplateColumns: "1fr 1fr" }}>
-        <div className="glass rounded-[20px]">
-          <div className="border-b px-5 py-4" style={{ borderColor: "var(--glass-border-soft)" }}>
-            <h2 className="text-[15px] font-bold">Deals by status</h2>
+        <div className="card">
+          <div className="border-b px-5 py-4" style={{ borderColor: "var(--hairline)" }}>
+            <h2 className="text-[15px] font-medium">Deals by status</h2>
           </div>
           <div className="px-5 py-3">
             {[...statusCounts.entries()].map(([status, count]) => (
@@ -101,9 +98,9 @@ export default async function AnalyticsPage() {
           </div>
         </div>
 
-        <div className="glass rounded-[20px]">
-          <div className="border-b px-5 py-4" style={{ borderColor: "var(--glass-border-soft)" }}>
-            <h2 className="text-[15px] font-bold">Template usage</h2>
+        <div className="card">
+          <div className="border-b px-5 py-4" style={{ borderColor: "var(--hairline)" }}>
+            <h2 className="text-[15px] font-medium">Template usage</h2>
           </div>
           <div className="px-5 py-3">
             {[...templateCounts.entries()].map(([name, count]) => (

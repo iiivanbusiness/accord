@@ -27,39 +27,33 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
 
   return (
     <AppShell active="/deals" screenLabel="Contract review">
-      <Link href={`/deals/${deal.id}`} className="mb-3.5 inline-flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: "var(--ink-muted)" }}>
+      <Link href={`/deals/${deal.id}`} className="mb-3.5 inline-flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "var(--ink-muted)" }}>
         ← Deal
       </Link>
 
       <div className="mb-5">
-        <h1 className="text-[25px] font-bold">Contract review</h1>
+        <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Contract review</h1>
         <div className="mt-1 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
           Confirm the details before sending to your client
         </div>
       </div>
 
       {deal.contract.status !== "draft" && (
-        <div
-          className="mb-[18px] flex items-center gap-2.5 rounded-[14px] border px-4 py-3 text-[13.5px] font-semibold"
-          style={{ background: "var(--accent-soft)", color: "var(--accent)", borderColor: "rgba(79,227,190,.25)" }}
-        >
+        <div className="chip chip-success mb-[18px] px-4 py-3 text-[13.5px]">
           ✓ Sent to {deal.client.name} for signature
         </div>
       )}
 
       <div className="grid gap-[18px]" style={{ gridTemplateColumns: "1fr 300px" }}>
-        <div
-          className="rounded-[20px] px-[46px] py-[42px]"
-          style={{ background: "linear-gradient(160deg, rgba(255,255,255,.10), rgba(255,255,255,.03))", border: "1px solid var(--glass-border)" }}
-        >
-          <div className="mb-1.5 text-[21px] font-bold">{deal.template.name}</div>
-          <div className="mb-7 border-b pb-[22px] text-[13.5px]" style={{ color: "var(--ink-muted)", borderColor: "var(--glass-border-soft)" }}>
+        <div className="card px-[46px] py-[42px]">
+          <div className="mb-1.5 text-[21px] font-medium" style={{ letterSpacing: "-0.6px" }}>{deal.template.name}</div>
+          <div className="mb-7 border-b pb-[22px] text-[13.5px]" style={{ color: "var(--ink-muted)", borderColor: "var(--hairline-soft)" }}>
             Between Horizon Media and {deal.client.name}
           </div>
           {clauses.map((clause, i) => (
             <div key={clause.title} className="mb-5 max-w-[64ch]">
-              <h3 className="mb-1.5 flex gap-2 text-[14px] font-bold">
-                <span className="font-mono-tab font-normal" style={{ color: "var(--ink-faint)" }}>{i + 1}.</span>
+              <h3 className="mb-1.5 flex gap-2 text-[14px] font-semibold">
+                <span className="font-mono-tab font-normal" style={{ color: "var(--ink-muted)" }}>{i + 1}.</span>
                 {clause.title}
               </h3>
               <p className="text-[14px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>{clause.body}</p>
@@ -67,25 +61,22 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
           ))}
         </div>
 
-        <aside className="glass rounded-[20px]">
-          <div className="border-b px-5 py-4" style={{ borderColor: "var(--glass-border-soft)" }}>
-            <h2 className="text-[15px] font-bold">Send</h2>
+        <aside className="card">
+          <div className="border-b px-5 py-4" style={{ borderColor: "var(--hairline)" }}>
+            <h2 className="text-[15px] font-medium">Send</h2>
           </div>
-          <div className="mx-5 my-3.5 flex items-center justify-between rounded-[10px] border px-3 py-2.5 text-[13px] font-semibold" style={{ borderColor: "var(--glass-border)", background: "rgba(255,255,255,.03)" }}>
+          <div className="mx-5 my-3.5 flex items-center justify-between rounded-[10px] px-3 py-2.5 text-[13px] font-medium" style={{ border: "1px solid var(--hairline)", background: "var(--canvas)" }}>
             {deal.template.name}
           </div>
           <div className="flex flex-col gap-2.5 p-5 pt-2">
             {deal.contract.status === "draft" ? (
               <form action={sendToClient.bind(null, deal.id)}>
-                <button
-                  className="w-full rounded-full py-2.5 text-[13.5px] font-semibold"
-                  style={{ background: "linear-gradient(160deg, var(--accent), var(--accent-strong))", color: "var(--accent-ink)" }}
-                >
+                <button type="submit" className="btn btn-primary w-full justify-center">
                   Send to client
                 </button>
               </form>
             ) : (
-              <button disabled className="w-full cursor-not-allowed rounded-full py-2.5 text-[13.5px] font-semibold" style={{ background: "var(--glass)", color: "var(--ink-faint)" }}>
+              <button disabled className="btn btn-primary w-full justify-center">
                 Sent ✓
               </button>
             )}

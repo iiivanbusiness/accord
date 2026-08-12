@@ -43,35 +43,35 @@ export default function CompanionPreview() {
 
   return (
     <div>
-      <div className="glass rounded-[20px]">
-        <div className="border-b px-5 py-4" style={{ borderColor: "var(--glass-border-soft)" }}>
-          <h2 className="flex items-center gap-2 text-[15px] font-bold">
-            <span className="pill-dot" style={{ background: "var(--accent)", animation: "pulse 1.4s ease-in-out infinite" }} />
+      <div className="gradient-spotlight-violet rounded-[20px]">
+        <div className="border-b px-5 py-4" style={{ borderColor: "rgba(255,255,255,.16)" }}>
+          <h2 className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: "#fff" }}>
+            <span className="chip-dot" style={{ background: "#fff", animation: "pulse 1.4s ease-in-out infinite" }} />
             Accord Companion
           </h2>
         </div>
         <div className="px-5 pb-0 pt-3">
-          <span className="text-[13px]" style={{ color: "var(--ink-muted)" }}>{status}</span>
+          <span className="text-[13px]" style={{ color: "rgba(255,255,255,.7)" }}>{status}</span>
         </div>
         <div className="px-5 py-3">
           {FIELDS.map((field, i) => (
             <div key={field.label} className={`companion-field flex items-center justify-between py-2 ${shown[i] ? "shown" : ""}`}>
-              <span className="text-[13.5px]" style={{ color: "var(--ink-muted)" }}>{field.label}</span>
-              <span className="text-[13.5px] font-semibold">{field.value}</span>
+              <span className="text-[13.5px]" style={{ color: "rgba(255,255,255,.7)" }}>{field.label}</span>
+              <span className="text-[13.5px] font-semibold" style={{ color: "#fff" }}>{field.value}</span>
             </div>
           ))}
         </div>
         <div className="p-5 pt-2">
           <button
             onClick={play}
-            className="w-full rounded-full border py-2 text-[12.5px] font-semibold"
-            style={{ borderColor: "var(--glass-border)", background: "var(--glass)" }}
+            className="w-full rounded-full py-2 text-[12.5px] font-medium"
+            style={{ background: "rgba(255,255,255,.14)", color: "#fff", border: "1px solid rgba(255,255,255,.2)" }}
           >
             Replay
           </button>
         </div>
       </div>
-      <div className="px-1 pt-3 text-center text-[12px] leading-relaxed" style={{ color: "var(--ink-faint)" }}>
+      <div className="px-1 pt-3 text-center text-[12px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>
         Your existing Zoom or Meet call, completely unmodified — Accord isn&apos;t a participant and doesn&apos;t record anything on its own.
       </div>
     </div>
