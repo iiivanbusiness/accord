@@ -129,3 +129,30 @@ h1, h2, h3 {
 .pill-sent { background: var(--glass); color: var(--ink-muted); border-color: var(--glass-border); }
 .pill-signed { background: linear-gradient(160deg, var(--accent), var(--accent-strong)); color: var(--accent-ink); }
 .pill-processing { background: var(--glass); color: var(--ink-muted); border-color: var(--glass-border); }
+
+/* ---------- concept: alongside a real Zoom call ---------- */
+.zoom-window {
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: #18191b;
+  border: 1px solid rgba(255,255,255,.08);
+  box-shadow: var(--shadow-glass);
+}
+.zoom-titlebar { display: flex; align-items: center; justify-content: space-between; padding: 11px 16px; background: #0e0f10; font-size: 12.5px; color: #c9cbcd; }
+.zoom-titlebar .rec { display: flex; align-items: center; gap: 6px; color: #ff5a5a; font-weight: 600; }
+.zoom-titlebar .rec .dot { width: 6px; height: 6px; border-radius: 50%; background: #ff5a5a; }
+@media (prefers-reduced-motion: no-preference) {
+  .zoom-titlebar .rec .dot { animation: recPulse 1.4s ease-in-out infinite; }
+  @keyframes recPulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+}
+.zoom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; background: #000; }
+.zoom-tile { aspect-ratio: 4/3; background: #232427; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; position: relative; }
+.zoom-tile .z-avatar { width: 56px; height: 56px; border-radius: 50%; background: #3a3c40; color: #e6e7e8; display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--font-display); font-size: 18px; }
+.zoom-tile .name-tag { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,.55); color: #eee; font-size: 11px; padding: 3px 8px; border-radius: 5px; }
+.zoom-toolbar { display: flex; align-items: center; justify-content: center; gap: 26px; padding: 14px; background: #0e0f10; }
+.zoom-toolbar .z-icon { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #c9cbcd; font-size: 9.5px; }
+.zoom-toolbar .z-icon.end { color: #ff5a5a; }
+
+.companion-field { opacity: 0; transform: translateY(4px); transition: opacity .4s ease, transform .4s ease; }
+.companion-field.shown { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .companion-field { transition: none; } }

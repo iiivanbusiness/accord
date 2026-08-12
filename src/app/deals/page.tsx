@@ -70,7 +70,7 @@ export default async function DealsPage() {
         </div>
       </div>
 
-      <div className="mb-5 flex items-center gap-1.5 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
+      <div className="mb-3.5 flex items-center gap-1.5 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
         <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--accent)" }} />
         Connected to Zoom — new calls are picked up and analyzed automatically
         {workspace && (
@@ -79,6 +79,15 @@ export default async function DealsPage() {
           </span>
         )}
       </div>
+
+      <Link
+        href="/deals/concept"
+        className="mb-5 inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-[12.5px] font-semibold"
+        style={{ borderColor: "var(--glass-border-soft)", background: "var(--glass)", color: "var(--ink-muted)" }}
+      >
+        See how this looks next to a real Zoom call
+        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 4l6 6-6 6" /></svg>
+      </Link>
 
       <div className="glass overflow-hidden rounded-[20px]">
         <div className="overflow-x-auto">
