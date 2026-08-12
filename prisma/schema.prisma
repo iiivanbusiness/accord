@@ -1,0 +1,127 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Workspace {
+  id                 String   @id @default(cuid())
+  name               String
+  plan               String   @default("Growth")
+  callsUsedThisMonth Int      @default(0)
+  callsLimit         Int      @default(15)
+  createdAt          DateTime @default(now())
+
+  users          User[]
+  clients        Client[]
+  deals          Deal[]
+  templates      ContractTemplate[]
+  calendarEvents CalendarEvent[]
+}
+
+model User {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  name        String
+  email       String    @unique
+  createdAt   DateTime  @default(now())
+}
+
+model Client {
+  id             String    @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace @relation(fields: [workspaceId], references: [id])
+  name           String
+  company        String
+  email          String?
+  billingAddress String?
+  createdAt      DateTime  @default(now())
+
+  deals Deal[]
+}
+
+// A contract template's clauses are stored as JSON: an array of
+// { title: string, body: string } objects. {placeholders} in body text
+// are filled from the linked Deal's fields at contract-generation time.
+model ContractTemplate {
+  id                 String    @id @default(cuid())
+  workspaceId        String
+  workspace          Workspace @relation(fields: [workspaceId], references: [id])
+  name               String
+  description        String
+  requiredFieldCount Int       @default(0)
+  clauses            String // JSON string: [{title, body}]
+
+  deals     Deal[]
+  contracts Contract[]
+}
+
+model Deal {
+  id          String            @id @default(cuid())
+  workspaceId String
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id])
+  clientId    String
+  client      Client            @relation(fields: [clientId], references: [id])
+  templateId  String?
+  template    ContractTemplate? @relation(fields: [templateId], references: [id])
+
+  service    String
+  feeDisplay String
+  status     String   @default("processing") // processing | missing_info | ready | sent | signed
+  source     String   @default("manual") // zoom | meet | manual | upload
+  callLength String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  fields   DealField[]
+  contract Contract?
+}
+
+// One row per deal-term shown in the Deal Detail screen — mirrors the
+// "field wrapper" pattern from the product spec: value + provenance,
+// not a bare value, so Missing Info and source-quote grounding both work.
+model DealField {
+  id         String  @id @default(cuid())
+  dealId     String
+  deal       Deal    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  groupLabel String
+  label      String
+  fieldKey   String
+  value      String?
+  status     String  @default("extracted") // extracted | confirmed | missing | user_edited
+  confidence Float?
+  sourceQuote String?
+  orderIndex Int     @default(0)
+}
+
+model Contract {
+  id         String            @id @default(cuid())
+  dealId     String            @unique
+  deal       Deal              @relation(fields: [dealId], references: [id])
+  templateId String?
+  template   ContractTemplate? @relation(fields: [templateId], references: [id])
+  status     String            @default("draft") // draft | sent | signed
+  sentAt     DateTime?
+  signedAt   DateTime?
+  createdAt  DateTime          @default(now())
+}
+
+// Stubbed for now — will be populated by a real calendar integration later.
+model CalendarEvent {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace @relation(fields: [workspaceId], references: [id])
+  title           String
+  clientName      String?
+  startTime       DateTime
+  durationMinutes Int       @default(30)
+  platform        String    @default("zoom") // zoom | meet
+  linkedDealId    String?
+}

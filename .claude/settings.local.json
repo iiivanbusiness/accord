@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pkill -f \"next dev\")",
+      "Bash(mkdir -p /Users/ivanivkovic/.local-node-22)",
+      "Read(//Users/ivanivkovic/**)",
+      "Bash(curl -fL -o node.tar.gz https://nodejs.org/dist/v22.23.2/node-v22.23.2-darwin-arm64.tar.gz)",
+      "Bash(tar -xzf node.tar.gz --strip-components=1)"
+    ]
+  }
+}

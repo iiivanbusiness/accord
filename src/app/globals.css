@@ -1,26 +1,131 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ink: #F5F7F6;
+  --ink-muted: rgba(245, 247, 246, 0.64);
+  --ink-faint: rgba(245, 247, 246, 0.40);
+  --accent: #4FE3BE;
+  --accent-strong: #2FD1A8;
+  --accent-ink: #04211B;
+  --accent-soft: rgba(79, 227, 190, 0.16);
+  --warn: #F5B94D;
+  --warn-soft: rgba(245, 185, 77, 0.15);
+  --danger: #FF6B57;
+  --danger-soft: rgba(255, 107, 87, 0.16);
+  --glass: rgba(255, 255, 255, 0.065);
+  --glass-strong: rgba(255, 255, 255, 0.12);
+  --glass-border: rgba(255, 255, 255, 0.15);
+  --glass-border-soft: rgba(255, 255, 255, 0.08);
+  --shadow-glass: 0 12px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  --r-sm: 9px;
+  --r-md: 14px;
+  --r-lg: 20px;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-glass: var(--glass);
+  --color-glass-strong: var(--glass-strong);
+  --color-glass-border: var(--glass-border);
+  --color-glass-border-soft: var(--glass-border-soft);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  background: #06090A;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  margin: 0;
+  text-wrap: balance;
+  letter-spacing: -0.01em;
+}
+
+.font-mono-tab {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- ambient mesh background ---------- */
+.mesh-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: #06090A;
+}
+.mesh-bg .blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+}
+.mesh-bg .blob-a { width: 640px; height: 640px; left: -140px; top: -180px; background: #3A3EA6; opacity: .5; }
+.mesh-bg .blob-b { width: 580px; height: 580px; right: -120px; top: -40px; background: #12695A; opacity: .55; }
+.mesh-bg .blob-c { width: 520px; height: 520px; left: 28%; bottom: -260px; background: #B8672B; opacity: .28; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .mesh-bg .blob-a { animation: driftA 44s ease-in-out infinite alternate; }
+  .mesh-bg .blob-b { animation: driftB 50s ease-in-out infinite alternate; }
+  .mesh-bg .blob-c { animation: driftC 56s ease-in-out infinite alternate; }
+  @keyframes driftA { from { transform: translate(0,0) scale(1); } to { transform: translate(70px,50px) scale(1.08); } }
+  @keyframes driftB { from { transform: translate(0,0) scale(1); } to { transform: translate(-60px,70px) scale(1.05); } }
+  @keyframes driftC { from { transform: translate(0,0); } to { transform: translate(50px,-50px); } }
+}
+
+/* ---------- glass primitive ---------- */
+.glass {
+  background: linear-gradient(160deg, rgba(255,255,255,0.11), rgba(255,255,255,0.035));
+  backdrop-filter: blur(28px) saturate(150%);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-glass);
+}
+
+/* ---------- status pill ---------- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px 5px 9px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.pill-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+.pill-ready { background: var(--accent-soft); color: var(--accent); }
+.pill-missing_info, .pill-missing { background: var(--warn-soft); color: var(--warn); }
+.pill-sent { background: var(--glass); color: var(--ink-muted); border-color: var(--glass-border); }
+.pill-signed { background: linear-gradient(160deg, var(--accent), var(--accent-strong)); color: var(--accent-ink); }
+.pill-processing { background: var(--glass); color: var(--ink-muted); border-color: var(--glass-border); }
