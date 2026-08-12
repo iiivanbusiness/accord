@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import { prisma } from "@/lib/db";
+import { generateContract } from "./actions";
 
 const STATUS_LABEL: Record<string, string> = {
   processing: "Analyzing call…",
@@ -15,7 +16,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const deal = await prisma.deal.findUnique({
     where: { id },
-    include: { client: true, fields: { orderBy: { orderIndex: "asc" } }, template: true },
+    include: { client: true, fields: { orderBy: { orderIndex: "asc" } }, template: true, contract: true },
   });
   if (!deal) notFound();
 
@@ -99,17 +100,29 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
           )}
 
           <div className="glass flex flex-col gap-2.5 rounded-[20px] p-5">
-            <button
-              disabled={missing.length > 0}
-              className="w-full rounded-full py-2.5 text-[13.5px] font-semibold disabled:cursor-not-allowed"
-              style={
-                missing.length > 0
-                  ? { background: "var(--glass)", color: "var(--ink-faint)" }
-                  : { background: "linear-gradient(160deg, var(--accent), var(--accent-strong))", color: "var(--accent-ink)" }
-              }
-            >
-              Generate contract
-            </button>
+            {deal.contract ? (
+              <Link
+                href={`/deals/${deal.id}/contract`}
+                className="w-full rounded-full py-2.5 text-center text-[13.5px] font-semibold"
+                style={{ background: "linear-gradient(160deg, var(--accent), var(--accent-strong))", color: "var(--accent-ink)" }}
+              >
+                View contract
+              </Link>
+            ) : (
+              <form action={generateContract.bind(null, deal.id)}>
+                <button
+                  disabled={missing.length > 0}
+                  className="w-full rounded-full py-2.5 text-[13.5px] font-semibold disabled:cursor-not-allowed"
+                  style={
+                    missing.length > 0
+                      ? { background: "var(--glass)", color: "var(--ink-faint)" }
+                      : { background: "linear-gradient(160deg, var(--accent), var(--accent-strong))", color: "var(--accent-ink)" }
+                  }
+                >
+                  Generate contract
+                </button>
+              </form>
+            )}
             <span className="text-center text-[12px]" style={{ color: "var(--ink-faint)" }}>
               Uses the {deal.template?.name ?? "default"} template
             </span>

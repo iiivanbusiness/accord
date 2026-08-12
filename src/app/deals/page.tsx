@@ -56,7 +56,8 @@ export default async function DealsPage() {
           >
             Start on Zoom
           </a>
-          <button
+          <Link
+            href="/deals/new"
             className="rounded-full px-[18px] py-[10px] text-[13.5px] font-semibold"
             style={{
               background: "linear-gradient(160deg, var(--accent), var(--accent-strong))",
@@ -65,7 +66,7 @@ export default async function DealsPage() {
             }}
           >
             + Upload a call
-          </button>
+          </Link>
         </div>
       </div>
 
