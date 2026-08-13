@@ -1,8 +1,15 @@
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import CompanionPreview from "@/components/CompanionPreview";
+import { prisma } from "@/lib/db";
 
-export default function ConceptPage() {
+export default async function ConceptPage() {
+  const acmeDeal = await prisma.deal.findFirst({
+    where: { client: { name: "Acme Fitness" } },
+    include: { contract: true },
+  });
+  const contractHref = acmeDeal?.contract ? `/deals/${acmeDeal.id}/contract` : `/deals/${acmeDeal?.id ?? ""}`;
+
   return (
     <AppShell active="/deals" screenLabel="Zoom concept">
       <Link href="/deals" className="mb-3.5 inline-flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "var(--ink-muted)" }}>
@@ -14,56 +21,61 @@ export default function ConceptPage() {
       </div>
 
       <div className="mb-6">
-        <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Accord, next to a real Zoom call</h1>
+        <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Accord, inside your Zoom call</h1>
         <div className="mt-1 max-w-[620px] text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-          Zoom keeps running exactly as it does today. Accord opens as a separate companion window beside it — it never joins the meeting.
+          The Companion overlay lives in the corner of the call itself — captured terms, anything still missing, and one tap through to the full contract, all without leaving the meeting.
         </div>
       </div>
 
-      <div className="grid gap-[18px]" style={{ gridTemplateColumns: "1fr 340px" }}>
-        <div className="zoom-window">
-          <div className="zoom-titlebar">
-            <span>Acme Fitness — Discovery Call</span>
-            <span className="rec">
-              <span className="dot" />
-              REC 14:32
-            </span>
+      <div className="zoom-window relative max-w-[700px]">
+        <div className="zoom-titlebar">
+          <span>Acme Fitness — Discovery Call</span>
+          <span className="rec">
+            <span className="dot" />
+            REC 14:32
+          </span>
+        </div>
+        <div className="zoom-grid">
+          <div className="zoom-tile">
+            <div className="z-avatar">HM</div>
+            <span className="name-tag">Horizon Media</span>
           </div>
-          <div className="zoom-grid">
-            <div className="zoom-tile">
-              <div className="z-avatar">HM</div>
-              <span className="name-tag">Horizon Media</span>
-            </div>
-            <div className="zoom-tile">
-              <div className="z-avatar">AF</div>
-              <span className="name-tag">Acme Fitness</span>
-            </div>
-          </div>
-          <div className="zoom-toolbar">
-            <span className="z-icon">
-              <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M10 3a2.4 2.4 0 0 1 2.4 2.4v4.2a2.4 2.4 0 1 1-4.8 0V5.4A2.4 2.4 0 0 1 10 3Z" /><path d="M6 9.2a4 4 0 0 0 8 0M10 13.2V16" /></svg>
-              Mute
-            </span>
-            <span className="z-icon">
-              <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3" y="6" width="9" height="8" rx="1.6" /><path d="M12.5 8.6l4-2.2v7.2l-4-2.2" /></svg>
-              Stop Video
-            </span>
-            <span className="z-icon">
-              <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="4" y="4" width="12" height="12" rx="2" /></svg>
-              Share
-            </span>
-            <span className="z-icon">
-              <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="10" cy="10" r="7" /></svg>
-              Record
-            </span>
-            <span className="z-icon end">
-              <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 12c3-3 9-3 12 0M10 12v3" /></svg>
-              Leave
-            </span>
+          <div className="zoom-tile">
+            <div className="z-avatar">AF</div>
+            <span className="name-tag">Acme Fitness</span>
           </div>
         </div>
 
-        <CompanionPreview />
+        <div className="absolute right-3 top-3">
+          <CompanionPreview contractHref={contractHref} />
+        </div>
+
+        <div className="zoom-toolbar">
+          <span className="z-icon">
+            <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M10 3a2.4 2.4 0 0 1 2.4 2.4v4.2a2.4 2.4 0 1 1-4.8 0V5.4A2.4 2.4 0 0 1 10 3Z" /><path d="M6 9.2a4 4 0 0 0 8 0M10 13.2V16" /></svg>
+            Mute
+          </span>
+          <span className="z-icon">
+            <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3" y="6" width="9" height="8" rx="1.6" /><path d="M12.5 8.6l4-2.2v7.2l-4-2.2" /></svg>
+            Stop Video
+          </span>
+          <span className="z-icon">
+            <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="4" y="4" width="12" height="12" rx="2" /></svg>
+            Share
+          </span>
+          <span className="z-icon">
+            <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="10" cy="10" r="7" /></svg>
+            Record
+          </span>
+          <span className="z-icon end">
+            <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 12c3-3 9-3 12 0M10 12v3" /></svg>
+            Leave
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-3 max-w-[700px] text-center text-[12px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>
+        This overlay lives inside your Zoom window while you talk — Accord never joins as a participant.
       </div>
     </AppShell>
   );
