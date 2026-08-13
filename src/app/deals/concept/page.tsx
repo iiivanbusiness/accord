@@ -38,7 +38,7 @@ export default async function ConceptPage() {
         </div>
       </div>
 
-      <div className="zoom-window relative max-w-[560px]">
+      <div className="zoom-window relative max-w-[760px]">
         <div className="zoom-titlebar">
           <span>Acme Fitness — Discovery Call</span>
           <span className="rec">
@@ -50,9 +50,7 @@ export default async function ConceptPage() {
           <div className="z-avatar-lg">AF</div>
           <span className="name-tag">Acme Fitness</span>
 
-          <div className="zoom-corner-stack">
-            <CompanionPreview templateName={acmeDeal?.template?.name ?? "Contract"} clauses={clauses} />
-          </div>
+          <CompanionPreview templateName={acmeDeal?.template?.name ?? "Contract"} clauses={clauses} />
         </div>
 
         <div className="zoom-toolbar">
@@ -79,7 +77,7 @@ export default async function ConceptPage() {
         </div>
       </div>
 
-      <div className="mt-3 max-w-[560px] text-center text-[12px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>
+      <div className="mt-3 max-w-[760px] text-center text-[12px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>
         This overlay lives inside your Zoom window while you talk — Accord never joins as a participant.
       </div>
     </AppShell>
