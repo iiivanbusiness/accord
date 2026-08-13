@@ -50,10 +50,12 @@ export default function CompanionPreview({ contractHref }: { contractHref: strin
 
   return (
     <div
-      className="w-[280px] overflow-hidden rounded-[16px]"
+      className="w-[260px] flex-none overflow-hidden rounded-[16px]"
       style={{
-        background: "linear-gradient(155deg, var(--gradient-violet), #4a2fb8)",
-        boxShadow: "0 0 0 0.5px rgba(255,255,255,0.10), 0 10px 30px rgba(0,0,0,0.45)",
+        background: "linear-gradient(155deg, rgba(106,76,245,0.50), rgba(74,47,184,0.50))",
+        backdropFilter: "blur(18px) saturate(150%)",
+        WebkitBackdropFilter: "blur(18px) saturate(150%)",
+        boxShadow: "0 0 0 0.5px rgba(255,255,255,0.14), 0 10px 30px rgba(0,0,0,0.45)",
       }}
     >
       <div className="border-b px-4 py-3" style={{ borderColor: "rgba(255,255,255,.16)" }}>

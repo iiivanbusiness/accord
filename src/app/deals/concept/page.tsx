@@ -35,19 +35,17 @@ export default async function ConceptPage() {
             REC 14:32
           </span>
         </div>
-        <div className="zoom-grid">
-          <div className="zoom-tile">
-            <div className="z-avatar">HM</div>
-            <span className="name-tag">Horizon Media</span>
-          </div>
-          <div className="zoom-tile">
-            <div className="z-avatar">AF</div>
-            <span className="name-tag">Acme Fitness</span>
-          </div>
-        </div>
+        <div className="zoom-stage">
+          <div className="z-avatar-lg">AF</div>
+          <span className="name-tag">Acme Fitness</span>
 
-        <div className="absolute right-3 top-3">
-          <CompanionPreview contractHref={contractHref} />
+          <div className="zoom-corner-stack">
+            <CompanionPreview contractHref={contractHref} />
+            <div className="zoom-pip">
+              <div className="z-avatar-sm">HM</div>
+              <span className="name-tag-sm">Horizon Media</span>
+            </div>
+          </div>
         </div>
 
         <div className="zoom-toolbar">

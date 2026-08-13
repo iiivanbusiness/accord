@@ -172,11 +172,16 @@ a {
   .zoom-titlebar .rec .dot { animation: recPulse 1.4s ease-in-out infinite; }
   @keyframes recPulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
 }
-.zoom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; background: #000; }
-.zoom-tile { min-height: 380px; background: #232427; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; position: relative; }
-@media (max-width: 640px) { .zoom-tile { min-height: 300px; } }
-.zoom-tile .z-avatar { width: 56px; height: 56px; border-radius: 50%; background: #3a3c40; color: #e6e7e8; display: flex; align-items: center; justify-content: center; font-weight: 600; font-family: var(--font-display); font-size: 18px; }
-.zoom-tile .name-tag { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,.55); color: #eee; font-size: 11px; padding: 3px 8px; border-radius: 5px; }
+.zoom-stage { position: relative; min-height: 420px; background: #232427; display: flex; align-items: center; justify-content: center; }
+@media (max-width: 640px) { .zoom-stage { min-height: 320px; } }
+.zoom-stage .z-avatar-lg { width: 100px; height: 100px; border-radius: 50%; background: #3a3c40; color: #e6e7e8; display: flex; align-items: center; justify-content: center; font-weight: 600; font-family: var(--font-display); font-size: 32px; }
+.zoom-stage .name-tag { position: absolute; bottom: 12px; left: 12px; background: rgba(0,0,0,.55); color: #eee; font-size: 11px; padding: 3px 8px; border-radius: 5px; }
+
+.zoom-corner-stack { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; max-width: calc(100% - 24px); }
+
+.zoom-pip { width: 104px; height: 76px; flex: none; border-radius: 10px; background: #2c2d30; border: 1px solid rgba(255,255,255,.15); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+.zoom-pip .z-avatar-sm { width: 34px; height: 34px; border-radius: 50%; background: #45474b; color: #e6e7e8; display: flex; align-items: center; justify-content: center; font-weight: 600; font-family: var(--font-display); font-size: 12px; }
+.zoom-pip .name-tag-sm { position: absolute; bottom: 4px; left: 4px; font-size: 9px; background: rgba(0,0,0,.55); color: #eee; padding: 1px 5px; border-radius: 4px; }
 .zoom-toolbar { display: flex; align-items: center; justify-content: center; gap: 26px; padding: 14px; background: #0e0f10; }
 .zoom-toolbar .z-icon { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #c9cbcd; font-size: 9.5px; }
 .zoom-toolbar .z-icon.end { color: #ff5a5a; }
