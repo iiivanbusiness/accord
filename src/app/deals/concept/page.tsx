@@ -3,12 +3,23 @@ import AppShell from "@/components/AppShell";
 import CompanionPreview from "@/components/CompanionPreview";
 import { prisma } from "@/lib/db";
 
+type Clause = { title: string; body: string };
+
+function fillClauses(clausesJson: string, fields: { fieldKey: string; value: string | null }[]): Clause[] {
+  const values = Object.fromEntries(fields.filter((f) => f.value).map((f) => [f.fieldKey, f.value as string]));
+  const clauses = JSON.parse(clausesJson) as Clause[];
+  return clauses.map((c) => ({
+    title: c.title,
+    body: c.body.replace(/\{(\w+)\}/g, (_, key: string) => values[key] ?? `{${key}}`),
+  }));
+}
+
 export default async function ConceptPage() {
   const acmeDeal = await prisma.deal.findFirst({
     where: { client: { name: "Acme Fitness" } },
-    include: { contract: true },
+    include: { contract: true, template: true, fields: true },
   });
-  const contractHref = acmeDeal?.contract ? `/deals/${acmeDeal.id}/contract` : `/deals/${acmeDeal?.id ?? ""}`;
+  const clauses = acmeDeal?.template ? fillClauses(acmeDeal.template.clauses, acmeDeal.fields) : [];
 
   return (
     <AppShell active="/deals" screenLabel="Zoom concept">
@@ -23,11 +34,11 @@ export default async function ConceptPage() {
       <div className="mb-6">
         <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Accord, inside your Zoom call</h1>
         <div className="mt-1 max-w-[620px] text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-          The Companion overlay lives in the corner of the call itself — captured terms, anything still missing, and one tap through to the full contract, all without leaving the meeting.
+          The Companion overlay lives in the corner of the call itself — captured terms, anything still missing, and the full contract without ever leaving the meeting.
         </div>
       </div>
 
-      <div className="zoom-window relative max-w-[700px]">
+      <div className="zoom-window relative max-w-[560px]">
         <div className="zoom-titlebar">
           <span>Acme Fitness — Discovery Call</span>
           <span className="rec">
@@ -40,11 +51,7 @@ export default async function ConceptPage() {
           <span className="name-tag">Acme Fitness</span>
 
           <div className="zoom-corner-stack">
-            <CompanionPreview contractHref={contractHref} />
-            <div className="zoom-pip">
-              <div className="z-avatar-sm">HM</div>
-              <span className="name-tag-sm">Horizon Media</span>
-            </div>
+            <CompanionPreview templateName={acmeDeal?.template?.name ?? "Contract"} clauses={clauses} />
           </div>
         </div>
 
@@ -72,7 +79,7 @@ export default async function ConceptPage() {
         </div>
       </div>
 
-      <div className="mt-3 max-w-[700px] text-center text-[12px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>
+      <div className="mt-3 max-w-[560px] text-center text-[12px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>
         This overlay lives inside your Zoom window while you talk — Accord never joins as a participant.
       </div>
     </AppShell>

@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
+
+type Clause = { title: string; body: string };
 
 const FIELDS = [
   { label: "Client", value: "Acme Fitness" },
@@ -12,7 +13,15 @@ const FIELDS = [
 
 const MISSING = ["Cancellation terms", "Client billing address"];
 
-export default function CompanionPreview({ contractHref }: { contractHref: string }) {
+const GLASS_STYLE: React.CSSProperties = {
+  background: "linear-gradient(155deg, rgba(106,76,245,0.50), rgba(74,47,184,0.50))",
+  backdropFilter: "blur(18px) saturate(150%)",
+  WebkitBackdropFilter: "blur(18px) saturate(150%)",
+  boxShadow: "0 0 0 0.5px rgba(255,255,255,0.14), 0 10px 30px rgba(0,0,0,0.45)",
+};
+
+export default function CompanionPreview({ templateName, clauses }: { templateName: string; clauses: Clause[] }) {
+  const [view, setView] = useState<"summary" | "contract">("summary");
   const [shown, setShown] = useState<boolean[]>(FIELDS.map(() => false));
   const [missingShown, setMissingShown] = useState(false);
   const [status, setStatus] = useState("Watching for deal terms…");
@@ -48,16 +57,36 @@ export default function CompanionPreview({ contractHref }: { contractHref: strin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  if (view === "contract") {
+    return (
+      <div className="flex max-h-[320px] w-[300px] flex-none flex-col overflow-hidden rounded-[16px]" style={GLASS_STYLE}>
+        <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "rgba(255,255,255,.16)" }}>
+          <button
+            onClick={() => setView("summary")}
+            className="flex items-center gap-1 text-[12px] font-semibold"
+            style={{ color: "#fff" }}
+          >
+            ← Back to call
+          </button>
+          <span className="text-[11px]" style={{ color: "rgba(255,255,255,.7)" }}>{templateName}</span>
+        </div>
+        <div className="overflow-y-auto px-4 py-3.5">
+          {clauses.map((clause, i) => (
+            <div key={clause.title} className="mb-3.5 last:mb-0">
+              <h3 className="mb-1 text-[12px] font-semibold" style={{ color: "#fff" }}>
+                {i + 1}. {clause.title}
+              </h3>
+              <p className="text-[11.5px] leading-relaxed" style={{ color: "rgba(255,255,255,.78)" }}>{clause.body}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div
-      className="w-[260px] flex-none overflow-hidden rounded-[16px]"
-      style={{
-        background: "linear-gradient(155deg, rgba(106,76,245,0.50), rgba(74,47,184,0.50))",
-        backdropFilter: "blur(18px) saturate(150%)",
-        WebkitBackdropFilter: "blur(18px) saturate(150%)",
-        boxShadow: "0 0 0 0.5px rgba(255,255,255,0.14), 0 10px 30px rgba(0,0,0,0.45)",
-      }}
-    >
+    <Fragment>
+    <div className="w-[260px] flex-none overflow-hidden rounded-[16px]" style={GLASS_STYLE}>
       <div className="border-b px-4 py-3" style={{ borderColor: "rgba(255,255,255,.16)" }}>
         <h2 className="flex items-center gap-2 text-[13px] font-semibold" style={{ color: "#fff" }}>
           <span className="chip-dot" style={{ background: "#fff", animation: "pulse 1.4s ease-in-out infinite" }} />
@@ -88,13 +117,13 @@ export default function CompanionPreview({ contractHref }: { contractHref: strin
       </div>
 
       <div className="flex flex-col gap-1.5 p-4 pt-3">
-        <Link
-          href={contractHref}
-          className="w-full rounded-full py-2 text-center text-[12px] font-semibold"
+        <button
+          onClick={() => setView("contract")}
+          className="w-full rounded-full py-2 text-[12px] font-semibold"
           style={{ background: "#fff", color: "#1a0e42" }}
         >
           View full contract
-        </Link>
+        </button>
         <button
           onClick={play}
           className="w-full rounded-full py-1.5 text-[11.5px] font-medium"
@@ -104,5 +133,10 @@ export default function CompanionPreview({ contractHref }: { contractHref: strin
         </button>
       </div>
     </div>
+    <div className="zoom-pip">
+      <div className="z-avatar-sm">HM</div>
+      <span className="name-tag-sm">Horizon Media</span>
+    </div>
+    </Fragment>
   );
 }
