@@ -46,11 +46,11 @@ export default async function DealsPage() {
           </div>
         </div>
         <div className="flex gap-2.5">
-          <a href="https://meet.google.com/new" target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
-            Start on Google Meet
+          <a href="https://meet.google.com" target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
+            Google Meet
           </a>
-          <a href="https://zoom.us/start/videomeeting" target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
-            Start on Zoom
+          <a href="https://zoom.us" target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
+            Zoom
           </a>
           <Link href="/deals/new" className="btn btn-primary">
             + Upload a call

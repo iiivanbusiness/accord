@@ -1,6 +1,5 @@
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
-import AICallDemo from "@/components/AICallDemo";
 import { prisma } from "@/lib/db";
 
 export default async function TemplatesPage() {
@@ -8,8 +7,6 @@ export default async function TemplatesPage() {
 
   return (
     <AppShell active="/templates" screenLabel="Templates">
-      <AICallDemo />
-
       <div className="mb-6 flex flex-wrap items-baseline justify-between gap-4">
         <div>
           <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Contract templates</h1>
