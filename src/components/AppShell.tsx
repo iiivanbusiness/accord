@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { signOut } from "@/lib/auth";
 
 const NAV_ITEMS = [
   { href: "/deals", label: "Deals", icon: DealsIcon },
@@ -62,11 +63,23 @@ export default function AppShell({
               <span style={{ color: "var(--ink-muted)" }}>·</span>
               <span style={{ color: "var(--ink-muted)" }}>{screenLabel}</span>
             </div>
-            <div
-              className="flex h-[29px] w-[29px] items-center justify-center rounded-full font-display text-[12px] font-semibold"
-              style={{ background: "var(--surface-2)", color: "var(--ink)" }}
-            >
-              HM
+            <div className="flex items-center gap-2.5">
+              <div
+                className="flex h-[29px] w-[29px] items-center justify-center rounded-full font-display text-[12px] font-semibold"
+                style={{ background: "var(--surface-2)", color: "var(--ink)" }}
+              >
+                HM
+              </div>
+              <form
+                action={async () => {
+                  "use server";
+                  await signOut({ redirectTo: "/login" });
+                }}
+              >
+                <button type="submit" className="text-[12.5px] font-medium" style={{ color: "var(--ink-muted)" }}>
+                  Sign out
+                </button>
+              </form>
             </div>
           </header>
 

@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { hashPassword } from "../src/lib/password";
 
 const url = (process.env.DATABASE_URL ?? "file:./dev.db").replace(/^file:/, "");
 const adapter = new PrismaBetterSqlite3({ url });
@@ -51,7 +52,12 @@ async function main() {
   });
 
   await prisma.user.create({
-    data: { workspaceId: workspace.id, name: "Horizon Media", email: "hello@horizonmedia.com" },
+    data: {
+      workspaceId: workspace.id,
+      name: "Horizon Media",
+      email: "hello@horizonmedia.com",
+      passwordHash: hashPassword("accord2026"),
+    },
   });
 
   const [marketingTpl, creativeTpl, consultingTpl, freelanceTpl, saasTpl] = await Promise.all([
