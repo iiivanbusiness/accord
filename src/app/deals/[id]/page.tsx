@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import AppShell from "@/components/AppShell";
+import DealTermsCard from "@/components/DealTermsCard";
 import { prisma } from "@/lib/db";
-import { fillMissingFields, generateContract } from "./actions";
+import { fillMissingFields, generateContract, updateFieldValues } from "./actions";
 
 const STATUS_LABEL: Record<string, string> = {
   processing: "Analyzing call…",
@@ -56,35 +57,10 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
       </div>
 
       <div className="grid gap-[18px]" style={{ gridTemplateColumns: "1fr 300px" }}>
-        <div className="card">
-          <div className="border-b px-5 py-4" style={{ borderColor: "var(--hairline)" }}>
-            <h2 className="text-[15px] font-medium">Deal terms</h2>
-          </div>
-          <div className="px-5 py-1.5">
-            {[...groups.entries()]
-              .filter(([label]) => label !== "Missing")
-              .map(([label, rows]) => (
-                <div key={label} className="border-b py-3 last:border-b-0" style={{ borderColor: "var(--hairline-soft)" }}>
-                  <div className="pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
-                    {label}
-                  </div>
-                  {rows.map((row) => (
-                    <div key={row.id} className="flex items-center justify-between gap-3 py-2">
-                      <span className="text-[13.5px]" style={{ color: "var(--ink-muted)" }}>{row.label}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[13.5px] font-medium">{row.value}</span>
-                        {row.sourceQuote && (
-                          <span title={row.sourceQuote} className="cursor-help text-[11px]" style={{ color: "var(--ink-muted)" }}>
-                            ⓘ
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-          </div>
-        </div>
+        <DealTermsCard
+          groups={[...groups.entries()].filter(([label]) => label !== "Missing")}
+          updateAction={updateFieldValues.bind(null, deal.id)}
+        />
 
         <div className="flex flex-col gap-4">
           {missing.length > 0 ? (

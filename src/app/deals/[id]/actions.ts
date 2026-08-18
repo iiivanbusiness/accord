@@ -45,6 +45,23 @@ export async function fillMissingFields(dealId: string, formData: FormData) {
   redirect(`/deals/${dealId}`);
 }
 
+export async function updateFieldValues(dealId: string, formData: FormData) {
+  const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { fields: true } });
+  if (!deal) throw new Error("Deal not found");
+
+  const editableFields = deal.fields.filter((f) => f.status !== "missing");
+  for (const field of editableFields) {
+    const value = String(formData.get(field.id) ?? "").trim();
+    if (value === field.value) continue;
+    await prisma.dealField.update({
+      where: { id: field.id },
+      data: { value, status: "user_edited" },
+    });
+  }
+
+  redirect(`/deals/${dealId}`);
+}
+
 export async function sendToClient(dealId: string) {
   await prisma.contract.update({ where: { dealId }, data: { status: "sent", sentAt: new Date() } });
   await prisma.deal.update({ where: { id: dealId }, data: { status: "sent" } });
