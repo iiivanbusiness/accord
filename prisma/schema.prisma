@@ -21,6 +21,12 @@ model Workspace {
   autoRemind         Boolean  @default(false)
   zoomConnected      Boolean  @default(true)
   meetConnected      Boolean  @default(false)
+
+  googleRefreshToken   String?
+  googleAccessToken    String?
+  googleTokenExpiresAt DateTime?
+  googleAccountEmail   String?
+
   createdAt          DateTime @default(now())
 
   users          User[]
@@ -121,7 +127,6 @@ model Contract {
   createdAt  DateTime          @default(now())
 }
 
-// Stubbed for now — will be populated by a real calendar integration later.
 model CalendarEvent {
   id              String    @id @default(cuid())
   workspaceId     String
@@ -132,4 +137,5 @@ model CalendarEvent {
   durationMinutes Int       @default(30)
   platform        String    @default("zoom") // zoom | meet
   linkedDealId    String?
+  googleEventId   String?   @unique // set when synced from Google Calendar; null for manually-added events
 }

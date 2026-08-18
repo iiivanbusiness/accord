@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
+import { syncWorkspaceCalendar } from "@/lib/google-calendar";
 
 export async function createEvent(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
@@ -32,5 +33,29 @@ export async function createEvent(formData: FormData) {
 
 export async function deleteEvent(eventId: string) {
   await prisma.calendarEvent.delete({ where: { id: eventId } });
+  revalidatePath("/calendar");
+}
+
+export async function syncGoogleCalendarNow() {
+  const workspace = await prisma.workspace.findFirst();
+  if (!workspace) throw new Error("No workspace found");
+
+  let redirectTo = "/calendar?error=google_sync_failed";
+  try {
+    const count = await syncWorkspaceCalendar(workspace.id);
+    redirectTo = `/calendar?synced=${count}`;
+  } catch {
+    // fall through to the error redirect set above
+  }
+  redirect(redirectTo);
+}
+
+export async function disconnectGoogleCalendar() {
+  const workspace = await prisma.workspace.findFirst();
+  if (!workspace) throw new Error("No workspace found");
+  await prisma.workspace.update({
+    where: { id: workspace.id },
+    data: { googleAccessToken: null, googleRefreshToken: null, googleTokenExpiresAt: null, googleAccountEmail: null },
+  });
   revalidatePath("/calendar");
 }
