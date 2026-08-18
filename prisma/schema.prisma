@@ -111,6 +111,8 @@ model Contract {
   status     String            @default("draft") // draft | sent | signed
   sentAt     DateTime?
   signedAt   DateTime?
+  signerName String?
+  signerIp   String?
   createdAt  DateTime          @default(now())
 }
 

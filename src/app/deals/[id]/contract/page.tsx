@@ -2,18 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import { prisma } from "@/lib/db";
+import { fillClauses } from "@/lib/contract";
 import { sendToClient } from "../actions";
-
-type Clause = { title: string; body: string };
-
-function fillClauses(clausesJson: string, fields: { fieldKey: string; value: string | null }[]): Clause[] {
-  const values = Object.fromEntries(fields.filter((f) => f.value).map((f) => [f.fieldKey, f.value as string]));
-  const clauses = JSON.parse(clausesJson) as Clause[];
-  return clauses.map((c) => ({
-    title: c.title,
-    body: c.body.replace(/\{(\w+)\}/g, (_, key: string) => values[key] ?? `{${key}}`),
-  }));
-}
 
 export default async function ContractPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -38,9 +28,14 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
-      {deal.contract.status !== "draft" && (
+      {deal.contract.status === "signed" && (
         <div className="chip chip-success mb-[18px] px-4 py-3 text-[13.5px]">
-          ✓ Sent to {deal.client.name} for signature
+          ✓ Signed by {deal.contract.signerName} on {deal.contract.signedAt?.toLocaleDateString()}
+        </div>
+      )}
+      {deal.contract.status === "sent" && (
+        <div className="chip chip-warn mb-[18px] px-4 py-3 text-[13.5px]">
+          ✓ Sent to {deal.client.name} — awaiting signature
         </div>
       )}
 
@@ -76,9 +71,14 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
                 </button>
               </form>
             ) : (
-              <button disabled className="btn btn-primary w-full justify-center">
-                Sent ✓
-              </button>
+              <>
+                <button disabled className="btn btn-primary w-full justify-center">
+                  {deal.contract.status === "signed" ? "Signed ✓" : "Sent ✓"}
+                </button>
+                <div className="rounded-[10px] px-3 py-2.5 text-[11.5px] break-all" style={{ border: "1px solid var(--hairline)", background: "var(--canvas)", color: "var(--ink-muted)" }}>
+                  {`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/sign/${deal.contract.id}`}
+                </div>
+              </>
             )}
           </div>
         </aside>
