@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 
 const NAV_ITEMS = [
   { href: "/deals", label: "Deals", icon: DealsIcon },
@@ -10,7 +11,7 @@ const NAV_ITEMS = [
   { href: "/settings", label: "Settings", icon: SettingsIcon },
 ] as const;
 
-export default function AppShell({
+export default async function AppShell({
   active,
   screenLabel,
   children,
@@ -19,6 +20,9 @@ export default function AppShell({
   screenLabel: string;
   children: React.ReactNode;
 }) {
+  const workspace = await prisma.workspace.findFirst();
+  const workspaceName = workspace?.name ?? "Workspace";
+
   return (
     <div className="min-h-screen" style={{ background: "var(--canvas)" }}>
       <div className="grid min-h-screen" style={{ gridTemplateColumns: "76px 1fr" }}>
@@ -59,7 +63,7 @@ export default function AppShell({
             style={{ background: "var(--surface-1)", border: "1px solid var(--hairline)" }}
           >
             <div className="flex items-center gap-2.5 text-[14px] font-medium" style={{ letterSpacing: "-0.14px" }}>
-              <span style={{ color: "var(--ink)" }}>Horizon Media</span>
+              <span style={{ color: "var(--ink)" }}>{workspaceName}</span>
               <span style={{ color: "var(--ink-muted)" }}>·</span>
               <span style={{ color: "var(--ink-muted)" }}>{screenLabel}</span>
             </div>

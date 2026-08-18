@@ -16,6 +16,11 @@ model Workspace {
   plan               String   @default("Growth")
   callsUsedThisMonth Int      @default(0)
   callsLimit         Int      @default(15)
+  requireApproval    Boolean  @default(true)
+  notifyOnSigned     Boolean  @default(true)
+  autoRemind         Boolean  @default(false)
+  zoomConnected      Boolean  @default(true)
+  meetConnected      Boolean  @default(false)
   createdAt          DateTime @default(now())
 
   users          User[]
