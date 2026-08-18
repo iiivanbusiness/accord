@@ -76,6 +76,10 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
             This agreement was signed electronically on {contract.signedAt?.toLocaleString()}.
           </div>
         )}
+
+        <a href={`/api/contracts/${contract.id}/pdf`} className="btn btn-secondary mt-5 w-full justify-center">
+          Download PDF
+        </a>
       </main>
     </div>
   );

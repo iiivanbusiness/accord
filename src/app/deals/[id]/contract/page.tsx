@@ -80,6 +80,9 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
                 </div>
               </>
             )}
+            <a href={`/api/contracts/${deal.contract.id}/pdf`} className="btn btn-secondary w-full justify-center">
+              Download PDF
+            </a>
           </div>
         </aside>
       </div>
