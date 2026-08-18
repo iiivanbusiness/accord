@@ -40,10 +40,13 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
           ))}
         </div>
 
-        <aside className="card p-5">
-          <div className="mb-4 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
+        <aside className="card flex flex-col gap-2.5 p-5">
+          <div className="mb-1.5 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
             Used by {template.deals.length} deal{template.deals.length === 1 ? "" : "s"}
           </div>
+          <Link href={`/templates/${template.id}/edit`} className="btn btn-secondary w-full justify-center">
+            Edit template
+          </Link>
           <form action={deleteTemplate.bind(null, template.id)}>
             <button
               type="submit"

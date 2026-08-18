@@ -4,10 +4,12 @@ import { useState } from "react";
 
 type Clause = { title: string; body: string };
 
-export default function ClauseEditor() {
-  const [clauses, setClauses] = useState<Clause[]>([
-    { title: "Services", body: "Horizon Media will provide {service} for {clientName}." },
-  ]);
+export default function ClauseEditor({ initialClauses }: { initialClauses?: Clause[] }) {
+  const [clauses, setClauses] = useState<Clause[]>(
+    initialClauses && initialClauses.length > 0
+      ? initialClauses
+      : [{ title: "Services", body: "Horizon Media will provide {service} for {clientName}." }]
+  );
 
   function update(i: number, key: keyof Clause, value: string) {
     setClauses((prev) => prev.map((c, idx) => (idx === i ? { ...c, [key]: value } : c)));

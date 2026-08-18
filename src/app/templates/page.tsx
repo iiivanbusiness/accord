@@ -14,9 +14,14 @@ export default async function TemplatesPage() {
             The engine fills these from what your call actually covered
           </div>
         </div>
-        <Link href="/templates/new" className="btn btn-primary">
-          + New template
-        </Link>
+        <div className="flex gap-2.5">
+          <Link href="/templates/upload" className="btn btn-secondary">
+            ⭱ Upload a contract
+          </Link>
+          <Link href="/templates/new" className="btn btn-primary">
+            + New template
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>

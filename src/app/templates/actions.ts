@@ -2,29 +2,33 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { extractText, splitIntoClauses } from "@/lib/parse-document";
 
 type ClauseInput = { title: string; body: string };
+
+function countPlaceholders(clauses: ClauseInput[]): number {
+  const placeholders = new Set<string>();
+  for (const clause of clauses) {
+    for (const m of clause.body.matchAll(/\{(\w+)\}/g)) placeholders.add(m[1]);
+  }
+  return placeholders.size;
+}
+
+function parseClausesJson(raw: string): ClauseInput[] {
+  try {
+    return (JSON.parse(raw) as ClauseInput[]).filter((c) => c.title.trim() || c.body.trim());
+  } catch {
+    return [];
+  }
+}
 
 export async function createTemplate(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
-  const clausesRaw = String(formData.get("clausesJson") ?? "[]");
+  const clauses = parseClausesJson(String(formData.get("clausesJson") ?? "[]"));
 
   if (!name) throw new Error("Template name is required");
-
-  let clauses: ClauseInput[] = [];
-  try {
-    clauses = (JSON.parse(clausesRaw) as ClauseInput[]).filter((c) => c.title.trim() || c.body.trim());
-  } catch {
-    clauses = [];
-  }
   if (clauses.length === 0) throw new Error("Add at least one clause");
-
-  const placeholders = new Set<string>();
-  for (const clause of clauses) {
-    const matches = clause.body.matchAll(/\{(\w+)\}/g);
-    for (const m of matches) placeholders.add(m[1]);
-  }
 
   const workspace = await prisma.workspace.findFirst();
   if (!workspace) throw new Error("No workspace found");
@@ -34,12 +38,59 @@ export async function createTemplate(formData: FormData) {
       workspaceId: workspace.id,
       name,
       description: description || `Custom template with ${clauses.length} clauses.`,
-      requiredFieldCount: placeholders.size,
+      requiredFieldCount: countPlaceholders(clauses),
       clauses: JSON.stringify(clauses),
     },
   });
 
   redirect(`/templates/${template.id}`);
+}
+
+export async function createTemplateFromDocument(formData: FormData) {
+  const name = String(formData.get("name") ?? "").trim();
+  const file = formData.get("file") as File | null;
+
+  if (!name) throw new Error("Template name is required");
+  if (!file || file.size === 0) throw new Error("Choose a file to upload");
+
+  const text = await extractText(file);
+  const clauses = splitIntoClauses(text);
+
+  const workspace = await prisma.workspace.findFirst();
+  if (!workspace) throw new Error("No workspace found");
+
+  const template = await prisma.contractTemplate.create({
+    data: {
+      workspaceId: workspace.id,
+      name,
+      description: `Imported from ${file.name}. Review the clauses and add {placeholder} fields where terms should be filled in automatically.`,
+      requiredFieldCount: countPlaceholders(clauses),
+      clauses: JSON.stringify(clauses),
+    },
+  });
+
+  redirect(`/templates/${template.id}/edit`);
+}
+
+export async function updateTemplate(templateId: string, formData: FormData) {
+  const name = String(formData.get("name") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const clauses = parseClausesJson(String(formData.get("clausesJson") ?? "[]"));
+
+  if (!name) throw new Error("Template name is required");
+  if (clauses.length === 0) throw new Error("Add at least one clause");
+
+  await prisma.contractTemplate.update({
+    where: { id: templateId },
+    data: {
+      name,
+      description,
+      requiredFieldCount: countPlaceholders(clauses),
+      clauses: JSON.stringify(clauses),
+    },
+  });
+
+  redirect(`/templates/${templateId}`);
 }
 
 export async function deleteTemplate(templateId: string) {
