@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import { prisma } from "@/lib/db";
-import { generateContract } from "./actions";
+import { fillMissingFields, generateContract } from "./actions";
 
 const STATUS_LABEL: Record<string, string> = {
   processing: "Analyzing call…",
@@ -92,14 +92,18 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               <div className="rounded-t-[20px] border-b px-5 py-4" style={{ background: "var(--warn-soft)", borderColor: "rgba(245,185,77,.2)" }}>
                 <h2 className="text-[15px] font-medium" style={{ color: "var(--warn)" }}>Missing information</h2>
               </div>
-              <div className="px-5 py-3">
+              <form action={fillMissingFields.bind(null, deal.id)} className="px-5 py-3">
                 {missing.map((m) => (
                   <div key={m.id} className="border-b py-3 last:border-b-0" style={{ borderColor: "var(--hairline-soft)" }}>
-                    <div className="text-[13px] font-medium">{m.label}</div>
-                    <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>Not mentioned in the call — add it during review.</div>
+                    <label className="text-[13px] font-medium" htmlFor={m.id}>{m.label}</label>
+                    <div className="mb-2 mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>Not mentioned in the call — add it below.</div>
+                    <input id={m.id} name={m.id} required placeholder={`Add ${m.label.toLowerCase()}…`} className="input w-full" style={{ fontSize: "13px", padding: "8px 11px" }} />
                   </div>
                 ))}
-              </div>
+                <button type="submit" className="btn btn-primary mt-3 w-full justify-center">
+                  Save &amp; continue
+                </button>
+              </form>
             </div>
           ) : (
             <div className="card flex items-center gap-2 px-5 py-4 text-[13.5px] font-medium" style={{ color: "var(--success)" }}>
