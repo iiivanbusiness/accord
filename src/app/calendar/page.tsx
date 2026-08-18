@@ -1,5 +1,7 @@
+import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import { prisma } from "@/lib/db";
+import { deleteEvent } from "./actions";
 
 function formatDay(date: Date): string {
   const today = new Date();
@@ -33,6 +35,9 @@ export default async function CalendarPage() {
             Upcoming calls Accord will pick up automatically
           </div>
         </div>
+        <Link href="/calendar/new" className="btn btn-primary">
+          + New event
+        </Link>
       </div>
 
       <div className="mb-5 flex items-center gap-1.5 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
@@ -72,7 +77,14 @@ export default async function CalendarPage() {
                         </div>
                       </div>
                     </div>
-                    <span className="chip chip-neutral capitalize">{event.platform}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="chip chip-neutral capitalize">{event.platform}</span>
+                      <form action={deleteEvent.bind(null, event.id)}>
+                        <button type="submit" className="text-[12px] font-medium" style={{ color: "var(--ink-muted)" }}>
+                          Remove
+                        </button>
+                      </form>
+                    </div>
                   </div>
                 ))}
               </div>
