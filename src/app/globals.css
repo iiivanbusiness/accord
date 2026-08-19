@@ -186,3 +186,237 @@ a {
 .companion-field { opacity: 0; transform: translateY(4px); transition: opacity .4s ease, transform .4s ease; }
 .companion-field.shown { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) { .companion-field { transition: none; } }
+
+/* ---------- scroll reveal ---------- */
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s cubic-bezier(.16,1,.3,1), transform .7s cubic-bezier(.16,1,.3,1); }
+.reveal.shown { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
+
+/* ---------- hover lift ---------- */
+.lift { transition: transform .25s cubic-bezier(.16,1,.3,1), border-color .25s ease, box-shadow .25s ease; }
+.lift:hover { transform: translateY(-4px); border-color: rgba(255,255,255,.16); }
+
+/* ---------- hero floating chips ---------- */
+.hero-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  padding: 10px 14px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.35);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-float-1 { animation: heroFloat 6s ease-in-out infinite; }
+  .hero-float-2 { animation: heroFloat 6s ease-in-out infinite; animation-delay: 1.8s; }
+  @keyframes heroFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+}
+
+/* ---------- hero atmospheric glow ---------- */
+.hero-glow {
+  background: radial-gradient(closest-side, rgba(0,153,255,0.16), rgba(106,76,245,0.10) 55%, transparent 75%);
+  filter: blur(10px);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-glow { animation: glowPulse 7s ease-in-out infinite; }
+  @keyframes glowPulse { 0%, 100% { opacity: .7; } 50% { opacity: 1; } }
+}
+
+/* ---------- how it works: aurora band ---------- */
+.aurora-band {
+  position: absolute;
+  left: 50%;
+  bottom: -20px;
+  width: 92%;
+  height: 220px;
+  transform: translateX(-50%);
+  background:
+    radial-gradient(38% 90% at 15% 50%, rgba(106,76,245,0.55), transparent 70%),
+    radial-gradient(34% 85% at 42% 40%, rgba(212,77,240,0.45), transparent 70%),
+    radial-gradient(34% 85% at 68% 55%, rgba(255,85,119,0.40), transparent 70%),
+    radial-gradient(30% 80% at 90% 45%, rgba(255,122,61,0.40), transparent 70%);
+  filter: blur(50px);
+  opacity: .5;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .aurora-band { animation: auroraDrift 12s ease-in-out infinite; }
+  @keyframes auroraDrift {
+    0%, 100% { opacity: .45; transform: translateX(-50%) scale(1); }
+    50% { opacity: .62; transform: translateX(-50%) scale(1.04); }
+  }
+}
+
+/* ---------- how it works: call — waveform ---------- */
+.wave-bar {
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #8fd0ff, var(--accent-blue));
+  transform-origin: bottom;
+  transform: scaleY(.3);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .wave-bar { animation-name: wavePulse; animation-timing-function: cubic-bezier(.22,.8,.36,1); animation-iteration-count: infinite; }
+  @keyframes wavePulse { 0% { transform: scaleY(.3); } 30% { transform: scaleY(1); } 100% { transform: scaleY(.3); } }
+}
+
+.wave-glow { }
+@media (prefers-reduced-motion: no-preference) {
+  .wave-glow { animation: waveGlowBreathe 2.2s ease-in-out infinite; }
+  @keyframes waveGlowBreathe {
+    0%, 100% { transform: scale(1); opacity: .8; }
+    50% { transform: scale(1.15); opacity: 1; }
+  }
+}
+
+.wave-spark {
+  position: absolute;
+  bottom: 58px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  opacity: 0;
+  box-shadow: 0 0 6px 1px rgba(0,153,255,.6);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .wave-spark { animation: waveSpark 3.3s ease-out infinite; }
+  @keyframes waveSpark {
+    0% { opacity: 0; transform: translateY(0) scale(.6); }
+    15% { opacity: 1; transform: translateY(-4px) scale(1); }
+    70% { opacity: .5; transform: translateY(-30px) scale(.8); }
+    100% { opacity: 0; transform: translateY(-42px) scale(.4); }
+  }
+}
+
+/* ---------- how it works: draft — sequential line-by-line write ---------- */
+.draft-line {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent-blue);
+  transform-origin: left;
+}
+.draft-check { opacity: 0; transform: scale(.4); transform-box: fill-box; transform-origin: center; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .draft-line-1 { animation: draftLine1 4.4s cubic-bezier(.16,1,.3,1) infinite; }
+  .draft-line-2 { animation: draftLine2 4.4s cubic-bezier(.16,1,.3,1) infinite; }
+  .draft-line-3 { animation: draftLine3 4.4s cubic-bezier(.16,1,.3,1) infinite; }
+  .draft-line-4 { animation: draftLine4 4.4s cubic-bezier(.16,1,.3,1) infinite; }
+  /* lines type in sequence (1→4), then clear in reverse (4→1) — a deliberate "undo" wipe instead of a simultaneous snap */
+  @keyframes draftLine1 { 0%, 4% { transform: scaleX(0); opacity: .3; } 16%, 93% { transform: scaleX(1); opacity: 1; } 97%, 100% { transform: scaleX(0); opacity: .3; } }
+  @keyframes draftLine2 { 0%, 16% { transform: scaleX(0); opacity: .3; } 28%, 90% { transform: scaleX(1); opacity: 1; } 94%, 100% { transform: scaleX(0); opacity: .3; } }
+  @keyframes draftLine3 { 0%, 28% { transform: scaleX(0); opacity: .3; } 40%, 87% { transform: scaleX(1); opacity: 1; } 91%, 100% { transform: scaleX(0); opacity: .3; } }
+  @keyframes draftLine4 { 0%, 40% { transform: scaleX(0); opacity: .3; } 52%, 84% { transform: scaleX(1); opacity: 1; } 88%, 100% { transform: scaleX(0); opacity: .3; } }
+
+  .draft-check-1 { animation: draftCheck1 4.4s cubic-bezier(.34,1.56,.64,1) infinite; }
+  .draft-check-2 { animation: draftCheck2 4.4s cubic-bezier(.34,1.56,.64,1) infinite; }
+  .draft-check-3 { animation: draftCheck3 4.4s cubic-bezier(.34,1.56,.64,1) infinite; }
+  .draft-check-4 { animation: draftCheck4 4.4s cubic-bezier(.34,1.56,.64,1) infinite; }
+  @keyframes draftCheck1 { 0%, 16% { opacity: 0; transform: scale(.4); } 22% { opacity: 1; transform: scale(1); } 93% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(.4); } }
+  @keyframes draftCheck2 { 0%, 28% { opacity: 0; transform: scale(.4); } 34% { opacity: 1; transform: scale(1); } 90% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(.4); } }
+  @keyframes draftCheck3 { 0%, 40% { opacity: 0; transform: scale(.4); } 46% { opacity: 1; transform: scale(1); } 87% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(.4); } }
+  @keyframes draftCheck4 { 0%, 52% { opacity: 0; transform: scale(.4); } 58% { opacity: 1; transform: scale(1); } 84% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(.4); } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .draft-line { transform: scaleX(1); }
+  .draft-check { opacity: 1; transform: scale(1); }
+}
+
+.draft-cursor-wrap { opacity: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .draft-cursor-wrap { animation: draftCursorWrap 4.4s ease-in-out infinite; }
+  @keyframes draftCursorWrap { 0%, 40% { opacity: 0; } 46%, 83% { opacity: 1; } 88%, 100% { opacity: 0; } }
+}
+.draft-cursor {
+  display: inline-block;
+  width: 2.5px;
+  height: 14px;
+  background: var(--accent-blue);
+  border-radius: 1px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .draft-cursor { animation: cursorBlink 1s step-end infinite; }
+  @keyframes cursorBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+}
+
+/* ---------- how it works: signature — draw, glow trail, confirm ---------- */
+.sign-draw {
+  stroke-dasharray: 340;
+  stroke-dashoffset: 0;
+  opacity: 1;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sign-draw { animation: signDraw 3s cubic-bezier(.65,0,.35,1) infinite; }
+  @keyframes signDraw {
+    0% { stroke-dashoffset: 340; opacity: 0; }
+    8% { opacity: 1; }
+    50%, 78% { stroke-dashoffset: 0; opacity: 1; }
+    95%, 100% { stroke-dashoffset: 0; opacity: 0; }
+  }
+}
+.sign-draw.sign-glow {
+  stroke-dasharray: 340;
+  filter: blur(5px);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sign-draw.sign-glow { animation-name: signDrawGlow; }
+  @keyframes signDrawGlow {
+    0%, 8% { stroke-dashoffset: 340; opacity: 0; }
+    20% { opacity: .4; }
+    50%, 78% { stroke-dashoffset: 0; opacity: .4; }
+    95%, 100% { stroke-dashoffset: 0; opacity: 0; }
+  }
+}
+
+.sign-ink-dot { opacity: 0; transform: scale(0); transform-box: fill-box; transform-origin: center; }
+@media (prefers-reduced-motion: no-preference) {
+  .sign-ink-dot { animation: signInkDot 3s cubic-bezier(.34,1.56,.64,1) infinite; }
+  @keyframes signInkDot {
+    0%, 46% { opacity: 0; transform: scale(0); }
+    50% { opacity: 1; transform: scale(1.6); }
+    58% { opacity: .8; transform: scale(1); }
+    70%, 100% { opacity: 0; transform: scale(0); }
+  }
+}
+
+.sign-pulse { opacity: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .sign-pulse-outer { animation: signPulseOuter 3s cubic-bezier(.16,1,.3,1) infinite; }
+  .sign-pulse-inner { animation: signPulseInner 3s cubic-bezier(.16,1,.3,1) infinite; }
+  /* the outer ring dissolves as it expands — mimics ink diffusing rather than a generic notification ping */
+  @keyframes signPulseOuter {
+    0%, 48% { transform: scale(.6); opacity: 0; filter: blur(0px); }
+    56% { transform: scale(1); opacity: .5; filter: blur(0px); }
+    78% { transform: scale(1.75); opacity: 0; filter: blur(3px); }
+    100% { opacity: 0; }
+  }
+  @keyframes signPulseInner {
+    0%, 50% { transform: scale(.5); opacity: 0; }
+    58% { transform: scale(.85); opacity: .6; }
+    68% { transform: scale(1.3); opacity: 0; filter: blur(1.5px); }
+    100% { opacity: 0; }
+  }
+}
+
+.sign-stamp {
+  opacity: 0;
+  transform: scale(.7);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sign-stamp { animation: signStamp 3s cubic-bezier(.34,1.56,.64,1) infinite; }
+  @keyframes signStamp {
+    0%, 48% { opacity: 0; transform: scale(.6); }
+    60% { opacity: 1; transform: scale(1.08); }
+    68%, 88% { opacity: 1; transform: scale(1); }
+    97%, 100% { opacity: 0; transform: scale(.9); }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sign-pulse, .sign-stamp, .sign-ink-dot, .sign-glow { display: none; }
+}

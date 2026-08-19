@@ -7,9 +7,12 @@ export const authConfig = {
   callbacks: {
     authorized({ auth, request }) {
       const isPublic =
+        request.nextUrl.pathname === "/" ||
         request.nextUrl.pathname.startsWith("/login") ||
         request.nextUrl.pathname.startsWith("/sign") ||
-        request.nextUrl.pathname.startsWith("/api/contracts");
+        request.nextUrl.pathname.startsWith("/api/contracts") ||
+        request.nextUrl.pathname.startsWith("/terms") ||
+        request.nextUrl.pathname.startsWith("/privacy");
       if (isPublic) return true;
       return !!auth?.user;
     },

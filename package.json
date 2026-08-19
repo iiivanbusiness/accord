@@ -12,7 +12,8 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@prisma/adapter-better-sqlite3": "^7.9.1",
+    "@neondatabase/serverless": "^0.10.4",
+    "@prisma/adapter-neon": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "@react-pdf/renderer": "^4.6.1",
     "mammoth": "^1.12.1",
