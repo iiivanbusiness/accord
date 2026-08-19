@@ -3,9 +3,14 @@ export async function extractText(file: File): Promise<string> {
   const name = file.name.toLowerCase();
 
   if (name.endsWith(".pdf")) {
-    const { default: pdfParse } = await import("pdf-parse");
-    const data = await pdfParse(buffer);
-    return data.text;
+    const { PDFParse } = await import("pdf-parse");
+    const parser = new PDFParse({ data: buffer });
+    try {
+      const result = await parser.getText();
+      return result.text;
+    } finally {
+      await parser.destroy();
+    }
   }
   if (name.endsWith(".docx")) {
     const mammoth = await import("mammoth");
