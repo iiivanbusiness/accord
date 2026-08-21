@@ -162,6 +162,12 @@ a {
 }
 .theme-toggle:hover { background: var(--surface-2); color: var(--ink); }
 
+/* ---------- theme-aware brand logo: swap image instead of recoloring ---------- */
+.brand-logo-light { display: block; }
+.brand-logo-dark { display: none; }
+:root[data-theme="dark"] .sm-theme .brand-logo-light { display: none; }
+:root[data-theme="dark"] .sm-theme .brand-logo-dark { display: block; }
+
 /* ---------- buttons ---------- */
 .btn {
   display: inline-flex;

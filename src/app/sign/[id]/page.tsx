@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { fillClauses } from "@/lib/contract";
 import { signContract } from "./actions";
+import BrandLogo from "@/components/BrandLogo";
 
 export default async function SignPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -26,7 +27,8 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
           </div>
           <span className="text-[14px] font-medium">Horizon Media</span>
           <span style={{ color: "var(--ink-muted)" }}>·</span>
-          <span className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>via SealMe</span>
+          <span className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>via</span>
+          <BrandLogo height={13} className="opacity-70" />
         </div>
       </header>
 

@@ -2,6 +2,7 @@ import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 import { signIn } from "@/lib/auth";
 import ThemeToggle from "@/components/ThemeToggle";
+import BrandLogo from "@/components/BrandLogo";
 
 const ERROR_MESSAGE: Record<string, string> = {
   CredentialsSignin: "Wrong email or password.",
@@ -36,8 +37,8 @@ export default async function LoginPage({
         <ThemeToggle />
       </div>
       <div className="w-full max-w-[360px]">
-        <div className="mb-6 font-display text-[22px] font-semibold" style={{ letterSpacing: "-0.6px", color: "var(--ink)" }}>
-          SealMe
+        <div className="mb-6">
+          <BrandLogo height={24} />
         </div>
         <h1 className="mb-1 text-[24px] font-medium" style={{ letterSpacing: "-0.8px" }}>Sign in to SealMe</h1>
         <p className="mb-6 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>Horizon Media workspace</p>

@@ -11,14 +11,8 @@ export default function TermsPage() {
     <div style={{ background: "var(--canvas)", color: "var(--ink)" }} className="min-h-screen">
       <header className="sticky top-0 z-10" style={{ background: "rgba(9,9,9,0.8)", backdropFilter: "blur(10px)", borderBottom: "1px solid var(--hairline)" }}>
         <div className="mx-auto flex max-w-[820px] items-center justify-between px-6 py-4">
-          <Link href="/" className="flex items-center gap-2.5 text-[15px] font-semibold" style={{ letterSpacing: "-0.2px" }}>
-            <div
-              className="flex h-[26px] w-[26px] items-center justify-center rounded-[8px] font-display text-[13px] font-semibold"
-              style={{ background: "var(--primary)", color: "var(--on-primary)" }}
-            >
-              S
-            </div>
-            SealMe
+          <Link href="/" className="flex items-center">
+            <img src="/logo-dark.png" alt="SealMe" className="h-[18px] w-auto" />
           </Link>
           <Link href="/" className="text-[13px]" style={{ color: "var(--ink-muted)" }}>← Back to home</Link>
         </div>

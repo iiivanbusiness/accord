@@ -75,15 +75,7 @@ export default async function LandingPage() {
       {/* Nav */}
       <header className="sticky top-0 z-10" style={{ background: "rgba(9,9,9,0.8)", backdropFilter: "blur(10px)", borderBottom: "1px solid var(--hairline)" }}>
         <div className="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-2.5 text-[15px] font-semibold" style={{ letterSpacing: "-0.2px" }}>
-            <div
-              className="flex h-[26px] w-[26px] items-center justify-center rounded-[8px] font-display text-[13px] font-semibold"
-              style={{ background: "var(--primary)", color: "var(--on-primary)" }}
-            >
-              S
-            </div>
-            SealMe
-          </div>
+          <img src="/logo-dark.png" alt="SealMe" className="h-[20px] w-auto" />
           <nav className="hidden items-center gap-1 md:flex">
             <a href="#how-it-works" className="rounded-full px-3 py-2 text-[13px]" style={{ color: "var(--ink-muted)" }}>How it works</a>
             <a href="#pricing" className="rounded-full px-3 py-2 text-[13px]" style={{ color: "var(--ink-muted)" }}>Pricing</a>
@@ -306,15 +298,7 @@ export default async function LandingPage() {
       {/* Footer */}
       <footer style={{ borderTop: "1px solid var(--hairline)" }}>
         <div className="mx-auto flex max-w-[1200px] flex-col items-center justify-between gap-4 px-6 py-8 sm:flex-row">
-          <div className="flex items-center gap-2 text-[13px] font-medium" style={{ color: "var(--ink-muted)" }}>
-            <div
-              className="flex h-[20px] w-[20px] items-center justify-center rounded-[6px] font-display text-[11px] font-semibold"
-              style={{ background: "var(--surface-2)", color: "var(--ink)" }}
-            >
-              S
-            </div>
-            SealMe
-          </div>
+          <img src="/logo-dark.png" alt="SealMe" className="h-[16px] w-auto opacity-70" />
           <div className="flex flex-wrap items-center justify-center gap-5 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
             <a href="#how-it-works">How it works</a>
             <a href="#pricing">Pricing</a>
