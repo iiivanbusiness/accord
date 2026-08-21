@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import { prisma } from "@/lib/db";
 import { fillClauses } from "@/lib/contract";
-import { sendToClient } from "../actions";
 
 export default async function ContractPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -65,11 +64,9 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
           </div>
           <div className="flex flex-col gap-2.5 p-5 pt-2">
             {deal.contract.status === "draft" ? (
-              <form action={sendToClient.bind(null, deal.id)}>
-                <button type="submit" className="btn btn-primary w-full justify-center">
-                  Send to client
-                </button>
-              </form>
+              <Link href={`/deals/${deal.id}/send`} className="btn btn-primary w-full justify-center">
+                Send to client
+              </Link>
             ) : (
               <>
                 <button disabled className="btn btn-primary w-full justify-center">

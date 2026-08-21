@@ -1,7 +1,8 @@
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import { prisma } from "@/lib/db";
-import { createDeal } from "./actions";
+import { isExtractionConfigured } from "@/lib/extract-deal";
+import { createDeal, createDealFromTranscript } from "./actions";
 
 function Field({ label, name, placeholder, required }: { label: string; name: string; placeholder?: string; required?: boolean }) {
   return (
@@ -12,8 +13,15 @@ function Field({ label, name, placeholder, required }: { label: string; name: st
   );
 }
 
-export default async function NewDealPage() {
+export default async function NewDealPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string; error?: string }>;
+}) {
+  const { mode, error } = await searchParams;
+  const isManual = mode === "manual";
   const templates = await prisma.contractTemplate.findMany({ orderBy: { name: "asc" } });
+  const configured = isExtractionConfigured();
 
   return (
     <AppShell active="/deals" screenLabel="Upload a call">
@@ -21,35 +29,94 @@ export default async function NewDealPage() {
         ← Deals
       </Link>
 
-      <div className="mb-6 max-w-[520px]">
+      <div className="mb-6 max-w-[560px]">
         <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Upload a call</h1>
         <div className="mt-1 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-          Real transcription and extraction come with the Zoom integration — for now, enter what the call covered and it&apos;ll drop straight into the same review flow.
+          {isManual
+            ? "Enter what the call covered and it'll drop straight into the review flow."
+            : "Paste the call transcript and Claude will pull out the deal terms for you to review."}
         </div>
       </div>
 
-      <form action={createDeal} className="card flex max-w-[520px] flex-col gap-4 p-6">
-        <Field label="Client name" name="clientName" placeholder="Acme Fitness" required />
-        <Field label="Company" name="company" placeholder="Same as client name if blank" />
-        <Field label="Client email" name="email" placeholder="hello@client.com" />
-        <Field label="Service" name="service" placeholder="Social Media Management" required />
-        <Field label="Fee" name="feeDisplay" placeholder="€2,500 / month" required />
+      <div className="mb-5 flex gap-2">
+        <Link href="/deals/new" className="btn btn-sm" style={!isManual ? { background: "var(--primary)", color: "var(--on-primary)" } : { background: "var(--surface-1)", border: "1px solid var(--hairline)", color: "var(--ink-muted)" }}>
+          Paste a transcript
+        </Link>
+        <Link href="/deals/new?mode=manual" className="btn btn-sm" style={isManual ? { background: "var(--primary)", color: "var(--on-primary)" } : { background: "var(--surface-1)", border: "1px solid var(--hairline)", color: "var(--ink-muted)" }}>
+          Enter manually
+        </Link>
+      </div>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-medium">Template</span>
-          <select name="templateId" className="input">
-            {templates.map((t) => (
-              <option key={t.id} value={t.id} style={{ background: "var(--surface-1)" }}>
-                {t.name}
+      {error && (
+        <div className="chip chip-warn mb-4 max-w-[560px] w-full justify-start px-4 py-2.5 text-[12.5px]">
+          {error}
+        </div>
+      )}
+
+      {isManual ? (
+        <form action={createDeal} className="card flex max-w-[520px] flex-col gap-4 p-6">
+          <Field label="Client name" name="clientName" placeholder="Acme Fitness" required />
+          <Field label="Company" name="company" placeholder="Same as client name if blank" />
+          <Field label="Client email" name="email" placeholder="hello@client.com" />
+          <Field label="Service" name="service" placeholder="Social Media Management" required />
+          <Field label="Fee" name="feeDisplay" placeholder="€2,500 / month" required />
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-medium">Template</span>
+            <select name="templateId" className="input">
+              {templates.map((t) => (
+                <option key={t.id} value={t.id} style={{ background: "var(--surface-1)" }}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <button type="submit" className="btn btn-primary mt-2 w-full justify-center">
+            Start processing
+          </button>
+        </form>
+      ) : !configured ? (
+        <div className="card max-w-[560px] p-6 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+          Transcript extraction isn&apos;t set up yet — it needs an <span className="font-mono-tab">ANTHROPIC_API_KEY</span> in <span className="font-mono-tab">.env</span>. Use{" "}
+          <Link href="/deals/new?mode=manual" className="font-medium" style={{ color: "var(--accent-blue)" }}>
+            manual entry
+          </Link>{" "}
+          for now.
+        </div>
+      ) : (
+        <form action={createDealFromTranscript} className="card flex max-w-[560px] flex-col gap-4 p-6">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-medium">Call transcript</span>
+            <textarea
+              name="transcript"
+              required
+              rows={12}
+              placeholder="Agency: Hey, thanks for hopping on...
+Client: Of course, excited to talk about..."
+              className="input font-mono-tab text-[12.5px]"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-medium">Template</span>
+            <select name="templateId" required className="input">
+              <option value="" style={{ background: "var(--surface-1)" }}>
+                Choose a template
               </option>
-            ))}
-          </select>
-        </label>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id} style={{ background: "var(--surface-1)" }}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <button type="submit" className="btn btn-primary mt-2 w-full justify-center">
-          Start processing
-        </button>
-      </form>
+          <button type="submit" className="btn btn-primary mt-2 w-full justify-center">
+            Extract deal terms
+          </button>
+        </form>
+      )}
     </AppShell>
   );
 }

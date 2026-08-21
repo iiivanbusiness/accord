@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { sendContractEmail as sendEmail } from "@/lib/email";
 
 export async function generateContract(dealId: string) {
   const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { fields: true } });
@@ -62,7 +63,24 @@ export async function updateFieldValues(dealId: string, formData: FormData) {
   redirect(`/deals/${dealId}`);
 }
 
-export async function sendToClient(dealId: string) {
+export async function sendContractEmail(dealId: string, formData: FormData) {
+  const to = String(formData.get("to") ?? "").trim();
+  const subject = String(formData.get("subject") ?? "").trim();
+  const message = String(formData.get("message") ?? "").trim();
+  if (!to || !subject || !message) throw new Error("To, subject, and message are all required");
+
+  const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { contract: true } });
+  if (!deal || !deal.contract) throw new Error("Deal not found");
+
+  const workspace = await prisma.workspace.findFirst();
+  const signLink = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/sign/${deal.contract.id}`;
+
+  try {
+    await sendEmail({ to, subject, message, signLink, workspaceName: workspace?.name ?? "Your workspace" });
+  } catch {
+    redirect(`/deals/${dealId}/send?error=${encodeURIComponent("Couldn't send the email — check your Resend setup and try again.")}`);
+  }
+
   await prisma.contract.update({ where: { dealId }, data: { status: "sent", sentAt: new Date() } });
   await prisma.deal.update({ where: { id: dealId }, data: { status: "sent" } });
   redirect(`/deals/${dealId}/contract`);
