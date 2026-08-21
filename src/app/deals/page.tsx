@@ -94,7 +94,7 @@ export default async function DealsPage() {
             </thead>
             <tbody>
               {deals.map((deal) => (
-                <tr key={deal.id} className="transition-colors hover:bg-white/[0.03]">
+                <tr key={deal.id} className="row-hover transition-colors">
                   <td className="border-b px-5 py-4" style={{ borderColor: "var(--hairline-soft)" }}>
                     <Link href={`/deals/${deal.id}`} className="flex flex-col gap-0.5" style={{ color: "inherit" }}>
                       <span className="font-medium" style={{ color: "var(--ink)" }}>{deal.client.name}</span>

@@ -1,10 +1,6 @@
 import AppShell from "@/components/AppShell";
 import { prisma } from "@/lib/db";
-
-function parseFee(feeDisplay: string): number {
-  const match = feeDisplay.replace(/,/g, "").match(/[\d.]+/);
-  return match ? parseFloat(match[0]) : 0;
-}
+import { parseFee } from "@/lib/money";
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (

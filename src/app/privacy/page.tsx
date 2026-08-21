@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "Privacy Policy — Accord",
+  title: "Privacy Policy — SealMe",
 };
 
 const LAST_UPDATED = "August 19, 2026";
@@ -16,9 +16,9 @@ export default function PrivacyPage() {
               className="flex h-[26px] w-[26px] items-center justify-center rounded-[8px] font-display text-[13px] font-semibold"
               style={{ background: "var(--primary)", color: "var(--on-primary)" }}
             >
-              A
+              S
             </div>
-            Accord
+            SealMe
           </Link>
           <Link href="/" className="text-[13px]" style={{ color: "var(--ink-muted)" }}>← Back to home</Link>
         </div>
@@ -34,7 +34,7 @@ export default function PrivacyPage() {
         <div className="flex flex-col gap-10 text-[14.5px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>
           <Section title="1. Overview">
             <p>
-              This Privacy Policy explains how Accord (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) collects, uses, and shares information when you use our website and
+              This Privacy Policy explains how SealMe (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) collects, uses, and shares information when you use our website and
               service (the &quot;Service&quot;). It applies to workspace administrators, team members, and — where relevant — the sales prospects whose calls are
               processed through the Service.
             </p>
@@ -44,7 +44,7 @@ export default function PrivacyPage() {
             <p>We collect the following categories of information:</p>
             <ul className="ml-5 mt-2 flex list-disc flex-col gap-1.5">
               <li><strong style={{ color: "var(--ink)" }}>Account data</strong> — name, work email, password hash, and workspace details.</li>
-              <li><strong style={{ color: "var(--ink)" }}>Call data</strong> — audio captured during calls you connect to Accord, and the transcripts and deal
+              <li><strong style={{ color: "var(--ink)" }}>Call data</strong> — audio captured during calls you connect to SealMe, and the transcripts and deal
                 terms extracted from it.</li>
               <li><strong style={{ color: "var(--ink)" }}>Deal and contract data</strong> — client names, pricing, contract templates, clauses, and signature
                 records you create in the Service.</li>
@@ -66,7 +66,7 @@ export default function PrivacyPage() {
 
           <Section title="4. AI and Third-Party Processing">
             <p>
-              Call audio and transcripts may be processed by third-party AI model providers under contract with Accord in order to extract deal terms and
+              Call audio and transcripts may be processed by third-party AI model providers under contract with SealMe in order to extract deal terms and
               generate contract language. These providers are bound by confidentiality and data-processing terms and are not permitted to use your data to
               train their own general-purpose models unless you explicitly opt in.
             </p>
@@ -102,7 +102,7 @@ export default function PrivacyPage() {
             <p>
               Depending on your location, you may have the right to access, correct, export, or delete your personal information, and to object to or restrict
               certain processing. Workspace administrators can manage most of this directly in account settings; you can also contact us using the details
-              below. Prospects whose calls are processed through Accord may direct data requests to the workspace that initiated the call.
+              below. Prospects whose calls are processed through SealMe may direct data requests to the workspace that initiated the call.
             </p>
           </Section>
 
@@ -140,7 +140,7 @@ export default function PrivacyPage() {
 
       <footer style={{ borderTop: "1px solid var(--hairline)" }}>
         <div className="mx-auto flex max-w-[820px] items-center justify-between px-6 py-8 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-          <span>© {new Date().getFullYear()} Accord.</span>
+          <span>© {new Date().getFullYear()} SealMe.</span>
           <Link href="/terms">Terms of Service</Link>
         </div>
       </footer>

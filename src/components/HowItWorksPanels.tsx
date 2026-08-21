@@ -1,8 +1,8 @@
 import Reveal from "@/components/Reveal";
 
 const COLUMNS = [
-  { label: "The call", body: "Accord sits inside your Zoom or Meet call. It hears the terms as they're said. No notes needed.", Stage: CallStage },
-  { label: "The draft", body: "The moment terms are confirmed, Accord assembles the agreement from your templates, clause by clause.", Stage: DraftStage },
+  { label: "The call", body: "SealMe sits inside your Zoom or Meet call. It hears the terms as they're said. No notes needed.", Stage: CallStage },
+  { label: "The draft", body: "The moment terms are confirmed, SealMe assembles the agreement from your templates, clause by clause.", Stage: DraftStage },
   { label: "The signature", body: "The finished contract goes out for signature immediately. Signed before the call ends.", Stage: SignStage },
 ];
 

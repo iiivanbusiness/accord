@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "Terms of Service — Accord",
+  title: "Terms of Service — SealMe",
 };
 
 const LAST_UPDATED = "August 19, 2026";
@@ -16,9 +16,9 @@ export default function TermsPage() {
               className="flex h-[26px] w-[26px] items-center justify-center rounded-[8px] font-display text-[13px] font-semibold"
               style={{ background: "var(--primary)", color: "var(--on-primary)" }}
             >
-              A
+              S
             </div>
-            Accord
+            SealMe
           </Link>
           <Link href="/" className="text-[13px]" style={{ color: "var(--ink-muted)" }}>← Back to home</Link>
         </div>
@@ -34,7 +34,7 @@ export default function TermsPage() {
         <div className="flex flex-col gap-10 text-[14.5px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>
           <Section title="1. Agreement to Terms">
             <p>
-              These Terms of Service (&quot;Terms&quot;) govern your access to and use of Accord (&quot;Accord,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;), including our
+              These Terms of Service (&quot;Terms&quot;) govern your access to and use of SealMe (&quot;SealMe,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;), including our
               website, AI call companion, contract generation tools, e-signature features, and related services (collectively, the &quot;Service&quot;). By creating an
               account or using the Service, you agree to be bound by these Terms. If you are using the Service on behalf of an organization, you represent that
               you have the authority to bind that organization.
@@ -43,18 +43,18 @@ export default function TermsPage() {
 
           <Section title="2. Description of Service">
             <p>
-              Accord provides a companion tool that joins alongside your sales calls (via Zoom, Google Meet, or similar platforms), listens to the conversation,
-              extracts deal terms in real time, drafts a contract from your templates, and routes the finished document for electronic signature. Accord does not
+              SealMe provides a companion tool that joins alongside your sales calls (via Zoom, Google Meet, or similar platforms), listens to the conversation,
+              extracts deal terms in real time, drafts a contract from your templates, and routes the finished document for electronic signature. SealMe does not
               participate in calls as a visible attendee; it operates as a background overlay or connected integration.
             </p>
           </Section>
 
           <Section title="3. Call Recording and Consent">
             <p>
-              Accord processes live audio from sales calls in order to capture deal terms. <strong style={{ color: "var(--ink)" }}>You are solely responsible for
+              SealMe processes live audio from sales calls in order to capture deal terms. <strong style={{ color: "var(--ink)" }}>You are solely responsible for
               obtaining any consent required by law before recording or processing a call</strong> — including two-party/all-party consent requirements in
               certain jurisdictions (e.g., several U.S. states) and equivalent requirements under EU, UK, or other applicable law. We recommend notifying every
-              participant at the start of a call that it is being processed by Accord. Accord is not liable for your failure to obtain required consent.
+              participant at the start of a call that it is being processed by SealMe. SealMe is not liable for your failure to obtain required consent.
             </p>
           </Section>
 
@@ -80,7 +80,7 @@ export default function TermsPage() {
           <Section title="6. Your Content and Data Ownership">
             <p>
               You retain ownership of the call data, deal terms, templates, and contracts you submit to or generate through the Service (&quot;Customer Content&quot;).
-              You grant Accord a limited license to process, store, and transmit Customer Content solely to provide and improve the Service. We do not sell
+              You grant SealMe a limited license to process, store, and transmit Customer Content solely to provide and improve the Service. We do not sell
               Customer Content to third parties.
             </p>
           </Section>
@@ -88,7 +88,7 @@ export default function TermsPage() {
           <Section title="7. Third-Party Services">
             <p>
               The Service integrates with third-party platforms — including Zoom, Google Meet, and Google Calendar — and may use third-party AI model providers
-              to process call audio and transcripts. Your use of those integrations is also subject to the applicable third party&apos;s own terms. Accord is not
+              to process call audio and transcripts. Your use of those integrations is also subject to the applicable third party&apos;s own terms. SealMe is not
               responsible for the availability or behavior of third-party services.
             </p>
           </Section>
@@ -111,14 +111,14 @@ export default function TermsPage() {
           <Section title="10. Disclaimers">
             <p>
               The Service is provided &quot;as is&quot; without warranties of any kind, express or implied. AI-generated field extraction and contract drafts may
-              contain errors — you are responsible for reviewing any contract before it is sent for signature. Accord does not provide legal advice, and
+              contain errors — you are responsible for reviewing any contract before it is sent for signature. SealMe does not provide legal advice, and
               generated contracts do not constitute legal advice.
             </p>
           </Section>
 
           <Section title="11. Limitation of Liability">
             <p>
-              To the maximum extent permitted by law, Accord will not be liable for indirect, incidental, special, consequential, or punitive damages, or for
+              To the maximum extent permitted by law, SealMe will not be liable for indirect, incidental, special, consequential, or punitive damages, or for
               any loss of profits, data, or business arising from your use of the Service. Our total liability for any claim will not exceed the amount you
               paid us in the twelve months preceding the claim.
             </p>
@@ -126,7 +126,7 @@ export default function TermsPage() {
 
           <Section title="12. Governing Law">
             <p>
-              These Terms are governed by the laws of the jurisdiction in which Accord is incorporated, without regard to conflict-of-law principles. [Specific
+              These Terms are governed by the laws of the jurisdiction in which SealMe is incorporated, without regard to conflict-of-law principles. [Specific
               jurisdiction to be finalized with counsel.]
             </p>
           </Section>
@@ -146,7 +146,7 @@ export default function TermsPage() {
 
       <footer style={{ borderTop: "1px solid var(--hairline)" }}>
         <div className="mx-auto flex max-w-[820px] items-center justify-between px-6 py-8 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-          <span>© {new Date().getFullYear()} Accord.</span>
+          <span>© {new Date().getFullYear()} SealMe.</span>
           <Link href="/privacy">Privacy Policy</Link>
         </div>
       </footer>

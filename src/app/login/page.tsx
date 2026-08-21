@@ -1,6 +1,7 @@
 import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 import { signIn } from "@/lib/auth";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const ERROR_MESSAGE: Record<string, string> = {
   CredentialsSignin: "Wrong email or password.",
@@ -19,7 +20,7 @@ export default async function LoginPage({
       await signIn("credentials", {
         email: formData.get("email"),
         password: formData.get("password"),
-        redirectTo: callbackUrl || "/deals",
+        redirectTo: callbackUrl || "/dashboard",
       });
     } catch (err) {
       if (err instanceof AuthError) {
@@ -30,15 +31,15 @@ export default async function LoginPage({
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4" style={{ background: "var(--canvas)" }}>
+    <div className="sm-theme relative flex min-h-screen items-center justify-center px-4" style={{ background: "var(--canvas)" }}>
+      <div className="absolute right-6 top-6">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-[360px]">
-        <div
-          className="mb-6 flex h-[34px] w-[34px] items-center justify-center rounded-[10px] font-display text-[15px] font-semibold"
-          style={{ background: "var(--primary)", color: "var(--on-primary)" }}
-        >
-          A
+        <div className="mb-6 font-display text-[22px] font-semibold" style={{ letterSpacing: "-0.6px", color: "var(--ink)" }}>
+          SealMe
         </div>
-        <h1 className="mb-1 text-[24px] font-medium" style={{ letterSpacing: "-0.8px" }}>Sign in to Accord</h1>
+        <h1 className="mb-1 text-[24px] font-medium" style={{ letterSpacing: "-0.8px" }}>Sign in to SealMe</h1>
         <p className="mb-6 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>Horizon Media workspace</p>
 
         {error && (

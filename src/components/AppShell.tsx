@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import ThemeToggle from "./ThemeToggle";
 
 const NAV_ITEMS = [
+  { href: "/dashboard", label: "Dashboard", icon: DashboardIcon },
   { href: "/deals", label: "Deals", icon: DealsIcon },
   { href: "/calendar", label: "Calendar", icon: CalendarIcon },
   { href: "/analytics", label: "Analytics", icon: AnalyticsIcon },
@@ -10,6 +12,12 @@ const NAV_ITEMS = [
   { href: "/templates", label: "Templates", icon: TemplatesIcon },
   { href: "/settings", label: "Settings", icon: SettingsIcon },
 ] as const;
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
+}
 
 export default async function AppShell({
   active,
@@ -24,17 +32,17 @@ export default async function AppShell({
   const workspaceName = workspace?.name ?? "Workspace";
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--canvas)" }}>
+    <div className="sm-theme min-h-screen" style={{ background: "var(--canvas)" }}>
       <div className="grid min-h-screen" style={{ gridTemplateColumns: "76px 1fr" }}>
         <nav
           className="m-3.5 flex flex-col items-center gap-2 rounded-[20px] py-[18px]"
-          style={{ background: "var(--surface-1)", border: "1px solid var(--hairline)" }}
+          style={{ background: "var(--surface-1)", border: "1px solid var(--hairline)", boxShadow: "var(--shadow-card)" }}
         >
           <div
             className="mb-4 flex h-[34px] w-[34px] items-center justify-center rounded-[10px] font-display text-[15px] font-semibold"
             style={{ background: "var(--primary)", color: "var(--on-primary)" }}
           >
-            A
+            S
           </div>
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
@@ -60,7 +68,7 @@ export default async function AppShell({
         <div className="flex min-w-0 flex-col">
           <header
             className="m-3.5 flex items-center justify-between rounded-[20px] px-[22px] py-[13px]"
-            style={{ background: "var(--surface-1)", border: "1px solid var(--hairline)" }}
+            style={{ background: "var(--surface-1)", border: "1px solid var(--hairline)", boxShadow: "var(--shadow-card)" }}
           >
             <div className="flex items-center gap-2.5 text-[14px] font-medium" style={{ letterSpacing: "-0.14px" }}>
               <span style={{ color: "var(--ink)" }}>{workspaceName}</span>
@@ -68,11 +76,12 @@ export default async function AppShell({
               <span style={{ color: "var(--ink-muted)" }}>{screenLabel}</span>
             </div>
             <div className="flex items-center gap-2.5">
+              <ThemeToggle />
               <div
                 className="flex h-[29px] w-[29px] items-center justify-center rounded-full font-display text-[12px] font-semibold"
                 style={{ background: "var(--surface-2)", color: "var(--ink)" }}
               >
-                HM
+                {initials(workspaceName)}
               </div>
               <form
                 action={async () => {
@@ -96,6 +105,17 @@ export default async function AppShell({
 
 function iconProps() {
   return { viewBox: "0 0 20 20", fill: "none", stroke: "currentColor", strokeWidth: 1.6, width: 19, height: 19 } as const;
+}
+
+function DashboardIcon() {
+  return (
+    <svg {...iconProps()}>
+      <rect x="3" y="3" width="6.5" height="6.5" rx="1.4" />
+      <rect x="10.5" y="3" width="6.5" height="4.2" rx="1.4" />
+      <rect x="10.5" y="8.7" width="6.5" height="8.3" rx="1.4" />
+      <rect x="3" y="11" width="6.5" height="6" rx="1.4" />
+    </svg>
+  );
 }
 
 function DealsIcon() {

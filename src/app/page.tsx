@@ -6,7 +6,7 @@ import { auth } from "@/lib/auth";
 const FEATURES = [
   {
     title: "Never leave the call",
-    body: "The companion overlay lives inside the meeting itself — Accord never joins as a participant.",
+    body: "The companion overlay lives inside the meeting itself — SealMe never joins as a participant.",
   },
   {
     title: "No more chasing signatures",
@@ -80,9 +80,9 @@ export default async function LandingPage() {
               className="flex h-[26px] w-[26px] items-center justify-center rounded-[8px] font-display text-[13px] font-semibold"
               style={{ background: "var(--primary)", color: "var(--on-primary)" }}
             >
-              A
+              S
             </div>
-            Accord
+            SealMe
           </div>
           <nav className="hidden items-center gap-1 md:flex">
             <a href="#how-it-works" className="rounded-full px-3 py-2 text-[13px]" style={{ color: "var(--ink-muted)" }}>How it works</a>
@@ -132,7 +132,7 @@ export default async function LandingPage() {
           </div>
 
           <p className="mx-auto mt-6 max-w-[560px] text-[16px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>
-            Accord listens on the call, fills in the contract as your prospect talks, and gets it signed before they hang up. No follow-up, no cold leads.
+            SealMe listens on the call, fills in the contract as your prospect talks, and gets it signed before they hang up. No follow-up, no cold leads.
           </p>
           <div className="mt-8 flex items-center justify-center gap-3">
             <button type="button" className="btn btn-primary">
@@ -294,7 +294,7 @@ export default async function LandingPage() {
               Ready to close faster?
             </h2>
             <p className="relative z-10 max-w-[420px] text-[14px]" style={{ color: "var(--ink-muted)" }}>
-              Bring Accord to your next call and watch the contract write itself.
+              Bring SealMe to your next call and watch the contract write itself.
             </p>
             <button type="button" className="btn btn-primary relative z-10">
               Start closing deals
@@ -311,9 +311,9 @@ export default async function LandingPage() {
               className="flex h-[20px] w-[20px] items-center justify-center rounded-[6px] font-display text-[11px] font-semibold"
               style={{ background: "var(--surface-2)", color: "var(--ink)" }}
             >
-              A
+              S
             </div>
-            Accord
+            SealMe
           </div>
           <div className="flex flex-wrap items-center justify-center gap-5 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
             <a href="#how-it-works">How it works</a>
@@ -323,7 +323,7 @@ export default async function LandingPage() {
             <Link href="/login">Sign in</Link>
           </div>
           <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            © {new Date().getFullYear()} Accord.
+            © {new Date().getFullYear()} SealMe.
           </div>
         </div>
       </footer>

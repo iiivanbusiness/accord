@@ -95,7 +95,7 @@ export default function CompanionPreview({ templateName, clauses }: { templateNa
         <div className="border-b px-4 py-2" style={{ borderColor: "rgba(255,255,255,.16)" }}>
           <h2 className="flex items-center gap-2 text-[12.5px] font-semibold" style={{ color: "#fff" }}>
             <span className="chip-dot" style={{ background: "#fff", animation: "pulse 1.4s ease-in-out infinite" }} />
-            Accord Companion
+            SealMe Companion
           </h2>
           <span className="text-[11px]" style={{ color: "rgba(255,255,255,.7)" }}>{status}</span>
         </div>

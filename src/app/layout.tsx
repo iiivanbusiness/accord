@@ -14,13 +14,23 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Accord",
+  title: "SealMe",
   description: "Turn sales calls into signed contracts.",
 };
 
+const THEME_INIT_SCRIPT = `
+  try {
+    var t = localStorage.getItem("sealme-theme");
+    if (t === "dark") document.documentElement.setAttribute("data-theme", "dark");
+  } catch (e) {}
+`;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geist.variable} ${inter.variable} h-full antialiased`}>
+    <html lang="en" className={`${geist.variable} ${inter.variable} h-full antialiased`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

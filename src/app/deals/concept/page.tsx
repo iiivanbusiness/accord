@@ -32,7 +32,7 @@ export default async function ConceptPage() {
       </div>
 
       <div className="mb-6">
-        <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Accord, inside your Zoom call</h1>
+        <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>SealMe, inside your Zoom call</h1>
         <div className="mt-1 max-w-[620px] text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
           The Companion overlay lives in the corner of the call itself — captured terms, anything still missing, and the full contract without ever leaving the meeting.
         </div>
@@ -78,7 +78,7 @@ export default async function ConceptPage() {
       </div>
 
       <div className="mt-3 max-w-[760px] text-center text-[12px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>
-        This overlay lives inside your Zoom window while you talk — Accord never joins as a participant.
+        This overlay lives inside your Zoom window while you talk — SealMe never joins as a participant.
       </div>
     </AppShell>
   );

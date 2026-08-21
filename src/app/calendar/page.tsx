@@ -49,7 +49,7 @@ export default async function CalendarPage({
         <div>
           <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Calendar</h1>
           <div className="mt-1 text-[14px]" style={{ color: "var(--ink-muted)" }}>
-            Upcoming calls Accord will pick up automatically
+            Upcoming calls SealMe will pick up automatically
           </div>
         </div>
         <Link href="/calendar/new" className="btn btn-primary">
