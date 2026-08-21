@@ -98,9 +98,17 @@ export default async function DashboardPage() {
             Everything happening across your workspace
           </div>
         </div>
-        <Link href="/deals/new" className="btn btn-primary">
-          + Upload a call
-        </Link>
+        <div className="flex gap-2.5">
+          <a href="https://meet.google.com" target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
+            Google Meet
+          </a>
+          <a href="https://zoom.us" target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
+            Zoom
+          </a>
+          <Link href="/deals/new" className="btn btn-primary">
+            + Upload a call
+          </Link>
+        </div>
       </div>
 
       <div className="mb-5 grid grid-cols-2 gap-4 md:grid-cols-4">

@@ -45,17 +45,9 @@ export default async function DealsPage() {
             {deals.length} active — from first call to signed contract
           </div>
         </div>
-        <div className="flex gap-2.5">
-          <a href="https://meet.google.com" target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
-            Google Meet
-          </a>
-          <a href="https://zoom.us" target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
-            Zoom
-          </a>
-          <Link href="/deals/new" className="btn btn-primary">
-            + Upload a call
-          </Link>
-        </div>
+        <Link href="/deals/new" className="btn btn-primary">
+          + Upload a call
+        </Link>
       </div>
 
       <div className="mb-3.5 flex items-center gap-1.5 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
@@ -67,14 +59,6 @@ export default async function DealsPage() {
           </span>
         )}
       </div>
-
-      <Link
-        href="/deals/concept"
-        className="btn btn-secondary btn-sm mb-5 inline-flex"
-      >
-        See how this looks next to a real Zoom call
-        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 4l6 6-6 6" /></svg>
-      </Link>
 
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">

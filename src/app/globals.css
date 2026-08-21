@@ -236,30 +236,6 @@ a {
 .gradient-spotlight-violet { background: linear-gradient(155deg, var(--gradient-violet), #4a2fb8); }
 .gradient-spotlight-magenta { background: linear-gradient(155deg, var(--gradient-magenta), #8e2fb8); }
 
-/* ---------- concept: a real third-party Zoom window, kept visually distinct from our own UI ---------- */
-.zoom-window { border-radius: var(--r-xl); overflow: hidden; background: #18191b; border: 1px solid rgba(255,255,255,.08); }
-.zoom-titlebar { display: flex; align-items: center; justify-content: space-between; padding: 11px 16px; background: #0e0f10; font-size: 12.5px; color: #c9cbcd; }
-.zoom-titlebar .rec { display: flex; align-items: center; gap: 6px; color: #ff5a5a; font-weight: 600; }
-.zoom-titlebar .rec .dot { width: 6px; height: 6px; border-radius: 50%; background: #ff5a5a; }
-@media (prefers-reduced-motion: no-preference) {
-  .zoom-titlebar .rec .dot { animation: recPulse 1.4s ease-in-out infinite; }
-  @keyframes recPulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
-}
-.zoom-stage { position: relative; aspect-ratio: 16 / 9; background: #232427; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.zoom-stage .z-avatar-lg { width: 100px; height: 100px; border-radius: 50%; background: #3a3c40; color: #e6e7e8; display: flex; align-items: center; justify-content: center; font-weight: 600; font-family: var(--font-display); font-size: 32px; }
-.zoom-stage .name-tag { position: absolute; bottom: 12px; left: 12px; background: rgba(0,0,0,.55); color: #eee; font-size: 11px; padding: 3px 8px; border-radius: 5px; }
-
-.zoom-pip { width: 104px; height: 76px; flex: none; border-radius: 10px; background: #2c2d30; border: 1px solid rgba(255,255,255,.15); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
-.zoom-pip .z-avatar-sm { width: 34px; height: 34px; border-radius: 50%; background: #45474b; color: #e6e7e8; display: flex; align-items: center; justify-content: center; font-weight: 600; font-family: var(--font-display); font-size: 12px; }
-.zoom-pip .name-tag-sm { position: absolute; bottom: 4px; left: 4px; font-size: 9px; background: rgba(0,0,0,.55); color: #eee; padding: 1px 5px; border-radius: 4px; }
-.zoom-toolbar { display: flex; align-items: center; justify-content: center; gap: 26px; padding: 14px; background: #0e0f10; }
-.zoom-toolbar .z-icon { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #c9cbcd; font-size: 9.5px; }
-.zoom-toolbar .z-icon.end { color: #ff5a5a; }
-
-.companion-field { opacity: 0; transform: translateY(4px); transition: opacity .4s ease, transform .4s ease; }
-.companion-field.shown { opacity: 1; transform: none; }
-@media (prefers-reduced-motion: reduce) { .companion-field { transition: none; } }
-
 /* ---------- scroll reveal ---------- */
 .reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s cubic-bezier(.16,1,.3,1), transform .7s cubic-bezier(.16,1,.3,1); }
 .reveal.shown { opacity: 1; transform: none; }
