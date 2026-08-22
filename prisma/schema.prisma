@@ -89,6 +89,7 @@ model Deal {
   status     String   @default("processing") // processing | missing_info | ready | sent | signed
   source     String   @default("manual") // zoom | meet | manual | upload
   callLength String?
+  recallBotId String? @unique // set when a Recall.ai bot is capturing this call
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

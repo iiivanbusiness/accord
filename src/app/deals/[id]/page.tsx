@@ -63,7 +63,12 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         />
 
         <div className="flex flex-col gap-4">
-          {missing.length > 0 ? (
+          {deal.status === "processing" ? (
+            <div className="card flex items-center gap-2.5 px-5 py-4 text-[13.5px] font-medium" style={{ color: "var(--ink-muted)" }}>
+              <span className="chip-dot h-1.5 w-1.5 rounded-full" style={{ background: "var(--ink-muted)" }} />
+              Analyzing the call — this updates automatically once it ends.
+            </div>
+          ) : missing.length > 0 ? (
             <div className="card" style={{ borderColor: "rgba(245,185,77,.28)" }}>
               <div className="rounded-t-[20px] border-b px-5 py-4" style={{ background: "var(--warn-soft)", borderColor: "rgba(245,185,77,.2)" }}>
                 <h2 className="text-[15px] font-medium" style={{ color: "var(--warn)" }}>Missing information</h2>
@@ -94,7 +99,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               </Link>
             ) : (
               <form action={generateContract.bind(null, deal.id)}>
-                <button type="submit" disabled={missing.length > 0} className="btn btn-primary w-full justify-center">
+                <button type="submit" disabled={missing.length > 0 || deal.status === "processing"} className="btn btn-primary w-full justify-center">
                   Generate contract
                 </button>
               </form>

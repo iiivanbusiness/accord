@@ -108,3 +108,55 @@ export async function extractDealFromTranscript(transcript: string, placeholderK
     })),
   };
 }
+
+export type DealFieldRow = {
+  groupLabel: string;
+  label: string;
+  fieldKey: string;
+  value: string | null;
+  status: string;
+  confidence: number | null;
+  sourceQuote: string | null;
+  orderIndex: number;
+};
+
+export function buildDealFieldRows(
+  extracted: ExtractedDeal,
+  placeholderKeys: string[]
+): { fieldRows: DealFieldRow[]; hasMissing: boolean; service: string; fee: string } {
+  const byKey = new Map(extracted.fields.map((f) => [f.fieldKey, f]));
+
+  const fieldRows: DealFieldRow[] = placeholderKeys.map((fieldKey, i) => {
+    const meta = fieldMeta(fieldKey);
+    const extractedField = byKey.get(fieldKey);
+    return {
+      groupLabel: meta.groupLabel,
+      label: meta.label,
+      fieldKey,
+      value: extractedField?.value ?? null,
+      status: extractedField?.value ? "extracted" : "missing",
+      confidence: extractedField?.confidence ?? null,
+      sourceQuote: extractedField?.sourceQuote ?? null,
+      orderIndex: i,
+    };
+  });
+  if (!fieldRows.some((f) => f.fieldKey === "clientName")) {
+    fieldRows.unshift({
+      groupLabel: "Client & engagement",
+      label: "Client",
+      fieldKey: "clientName",
+      value: extracted.clientName,
+      status: "extracted",
+      confidence: 1,
+      sourceQuote: null,
+      orderIndex: -1,
+    });
+  }
+
+  return {
+    fieldRows,
+    hasMissing: fieldRows.some((f) => f.status === "missing"),
+    service: byKey.get("service")?.value ?? "",
+    fee: byKey.get("fee")?.value ?? "",
+  };
+}

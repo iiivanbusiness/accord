@@ -2,8 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { extractDealFromTranscript, fieldMeta } from "@/lib/extract-deal";
+import { extractDealFromTranscript, buildDealFieldRows } from "@/lib/extract-deal";
 import { extractPlaceholderKeys } from "@/lib/contract";
+import { createCallBot, detectPlatformFromUrl } from "@/lib/recall";
 
 export async function createDeal(formData: FormData) {
   const clientName = String(formData.get("clientName") ?? "").trim();
@@ -73,9 +74,7 @@ export async function createDealFromTranscript(formData: FormData) {
     redirect(`/deals/new?error=${encodeURIComponent("Couldn't extract deal terms from that transcript — try again or enter it manually.")}`);
   }
 
-  const byKey = new Map(extracted.fields.map((f) => [f.fieldKey, f]));
-  const service = byKey.get("service")?.value ?? "";
-  const fee = byKey.get("fee")?.value ?? "";
+  const { fieldRows, hasMissing, service, fee } = buildDealFieldRows(extracted, placeholderKeys);
 
   const client = await prisma.client.create({
     data: {
@@ -85,35 +84,6 @@ export async function createDealFromTranscript(formData: FormData) {
       email: extracted.email,
     },
   });
-
-  const fieldRows = placeholderKeys.map((fieldKey, i) => {
-    const meta = fieldMeta(fieldKey);
-    const extractedField = byKey.get(fieldKey);
-    return {
-      groupLabel: meta.groupLabel,
-      label: meta.label,
-      fieldKey,
-      value: extractedField?.value ?? null,
-      status: extractedField?.value ? "extracted" : "missing",
-      confidence: extractedField?.confidence ?? null,
-      sourceQuote: extractedField?.sourceQuote ?? null,
-      orderIndex: i,
-    };
-  });
-  if (!fieldRows.some((f) => f.fieldKey === "clientName")) {
-    fieldRows.unshift({
-      groupLabel: "Client & engagement",
-      label: "Client",
-      fieldKey: "clientName",
-      value: extracted.clientName,
-      status: "extracted",
-      confidence: 1,
-      sourceQuote: null,
-      orderIndex: -1,
-    });
-  }
-
-  const hasMissing = fieldRows.some((f) => f.status === "missing");
 
   const deal = await prisma.deal.create({
     data: {
@@ -125,6 +95,50 @@ export async function createDealFromTranscript(formData: FormData) {
       status: hasMissing ? "missing_info" : "ready",
       source: "upload",
       fields: { create: fieldRows },
+    },
+  });
+
+  await prisma.workspace.update({
+    where: { id: workspace.id },
+    data: { callsUsedThisMonth: { increment: 1 } },
+  });
+
+  redirect(`/deals/${deal.id}`);
+}
+
+export async function startCallBot(formData: FormData) {
+  const meetingUrl = String(formData.get("meetingUrl") ?? "").trim();
+  const clientName = String(formData.get("clientName") ?? "").trim();
+  const templateId = String(formData.get("templateId") ?? "").trim();
+
+  if (!meetingUrl) throw new Error("Paste the meeting link first");
+  if (!clientName) throw new Error("Enter who you're meeting with");
+  if (!templateId) throw new Error("Choose a template");
+
+  const workspace = await prisma.workspace.findFirst();
+  if (!workspace) throw new Error("No workspace found");
+
+  let bot;
+  try {
+    bot = await createCallBot(meetingUrl);
+  } catch {
+    redirect(`/deals/new?mode=live&error=${encodeURIComponent("Couldn't start the call bot — check the meeting link and try again.")}`);
+  }
+
+  const client = await prisma.client.create({
+    data: { workspaceId: workspace.id, name: clientName, company: clientName },
+  });
+
+  const deal = await prisma.deal.create({
+    data: {
+      workspaceId: workspace.id,
+      clientId: client.id,
+      templateId,
+      service: "",
+      feeDisplay: "",
+      status: "processing",
+      source: detectPlatformFromUrl(meetingUrl),
+      recallBotId: bot.id,
     },
   });
 
