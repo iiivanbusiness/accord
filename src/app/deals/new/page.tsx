@@ -92,9 +92,17 @@ export default async function NewDealPage({
           </button>
         </form>
       ) : isLive ? (
-        !recallConfigured ? (
+        !recallConfigured || !extractionConfigured ? (
           <div className="card max-w-[560px] p-6 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-            Live calls aren&apos;t set up yet — they need a <span className="font-mono-tab">RECALL_API_KEY</span> in <span className="font-mono-tab">.env</span>. Use{" "}
+            Live calls aren&apos;t fully set up yet — they need both a{" "}
+            <span className="font-mono-tab">RECALL_API_KEY</span> and an <span className="font-mono-tab">ANTHROPIC_API_KEY</span> in{" "}
+            <span className="font-mono-tab">.env</span>
+            {!recallConfigured && !extractionConfigured
+              ? " (both are missing)"
+              : !recallConfigured
+                ? " (Recall is missing)"
+                : " (Anthropic is missing)"}
+            . Use{" "}
             <Link href="/deals/new?mode=manual" className="font-medium" style={{ color: "var(--accent-blue)" }}>
               manual entry
             </Link>{" "}

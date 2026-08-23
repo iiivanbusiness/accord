@@ -90,6 +90,8 @@ model Deal {
   source     String   @default("manual") // zoom | meet | manual | upload
   callLength String?
   recallBotId String? @unique // set when a Recall.ai bot is capturing this call
+  liveTranscript  String?   // accumulated utterances while a live call is in progress
+  lastExtractedAt DateTime? // throttles re-extraction during a live call
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -112,6 +114,8 @@ model DealField {
   confidence Float?
   sourceQuote String?
   orderIndex Int     @default(0)
+
+  @@unique([dealId, fieldKey])
 }
 
 model Contract {

@@ -18,6 +18,7 @@ export function detectPlatformFromUrl(meetingUrl: string): string {
 }
 
 export async function createCallBot(meetingUrl: string): Promise<{ id: string }> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const res = await fetch(`${API_BASE}/bot/`, {
     method: "POST",
     headers: authHeaders(),
@@ -25,7 +26,17 @@ export async function createCallBot(meetingUrl: string): Promise<{ id: string }>
       meeting_url: meetingUrl,
       bot_name: "SealMe Notetaker",
       recording_config: {
-        transcript: { provider: { recallai_streaming: {} } },
+        transcript: {
+          provider: { recallai_streaming: { mode: "prioritize_low_latency", language_code: "en" } },
+          diarization: { use_separate_streams_when_available: true },
+        },
+        realtime_endpoints: [
+          {
+            type: "webhook",
+            url: `${appUrl}/api/recall/realtime`,
+            events: ["transcript.data"],
+          },
+        ],
       },
     }),
   });
@@ -74,4 +85,25 @@ export async function verifyRecallWebhook(payload: string, headers: Record<strin
   if (!secret) throw new Error("RECALL_WEBHOOK_SECRET isn't set");
   const wh = new Webhook(secret);
   return wh.verify(payload, headers);
+}
+
+type RealtimeTranscriptEvent = {
+  event: string;
+  data: {
+    bot: { id: string };
+    data: {
+      words?: { text: string }[];
+      participant?: { name?: string | null };
+    };
+  };
+};
+
+export function parseRealtimeTranscriptEvent(event: unknown): { botId: string; speaker: string; text: string } | null {
+  const e = event as RealtimeTranscriptEvent;
+  if (e?.event !== "transcript.data") return null;
+  const botId = e.data?.bot?.id;
+  const text = (e.data?.data?.words ?? []).map((w) => w.text).join(" ").trim();
+  if (!botId || !text) return null;
+  const speaker = e.data?.data?.participant?.name ?? "Speaker";
+  return { botId, speaker, text };
 }

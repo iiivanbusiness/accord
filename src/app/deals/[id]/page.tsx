@@ -66,7 +66,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
           {deal.status === "processing" ? (
             <div className="card flex items-center gap-2.5 px-5 py-4 text-[13.5px] font-medium" style={{ color: "var(--ink-muted)" }}>
               <span className="chip-dot h-1.5 w-1.5 rounded-full" style={{ background: "var(--ink-muted)" }} />
-              Analyzing the call — this updates automatically once it ends.
+              Analyzing the call — terms appear here live as they're mentioned.
             </div>
           ) : missing.length > 0 ? (
             <div className="card" style={{ borderColor: "rgba(245,185,77,.28)" }}>

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { fetchBotTranscript, verifyRecallWebhook } from "@/lib/recall";
-import { extractDealFromTranscript, buildDealFieldRows } from "@/lib/extract-deal";
+import { applyExtractionToDeal } from "@/lib/deal-live";
 import { extractPlaceholderKeys } from "@/lib/contract";
 
 type RecallWebhookPayload = {
@@ -25,35 +25,20 @@ export async function POST(req: Request) {
   }
 
   const botId = event.data.bot.id;
-  const deal = await prisma.deal.findUnique({ where: { recallBotId: botId }, include: { client: true, template: true } });
+  const deal = await prisma.deal.findUnique({ where: { recallBotId: botId }, include: { template: true } });
   if (!deal || !deal.template) return NextResponse.json({ ok: true });
 
   try {
+    // The full post-call recording transcribes more accurately than the live stream —
+    // this is the final, authoritative pass, reconciling anything the live pass missed.
     const transcript = await fetchBotTranscript(botId);
     const placeholderKeys = extractPlaceholderKeys(deal.template.clauses);
-    const extracted = await extractDealFromTranscript(transcript, placeholderKeys);
-    const { fieldRows, hasMissing, service, fee } = buildDealFieldRows(extracted, placeholderKeys);
-
-    await prisma.client.update({
-      where: { id: deal.clientId },
-      data: {
-        company: extracted.company ?? deal.client.company,
-        email: extracted.email ?? deal.client.email,
-      },
-    });
-
-    await prisma.deal.update({
-      where: { id: deal.id },
-      data: {
-        service,
-        feeDisplay: fee,
-        status: hasMissing ? "missing_info" : "ready",
-        fields: { create: fieldRows },
-      },
-    });
+    await applyExtractionToDeal(deal.id, transcript, placeholderKeys);
   } catch (err) {
     console.error(`Recall webhook: failed to process bot ${botId}`, err);
-    await prisma.deal.update({ where: { id: deal.id }, data: { status: "missing_info" } });
+    if (deal.status !== "sent" && deal.status !== "signed") {
+      await prisma.deal.update({ where: { id: deal.id }, data: { status: "missing_info" } });
+    }
   }
 
   return NextResponse.json({ ok: true });
