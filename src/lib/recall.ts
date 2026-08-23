@@ -27,7 +27,11 @@ export async function createCallBot(meetingUrl: string): Promise<{ id: string }>
       bot_name: "SealMe Notetaker",
       recording_config: {
         transcript: {
-          provider: { recallai_streaming: { mode: "prioritize_low_latency", language_code: "en" } },
+          // "prioritize_low_latency" only transcribes English. Auto-detecting the
+          // language needs "prioritize_accuracy", which delivers transcript events
+          // every 3-10 minutes instead of every few seconds — still well within a
+          // typical call, just not instant.
+          provider: { recallai_streaming: { mode: "prioritize_accuracy", language_code: "auto" } },
           diarization: { use_separate_streams_when_available: true },
         },
         realtime_endpoints: [
