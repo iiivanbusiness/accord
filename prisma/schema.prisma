@@ -27,6 +27,14 @@ model Workspace {
   googleTokenExpiresAt DateTime?
   googleAccountEmail   String?
 
+  // Custom sending domain, verified with Resend, so contracts go out as
+  // "you@yourcompany.com" instead of "via SealMe". senderDomainStatus mirrors
+  // Resend's domain status ("pending" | "verified" | "failed") until verified.
+  senderDomain       String?
+  senderDomainId     String?
+  senderDomainStatus String?
+  senderEmail        String?
+
   createdAt          DateTime @default(now())
 
   users           User[]
@@ -43,7 +51,7 @@ model User {
   workspace    Workspace @relation(fields: [workspaceId], references: [id])
   name         String
   email        String    @unique
-  passwordHash String
+  passwordHash String? // null for accounts created via Google sign-in
   createdAt    DateTime  @default(now())
 }
 

@@ -80,9 +80,10 @@ export async function sendContractEmail(dealId: string, formData: FormData) {
   const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId }, include: { users: true } });
   const signLink = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/sign/${deal.contract.id}`;
   const replyTo = workspace?.users[0]?.email ?? null;
+  const verifiedSenderEmail = workspace?.senderDomainStatus === "verified" ? workspace.senderEmail : null;
 
   try {
-    await sendEmail({ to, subject, message, signLink, workspaceName: workspace?.name ?? "Your workspace", replyTo });
+    await sendEmail({ to, subject, message, signLink, workspaceName: workspace?.name ?? "Your workspace", replyTo, verifiedSenderEmail });
   } catch {
     redirect(`/deals/${dealId}/send?error=${encodeURIComponent("Couldn't send the email — check your Resend setup and try again.")}`);
   }

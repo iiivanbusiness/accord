@@ -1,7 +1,15 @@
 import AppShell from "@/components/AppShell";
 import { prisma } from "@/lib/db";
 import { requireWorkspaceId } from "@/lib/workspace";
-import { requestUpgrade, toggleWorkspaceFlag, updateWorkspaceName } from "./actions";
+import { getSenderDomainStatus, type SenderDomainRecord } from "@/lib/sender-domain";
+import {
+  checkSenderDomainVerification,
+  connectSenderDomain,
+  disconnectSenderDomain,
+  requestUpgrade,
+  toggleWorkspaceFlag,
+  updateWorkspaceName,
+} from "./actions";
 
 function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notifyOnSigned" | "autoRemind" }) {
   return (
@@ -27,6 +35,16 @@ export default async function SettingsPage() {
   if (!workspace) return null;
   const notifyEmail = workspace.users[0]?.email ?? "your account email";
   const pendingUpgrade = await prisma.upgradeRequest.findFirst({ where: { workspaceId, status: "pending" } });
+
+  let senderRecords: SenderDomainRecord[] = [];
+  if (workspace.senderDomainId && workspace.senderDomainStatus !== "verified") {
+    try {
+      const live = await getSenderDomainStatus(workspace.senderDomainId);
+      senderRecords = live.records;
+    } catch {
+      // Resend lookup failed — fall back to showing the last known status below
+    }
+  }
 
   return (
     <AppShell active="/settings" screenLabel="Settings">
@@ -120,6 +138,98 @@ export default async function SettingsPage() {
               </form>
             )}
           </div>
+        </div>
+      </div>
+
+      <div className="card mb-4 max-w-[600px]">
+        <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
+          <h2 className="text-[15px] font-medium">Sending domain</h2>
+        </div>
+        <div className="px-[22px] py-[18px]">
+          {!workspace.senderDomain ? (
+            <>
+              <p className="mb-3 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
+                Verify your own domain so contracts go out as you, not &ldquo;via SealMe&rdquo;.
+              </p>
+              <form action={connectSenderDomain} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <input
+                  name="mailbox"
+                  defaultValue="hello"
+                  placeholder="hello"
+                  className="input"
+                  style={{ fontSize: "13px", padding: "8px 11px", width: 110 }}
+                />
+                <span className="text-[13px]" style={{ color: "var(--ink-muted)" }}>@</span>
+                <input
+                  name="domain"
+                  required
+                  placeholder="yourcompany.com"
+                  className="input flex-1"
+                  style={{ fontSize: "13px", padding: "8px 11px" }}
+                />
+                <button type="submit" className="btn btn-primary btn-sm">Connect</button>
+              </form>
+            </>
+          ) : workspace.senderDomainStatus === "verified" ? (
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="chip chip-success">Verified ✓</div>
+                <div className="mt-2 text-[13px] font-medium">{workspace.senderEmail}</div>
+                <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>Contracts are sent from this address.</div>
+              </div>
+              <form action={disconnectSenderDomain}>
+                <button type="submit" className="btn btn-secondary btn-sm">Change</button>
+              </form>
+            </div>
+          ) : (
+            <>
+              <div className="mb-3 flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-[13.5px] font-medium">{workspace.senderDomain}</div>
+                  <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
+                    Add these DNS records at your domain host, then check verification.
+                  </div>
+                </div>
+              </div>
+              {senderRecords.length > 0 && (
+                <div className="mb-3 overflow-x-auto rounded-[10px]" style={{ border: "1px solid var(--hairline)" }}>
+                  <table className="w-full border-collapse text-[12px]">
+                    <thead>
+                      <tr>
+                        {["Type", "Name", "Value", "Status"].map((h) => (
+                          <th key={h} className="border-b px-3 py-2 text-left font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)", borderColor: "var(--hairline)" }}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {senderRecords.map((rec, i) => (
+                        <tr key={i}>
+                          <td className="font-mono-tab border-b px-3 py-2" style={{ borderColor: "var(--hairline-soft)" }}>{rec.type}</td>
+                          <td className="font-mono-tab border-b px-3 py-2 break-all" style={{ borderColor: "var(--hairline-soft)" }}>{rec.name}</td>
+                          <td className="font-mono-tab border-b px-3 py-2 break-all" style={{ borderColor: "var(--hairline-soft)" }}>{rec.value}</td>
+                          <td className="border-b px-3 py-2" style={{ borderColor: "var(--hairline-soft)" }}>
+                            <span className={`chip ${rec.status === "verified" ? "chip-success" : "chip-neutral"}`} style={{ fontSize: 11 }}>
+                              {rec.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <form action={checkSenderDomainVerification}>
+                  <button type="submit" className="btn btn-primary btn-sm">Check verification</button>
+                </form>
+                <form action={disconnectSenderDomain}>
+                  <button type="submit" className="btn btn-secondary btn-sm">Start over</button>
+                </form>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
