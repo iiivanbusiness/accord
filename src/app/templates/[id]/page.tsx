@@ -29,8 +29,8 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
         <span className="chip chip-neutral">{clauses.length} clauses</span>
       </div>
 
-      <div className="grid gap-[18px]" style={{ gridTemplateColumns: "1fr 260px" }}>
-        <div className="card px-[46px] py-[42px]">
+      <div className="grid grid-cols-1 gap-[18px] lg:grid-cols-[1fr_260px]">
+        <div className="card px-5 py-7 md:px-[46px] md:py-[42px]">
           {clauses.map((clause, i) => (
             <div key={clause.title + i} className="mb-5 max-w-[64ch] last:mb-0">
               <h3 className="mb-1.5 flex gap-2 text-[14px] font-semibold">

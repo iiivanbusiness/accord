@@ -48,7 +48,7 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
           </div>
         )}
 
-        <div className="card px-[46px] py-[42px]">
+        <div className="card px-5 py-7 md:px-[46px] md:py-[42px]">
           <div className="mb-1.5 text-[22px] font-medium" style={{ letterSpacing: "-0.6px" }}>{contract.template.name}</div>
           <div className="mb-7 border-b pb-[22px] text-[13.5px]" style={{ color: "var(--ink-muted)", borderColor: "var(--hairline-soft)" }}>
             Between {contract.deal.workspace.name} and {contract.deal.client.name}

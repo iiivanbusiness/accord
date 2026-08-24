@@ -84,7 +84,7 @@ export default async function AnalyticsPage() {
         <StatCard label="Avg. time to signature" value={avgSignDays === "—" ? avgSignDays : `${avgSignDays}d`} sub="From send to signed" />
       </div>
 
-      <div className="grid gap-[18px]" style={{ gridTemplateColumns: "1fr 1fr" }}>
+      <div className="grid grid-cols-1 gap-[18px] md:grid-cols-2">
         <div className="card">
           <div className="border-b px-5 py-4" style={{ borderColor: "var(--hairline)" }}>
             <h2 className="text-[15px] font-medium">Deals by status</h2>

@@ -58,7 +58,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         </span>
       </div>
 
-      <div className="grid gap-[18px]" style={{ gridTemplateColumns: "1fr 300px" }}>
+      <div className="grid grid-cols-1 gap-[18px] lg:grid-cols-[1fr_300px]">
         <DealTermsCard
           groups={[...groups.entries()].filter(([label]) => label !== "Missing")}
           updateAction={updateFieldValues.bind(null, deal.id)}

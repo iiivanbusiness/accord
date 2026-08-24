@@ -3,6 +3,7 @@ import { signOut } from "@/lib/auth";
 import { requireWorkspace } from "@/lib/workspace";
 import ThemeToggle from "./ThemeToggle";
 import BrandLogo from "./BrandLogo";
+import MobileNavDrawer from "./MobileNavDrawer";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: DashboardIcon },
@@ -32,74 +33,89 @@ export default async function AppShell({
   const workspace = await requireWorkspace();
   const workspaceName = workspace.name;
 
+  const navLinks = (
+    <div className="flex flex-1 flex-col gap-1">
+      {NAV_ITEMS.map((item) => {
+        const Icon = item.icon;
+        const isActive = item.href === active;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-[13.5px] font-medium transition-colors"
+            style={
+              isActive
+                ? { background: "var(--primary)", color: "var(--on-primary)" }
+                : { color: "var(--ink-muted)" }
+            }
+          >
+            <Icon />
+            {item.label}
+          </Link>
+        );
+      })}
+    </div>
+  );
+
+  const workspaceFooter = (
+    <div className="mt-4 flex flex-col gap-3 border-t pt-4" style={{ borderColor: "var(--hairline-soft)" }}>
+      <div className="flex items-center gap-2.5 px-2">
+        <div
+          className="flex h-[29px] w-[29px] flex-none items-center justify-center rounded-full font-display text-[12px] font-semibold"
+          style={{ background: "var(--surface-2)", color: "var(--ink)" }}
+        >
+          {initials(workspaceName)}
+        </div>
+        <span className="truncate text-[13px] font-medium" style={{ color: "var(--ink)" }}>{workspaceName}</span>
+      </div>
+      <form
+        action={async () => {
+          "use server";
+          await signOut({ redirectTo: "/login" });
+        }}
+      >
+        <button type="submit" className="w-full rounded-[10px] px-3 py-2 text-left text-[13px] font-medium transition-colors" style={{ color: "var(--ink-muted)" }}>
+          Sign out
+        </button>
+      </form>
+    </div>
+  );
+
   return (
     <div className="sm-theme min-h-screen" style={{ background: "var(--canvas)" }}>
-      <div className="grid min-h-screen" style={{ gridTemplateColumns: "232px 1fr" }}>
+      <div className="grid min-h-screen grid-cols-1 md:grid-cols-[232px_1fr]">
         <nav
-          className="m-3.5 flex flex-col rounded-[20px] px-3.5 py-[22px]"
+          className="m-3.5 hidden flex-col rounded-[20px] px-3.5 py-[22px] md:flex"
           style={{ background: "var(--surface-1)", border: "1px solid var(--hairline)", boxShadow: "var(--shadow-card)" }}
         >
           <div className="mb-7 px-2">
             <BrandLogo height={20} />
           </div>
-
-          <div className="flex flex-1 flex-col gap-1">
-            {NAV_ITEMS.map((item) => {
-              const Icon = item.icon;
-              const isActive = item.href === active;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-[13.5px] font-medium transition-colors"
-                  style={
-                    isActive
-                      ? { background: "var(--primary)", color: "var(--on-primary)" }
-                      : { color: "var(--ink-muted)" }
-                  }
-                >
-                  <Icon />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
-
-          <div className="mt-4 flex flex-col gap-3 border-t pt-4" style={{ borderColor: "var(--hairline-soft)" }}>
-            <div className="flex items-center gap-2.5 px-2">
-              <div
-                className="flex h-[29px] w-[29px] flex-none items-center justify-center rounded-full font-display text-[12px] font-semibold"
-                style={{ background: "var(--surface-2)", color: "var(--ink)" }}
-              >
-                {initials(workspaceName)}
-              </div>
-              <span className="truncate text-[13px] font-medium" style={{ color: "var(--ink)" }}>{workspaceName}</span>
-            </div>
-            <form
-              action={async () => {
-                "use server";
-                await signOut({ redirectTo: "/login" });
-              }}
-            >
-              <button type="submit" className="w-full rounded-[10px] px-3 py-2 text-left text-[13px] font-medium transition-colors" style={{ color: "var(--ink-muted)" }}>
-                Sign out
-              </button>
-            </form>
-          </div>
+          {navLinks}
+          {workspaceFooter}
         </nav>
 
         <div className="flex min-w-0 flex-col">
           <header
-            className="m-3.5 flex items-center justify-between rounded-[20px] px-[22px] py-[13px]"
+            className="m-3.5 flex items-center justify-between rounded-[20px] px-3.5 py-[13px] md:px-[22px]"
             style={{ background: "var(--surface-1)", border: "1px solid var(--hairline)", boxShadow: "var(--shadow-card)" }}
           >
-            <div className="text-[14px] font-medium" style={{ letterSpacing: "-0.14px", color: "var(--ink)" }}>
-              {screenLabel}
+            <div className="flex min-w-0 items-center gap-1.5">
+              <MobileNavDrawer>
+                <div className="mb-7 px-1">
+                  <BrandLogo height={20} />
+                </div>
+                {navLinks}
+                {workspaceFooter}
+              </MobileNavDrawer>
+              <div className="truncate text-[14px] font-medium" style={{ letterSpacing: "-0.14px", color: "var(--ink)" }}>
+                {screenLabel}
+              </div>
             </div>
             <ThemeToggle />
           </header>
 
-          <main className="mx-auto w-full max-w-[1180px] flex-1 px-6 pb-16 pt-2">{children}</main>
+          <main className="mx-auto w-full max-w-[1180px] flex-1 px-3.5 pb-16 pt-2 md:px-6">{children}</main>
         </div>
       </div>
     </div>

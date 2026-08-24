@@ -48,8 +48,8 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
         </div>
       )}
 
-      <div className="grid gap-[18px]" style={{ gridTemplateColumns: "1fr 300px" }}>
-        <div className="card px-[46px] py-[42px]">
+      <div className="grid grid-cols-1 gap-[18px] lg:grid-cols-[1fr_300px]">
+        <div className="card px-5 py-7 md:px-[46px] md:py-[42px]">
           <div className="mb-1.5 text-[21px] font-medium" style={{ letterSpacing: "-0.6px" }}>{deal.template.name}</div>
           <div className="mb-7 border-b pb-[22px] text-[13.5px]" style={{ color: "var(--ink-muted)", borderColor: "var(--hairline-soft)" }}>
             Between {deal.workspace.name} and {deal.client.name}

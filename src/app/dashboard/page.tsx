@@ -120,7 +120,7 @@ export default async function DashboardPage() {
         <StatCard label="Clients" value={String(clientCount)} sub="Total on file" />
       </div>
 
-      <div className="mb-5 grid gap-4" style={{ gridTemplateColumns: "1.6fr 1fr" }}>
+      <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr]">
         <div className="card p-5">
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-[15px] font-medium">Deal value by month</h2>
