@@ -35,6 +35,11 @@ model Workspace {
   senderDomainStatus String?
   senderEmail        String?
 
+  // Base64 data URL, shown to clients on the sign page and on the contract
+  // PDF instead of just the workspace name — same storage pattern as
+  // Contract.signatureImage.
+  logoImage String?
+
   createdAt          DateTime @default(now())
 
   users           User[]

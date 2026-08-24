@@ -20,13 +20,20 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
     <div className="sm-theme min-h-screen" style={{ background: "var(--canvas)" }}>
       <header className="border-b px-6 py-4" style={{ borderColor: "var(--hairline)" }}>
         <div className="mx-auto flex max-w-[720px] items-center gap-2.5">
-          <div
-            className="flex h-[30px] w-[30px] items-center justify-center rounded-[9px] font-display text-[14px] font-semibold"
-            style={{ background: "var(--primary)", color: "var(--on-primary)" }}
-          >
-            S
-          </div>
-          <span className="text-[14px] font-medium">{contract.deal.workspace.name}</span>
+          {contract.deal.workspace.logoImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={contract.deal.workspace.logoImage} alt={contract.deal.workspace.name} style={{ height: 28, maxWidth: 160, objectFit: "contain" }} />
+          ) : (
+            <>
+              <div
+                className="flex h-[30px] w-[30px] items-center justify-center rounded-[9px] font-display text-[14px] font-semibold"
+                style={{ background: "var(--primary)", color: "var(--on-primary)" }}
+              >
+                S
+              </div>
+              <span className="text-[14px] font-medium">{contract.deal.workspace.name}</span>
+            </>
+          )}
           <span style={{ color: "var(--ink-muted)" }}>·</span>
           <span className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>via</span>
           <BrandLogo height={13} className="opacity-70" />

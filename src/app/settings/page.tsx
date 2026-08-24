@@ -7,10 +7,12 @@ import {
   connectSenderDomain,
   disconnectSenderDomain,
   inviteTeammate,
+  removeLogo,
   removeTeammate,
   requestUpgrade,
   toggleWorkspaceFlag,
   updateWorkspaceName,
+  uploadLogo,
 } from "./actions";
 
 function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notifyOnSigned" | "autoRemind" }) {
@@ -100,6 +102,29 @@ export default async function SettingsPage() {
             <form action={updateWorkspaceName} className="mt-2 flex gap-2">
               <input name="name" defaultValue={workspace.name} className="input flex-1" style={{ fontSize: "13px", padding: "8px 11px" }} />
               <button type="submit" className="btn btn-secondary btn-sm">Save</button>
+            </form>
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-4 border-t py-[15px]" style={{ borderColor: "var(--hairline-soft)" }}>
+          <div className="w-full">
+            <div className="text-[13.5px] font-medium">Logo</div>
+            <div className="mb-2 text-[12px]" style={{ color: "var(--ink-muted)" }}>
+              Shown to clients on the sign page and the contract PDF instead of just your name.
+            </div>
+            {workspace.logoImage && (
+              <div className="mb-2.5 flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={workspace.logoImage} alt="Workspace logo" style={{ height: 36, maxWidth: 160, objectFit: "contain" }} />
+                <form action={removeLogo}>
+                  <button type="submit" className="text-[12px] font-medium" style={{ color: "var(--ink-muted)" }}>
+                    Remove
+                  </button>
+                </form>
+              </div>
+            )}
+            <form action={uploadLogo} className="flex gap-2">
+              <input name="logo" type="file" accept="image/*" required className="input flex-1" style={{ fontSize: "13px", padding: "7px 11px" }} />
+              <button type="submit" className="btn btn-secondary btn-sm">{workspace.logoImage ? "Replace" : "Upload"}</button>
             </form>
           </div>
         </div>

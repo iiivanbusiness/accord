@@ -19,6 +19,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     <ContractPdfDocument
       templateName={contract.template.name}
       agencyName={contract.deal.workspace.name}
+      agencyLogo={contract.deal.workspace.logoImage}
       clientName={contract.deal.client.name}
       clauses={clauses}
       signedBy={contract.signerName}

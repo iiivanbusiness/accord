@@ -122,6 +122,28 @@ export async function removeTeammate(userId: string) {
   revalidatePath("/settings");
 }
 
+const MAX_LOGO_BYTES = 1.5 * 1024 * 1024;
+
+export async function uploadLogo(formData: FormData) {
+  const file = formData.get("logo") as File | null;
+  if (!file || file.size === 0) throw new Error("Choose an image file");
+  if (!file.type.startsWith("image/")) throw new Error("That's not an image file");
+  if (file.size > MAX_LOGO_BYTES) throw new Error("Keep the logo under 1.5MB");
+
+  const workspace = await requireWorkspace();
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const dataUrl = `data:${file.type};base64,${bytes.toString("base64")}`;
+
+  await prisma.workspace.update({ where: { id: workspace.id }, data: { logoImage: dataUrl } });
+  revalidatePath("/settings");
+}
+
+export async function removeLogo() {
+  const workspace = await requireWorkspace();
+  await prisma.workspace.update({ where: { id: workspace.id }, data: { logoImage: null } });
+  revalidatePath("/settings");
+}
+
 export async function requestUpgrade(formData: FormData) {
   const note = String(formData.get("note") ?? "").trim() || null;
   const workspace = await requireWorkspace();

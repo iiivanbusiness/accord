@@ -3,6 +3,7 @@ import type { Clause } from "./contract";
 
 const styles = StyleSheet.create({
   page: { padding: 56, fontSize: 11, fontFamily: "Helvetica", color: "#14181A" },
+  logo: { height: 28, marginBottom: 18, objectFit: "contain" },
   title: { fontSize: 20, marginBottom: 6, fontFamily: "Helvetica-Bold" },
   parties: { fontSize: 11, color: "#5B6461", marginBottom: 26 },
   clause: { marginBottom: 16 },
@@ -15,6 +16,7 @@ const styles = StyleSheet.create({
 export function ContractPdfDocument({
   templateName,
   agencyName,
+  agencyLogo,
   clientName,
   clauses,
   signedBy,
@@ -23,6 +25,7 @@ export function ContractPdfDocument({
 }: {
   templateName: string;
   agencyName: string;
+  agencyLogo?: string | null;
   clientName: string;
   clauses: Clause[];
   signedBy?: string | null;
@@ -32,6 +35,7 @@ export function ContractPdfDocument({
   return (
     <Document>
       <Page size="A4" style={styles.page}>
+        {agencyLogo && <Image style={styles.logo} src={agencyLogo} />}
         <Text style={styles.title}>{templateName}</Text>
         <Text style={styles.parties}>Between {agencyName} and {clientName}</Text>
         {clauses.map((clause, i) => (
