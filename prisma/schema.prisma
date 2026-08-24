@@ -58,6 +58,20 @@ model User {
   email        String    @unique
   passwordHash String? // null for accounts created via Google sign-in
   createdAt    DateTime  @default(now())
+
+  resetTokens PasswordResetToken[]
+}
+
+// tokenHash stores SHA-256 of the raw token emailed to the user — the raw
+// value never touches the database, same reasoning as password hashing.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
 }
 
 model Client {

@@ -13,9 +13,9 @@ const ERROR_MESSAGE: Record<string, string> = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ callbackUrl?: string; error?: string }>;
+  searchParams: Promise<{ callbackUrl?: string; error?: string; reset?: string }>;
 }) {
-  const { callbackUrl, error } = await searchParams;
+  const { callbackUrl, error, reset } = await searchParams;
 
   async function authenticate(formData: FormData) {
     "use server";
@@ -60,6 +60,11 @@ export default async function LoginPage({
             {ERROR_MESSAGE[error] ?? "Something went wrong — try again."}
           </div>
         )}
+        {reset && (
+          <div className="chip chip-success mb-4 w-full justify-center py-2.5 text-[12.5px]">
+            Password updated — sign in below.
+          </div>
+        )}
 
         <div className="card flex flex-col gap-3 p-6">
           <form action={continueWithGoogle}>
@@ -81,7 +86,12 @@ export default async function LoginPage({
               <input name="email" type="email" required placeholder="you@company.com" className="input" />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[13px] font-medium">Password</span>
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] font-medium">Password</span>
+                <Link href="/forgot-password" className="text-[12px] font-medium" style={{ color: "var(--accent-blue)" }}>
+                  Forgot?
+                </Link>
+              </div>
               <input name="password" type="password" required placeholder="••••••••" className="input" />
             </label>
             <button type="submit" className="btn btn-primary mt-2 w-full justify-center">

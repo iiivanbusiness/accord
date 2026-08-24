@@ -1,0 +1,47 @@
+import ThemeToggle from "@/components/ThemeToggle";
+import BrandLogo from "@/components/BrandLogo";
+import { resetPassword } from "./actions";
+
+export default async function ResetPasswordPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ token: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { token } = await params;
+  const { error } = await searchParams;
+
+  return (
+    <div className="sm-theme relative flex min-h-screen items-center justify-center px-4" style={{ background: "var(--canvas)" }}>
+      <div className="absolute right-6 top-6">
+        <ThemeToggle />
+      </div>
+      <div className="w-full max-w-[360px]">
+        <div className="mb-6">
+          <BrandLogo height={24} />
+        </div>
+        <h1 className="mb-1 text-[24px] font-medium" style={{ letterSpacing: "-0.8px" }}>Set a new password</h1>
+        <p className="mb-6 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+          Choose a new password for your SealMe account.
+        </p>
+
+        {error && (
+          <div className="chip chip-warn mb-4 w-full justify-center py-2.5 text-center text-[12.5px]">
+            {error}
+          </div>
+        )}
+
+        <form action={resetPassword.bind(null, token)} className="card flex flex-col gap-3 p-6">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-medium">New password</span>
+            <input name="password" type="password" required minLength={8} placeholder="At least 8 characters" className="input" />
+          </label>
+          <button type="submit" className="btn btn-primary mt-2 w-full justify-center">
+            Reset password
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}

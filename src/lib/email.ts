@@ -137,6 +137,36 @@ export async function sendTeammateInviteEmail(options: {
   });
 }
 
+export async function sendPasswordResetEmail(options: { to: string; resetUrl: string }): Promise<void> {
+  await sendSystemEmail({
+    to: [options.to],
+    subject: "Reset your SealMe password",
+    bodyHtml: `
+      <p style="margin:0 0 14px;">Someone requested a password reset for this email address. If that was you, set a new password below — this link expires in 1 hour.</p>
+      <a href="${options.resetUrl}" style="display:inline-block;margin:0 0 20px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
+        Reset password
+      </a>
+      <p style="margin:0;font-size:12.5px;color:#6e6e73;">If you didn&apos;t request this, you can ignore this email.</p>
+    `,
+  });
+}
+
+// Cross-tenant platform failures — sent to ADMIN_EMAILS, not any one workspace's
+// team, so problems surface before a customer has to report them.
+export async function sendAdminAlertEmail(options: { subject: string; details: string }): Promise<void> {
+  const admins = (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean);
+  if (admins.length === 0) return;
+
+  await sendSystemEmail({
+    to: admins,
+    subject: `[SealMe alert] ${options.subject}`,
+    bodyHtml: `<pre style="white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12.5px;background:#f5f5f5;padding:12px;border-radius:8px;">${escapeHtml(options.details)}</pre>`,
+  });
+}
+
 function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }

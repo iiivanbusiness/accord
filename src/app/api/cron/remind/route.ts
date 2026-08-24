@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { sendReminderEmail } from "@/lib/email";
+import { sendAdminAlertEmail, sendReminderEmail } from "@/lib/email";
 
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -13,36 +13,49 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const cutoff = new Date(Date.now() - THREE_DAYS_MS);
+  try {
+    const cutoff = new Date(Date.now() - THREE_DAYS_MS);
 
-  const dueContracts = await prisma.contract.findMany({
-    where: {
-      status: "sent",
-      sentAt: { lte: cutoff },
-      reminderSentAt: null,
-      deal: { workspace: { autoRemind: true } },
-    },
-    include: { deal: { include: { client: true, workspace: true } } },
-  });
+    const dueContracts = await prisma.contract.findMany({
+      where: {
+        status: "sent",
+        sentAt: { lte: cutoff },
+        reminderSentAt: null,
+        deal: { workspace: { autoRemind: true } },
+      },
+      include: { deal: { include: { client: true, workspace: true } } },
+    });
 
-  let sent = 0;
-  for (const contract of dueContracts) {
-    if (!contract.deal.client.email) continue;
-    try {
-      const verifiedSenderEmail = contract.deal.workspace.senderDomainStatus === "verified" ? contract.deal.workspace.senderEmail : null;
-      await sendReminderEmail({
-        to: contract.deal.client.email,
-        clientName: contract.deal.client.name,
-        workspaceName: contract.deal.workspace.name,
-        signLink: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/sign/${contract.id}`,
-        verifiedSenderEmail,
-      });
-      await prisma.contract.update({ where: { id: contract.id }, data: { reminderSentAt: new Date() } });
-      sent++;
-    } catch (err) {
-      console.error(`Failed to send reminder for contract ${contract.id}`, err);
+    let sent = 0;
+    for (const contract of dueContracts) {
+      if (!contract.deal.client.email) continue;
+      try {
+        const verifiedSenderEmail = contract.deal.workspace.senderDomainStatus === "verified" ? contract.deal.workspace.senderEmail : null;
+        await sendReminderEmail({
+          to: contract.deal.client.email,
+          clientName: contract.deal.client.name,
+          workspaceName: contract.deal.workspace.name,
+          signLink: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/sign/${contract.id}`,
+          verifiedSenderEmail,
+        });
+        await prisma.contract.update({ where: { id: contract.id }, data: { reminderSentAt: new Date() } });
+        sent++;
+      } catch (err) {
+        console.error(`Failed to send reminder for contract ${contract.id}`, err);
+      }
     }
-  }
 
-  return NextResponse.json({ checked: dueContracts.length, sent });
+    return NextResponse.json({ checked: dueContracts.length, sent });
+  } catch (err) {
+    console.error("Reminder cron crashed", err);
+    try {
+      await sendAdminAlertEmail({
+        subject: "Reminder cron crashed",
+        details: err instanceof Error ? (err.stack ?? err.message) : String(err),
+      });
+    } catch (alertErr) {
+      console.error("Failed to send admin alert email", alertErr);
+    }
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+  }
 }

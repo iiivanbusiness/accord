@@ -4,6 +4,7 @@ import { fetchBotTranscript, verifyRecallWebhook } from "@/lib/recall";
 import { applyExtractionToDeal } from "@/lib/deal-live";
 import { extractPlaceholderKeys } from "@/lib/contract";
 import { autoGenerateAndSendContract } from "@/lib/auto-send";
+import { sendAdminAlertEmail } from "@/lib/email";
 
 type RecallWebhookPayload = {
   event: string;
@@ -46,6 +47,14 @@ export async function POST(req: Request) {
     console.error(`Recall webhook: failed to process bot ${botId}`, err);
     if (deal.status !== "sent" && deal.status !== "signed") {
       await prisma.deal.update({ where: { id: deal.id }, data: { status: "extraction_failed" } });
+    }
+    try {
+      await sendAdminAlertEmail({
+        subject: "Call extraction failed",
+        details: `Workspace: ${deal.workspace.name} (${deal.workspaceId})\nDeal: ${deal.id}\nBot: ${botId}\n\n${err instanceof Error ? err.stack ?? err.message : String(err)}`,
+      });
+    } catch (alertErr) {
+      console.error("Failed to send admin alert email", alertErr);
     }
   }
 
