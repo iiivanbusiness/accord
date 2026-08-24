@@ -7,7 +7,9 @@ import { extractPlaceholderKeys } from "@/lib/contract";
 
 // Re-running full extraction on every single utterance would be wasteful (a sales
 // call can produce dozens of these per minute) — throttle to one pass per window.
-const EXTRACTION_THROTTLE_MS = 15000;
+// Each pass resends the full transcript so far, so cost grows with window count;
+// a minute keeps terms feeling live without re-billing the whole call every 15s.
+const EXTRACTION_THROTTLE_MS = 60000;
 
 export async function POST(req: Request) {
   const payload = await req.text();

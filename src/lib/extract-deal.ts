@@ -40,7 +40,7 @@ export async function extractDealFromTranscript(transcript: string, placeholderK
   const fieldKeys = [...new Set(["service", "fee", ...placeholderKeys])];
 
   const response = await client.messages.create({
-    model: "claude-opus-5",
+    model: "claude-sonnet-5",
     max_tokens: 4096,
     system:
       "You extract structured sales-deal terms from a raw call transcript between an agency and a prospective client. " +
