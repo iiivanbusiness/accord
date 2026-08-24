@@ -8,7 +8,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const contract = await prisma.contract.findUnique({
     where: { id },
-    include: { deal: { include: { client: true, fields: true } }, template: true },
+    include: { deal: { include: { client: true, fields: true, workspace: true } }, template: true },
   });
   if (!contract || !contract.template) {
     return new NextResponse("Not found", { status: 404 });
@@ -18,6 +18,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const buffer = await renderToBuffer(
     <ContractPdfDocument
       templateName={contract.template.name}
+      agencyName={contract.deal.workspace.name}
       clientName={contract.deal.client.name}
       clauses={clauses}
       signedBy={contract.signerName}

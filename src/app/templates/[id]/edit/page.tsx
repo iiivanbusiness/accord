@@ -3,13 +3,15 @@ import { notFound } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import ClauseEditor from "@/components/ClauseEditor";
 import { prisma } from "@/lib/db";
+import { requireWorkspaceId } from "@/lib/workspace";
 import { updateTemplate } from "../../actions";
 
 type Clause = { title: string; body: string };
 
 export default async function EditTemplatePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const template = await prisma.contractTemplate.findUnique({ where: { id } });
+  const workspaceId = await requireWorkspaceId();
+  const template = await prisma.contractTemplate.findFirst({ where: { id, workspaceId } });
   if (!template) notFound();
 
   const clauses = JSON.parse(template.clauses) as Clause[];

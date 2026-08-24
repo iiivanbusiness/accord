@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { syncWorkspaceCalendar } from "@/lib/google-calendar";
+import { requireWorkspaceId } from "@/lib/workspace";
 
 export async function createEvent(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
@@ -14,12 +15,11 @@ export async function createEvent(formData: FormData) {
 
   if (!title || !startTimeRaw) throw new Error("Title and start time are required");
 
-  const workspace = await prisma.workspace.findFirst();
-  if (!workspace) throw new Error("No workspace found");
+  const workspaceId = await requireWorkspaceId();
 
   await prisma.calendarEvent.create({
     data: {
-      workspaceId: workspace.id,
+      workspaceId,
       title,
       clientName,
       startTime: new Date(startTimeRaw),
@@ -32,17 +32,17 @@ export async function createEvent(formData: FormData) {
 }
 
 export async function deleteEvent(eventId: string) {
-  await prisma.calendarEvent.delete({ where: { id: eventId } });
+  const workspaceId = await requireWorkspaceId();
+  await prisma.calendarEvent.deleteMany({ where: { id: eventId, workspaceId } });
   revalidatePath("/calendar");
 }
 
 export async function syncGoogleCalendarNow() {
-  const workspace = await prisma.workspace.findFirst();
-  if (!workspace) throw new Error("No workspace found");
+  const workspaceId = await requireWorkspaceId();
 
   let redirectTo = "/calendar?error=google_sync_failed";
   try {
-    const count = await syncWorkspaceCalendar(workspace.id);
+    const count = await syncWorkspaceCalendar(workspaceId);
     redirectTo = `/calendar?synced=${count}`;
   } catch {
     // fall through to the error redirect set above
@@ -51,10 +51,9 @@ export async function syncGoogleCalendarNow() {
 }
 
 export async function disconnectGoogleCalendar() {
-  const workspace = await prisma.workspace.findFirst();
-  if (!workspace) throw new Error("No workspace found");
+  const workspaceId = await requireWorkspaceId();
   await prisma.workspace.update({
-    where: { id: workspace.id },
+    where: { id: workspaceId },
     data: { googleAccessToken: null, googleRefreshToken: null, googleTokenExpiresAt: null, googleAccountEmail: null },
   });
   revalidatePath("/calendar");

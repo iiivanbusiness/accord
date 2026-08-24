@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { exchangeCodeForTokens, getUserEmail } from "@/lib/google-calendar";
+import { requireWorkspaceId } from "@/lib/workspace";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -18,11 +19,12 @@ export async function GET(req: Request) {
     const tokens = await exchangeCodeForTokens(code);
     const email = await getUserEmail(tokens.access_token);
 
-    const workspace = await prisma.workspace.findFirst();
+    const workspaceId = await requireWorkspaceId();
+    const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
     if (!workspace) throw new Error("No workspace found");
 
     await prisma.workspace.update({
-      where: { id: workspace.id },
+      where: { id: workspaceId },
       data: {
         googleAccessToken: tokens.access_token,
         googleRefreshToken: tokens.refresh_token ?? workspace.googleRefreshToken,

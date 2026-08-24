@@ -8,7 +8,7 @@ export default function ClauseEditor({ initialClauses }: { initialClauses?: Clau
   const [clauses, setClauses] = useState<Clause[]>(
     initialClauses && initialClauses.length > 0
       ? initialClauses
-      : [{ title: "Services", body: "Horizon Media will provide {service} for {clientName}." }]
+      : [{ title: "Services", body: "Agency will provide {service} for {clientName}." }]
   );
 
   function update(i: number, key: keyof Clause, value: string) {

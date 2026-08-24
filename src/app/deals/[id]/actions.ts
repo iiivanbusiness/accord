@@ -3,9 +3,11 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { sendContractEmail as sendEmail } from "@/lib/email";
+import { requireWorkspaceId } from "@/lib/workspace";
 
 export async function generateContract(dealId: string) {
-  const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { fields: true } });
+  const workspaceId = await requireWorkspaceId();
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId }, include: { fields: true } });
   if (!deal) throw new Error("Deal not found");
 
   const missing = deal.fields.some((f) => f.status === "missing");
@@ -25,7 +27,8 @@ export async function generateContract(dealId: string) {
 }
 
 export async function fillMissingFields(dealId: string, formData: FormData) {
-  const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { fields: true } });
+  const workspaceId = await requireWorkspaceId();
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId }, include: { fields: true } });
   if (!deal) throw new Error("Deal not found");
 
   const missingFields = deal.fields.filter((f) => f.status === "missing");
@@ -47,7 +50,8 @@ export async function fillMissingFields(dealId: string, formData: FormData) {
 }
 
 export async function updateFieldValues(dealId: string, formData: FormData) {
-  const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { fields: true } });
+  const workspaceId = await requireWorkspaceId();
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId }, include: { fields: true } });
   if (!deal) throw new Error("Deal not found");
 
   const editableFields = deal.fields.filter((f) => f.status !== "missing");
@@ -69,10 +73,11 @@ export async function sendContractEmail(dealId: string, formData: FormData) {
   const message = String(formData.get("message") ?? "").trim();
   if (!to || !subject || !message) throw new Error("To, subject, and message are all required");
 
-  const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { contract: true } });
+  const workspaceId = await requireWorkspaceId();
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId }, include: { contract: true } });
   if (!deal || !deal.contract) throw new Error("Deal not found");
 
-  const workspace = await prisma.workspace.findFirst({ include: { users: true } });
+  const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId }, include: { users: true } });
   const signLink = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/sign/${deal.contract.id}`;
   const replyTo = workspace?.users[0]?.email ?? null;
 

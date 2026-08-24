@@ -2,6 +2,7 @@ import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import { prisma } from "@/lib/db";
 import { parseFee } from "@/lib/money";
+import { requireWorkspaceId } from "@/lib/workspace";
 
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -61,11 +62,12 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
 
 export default async function DashboardPage() {
   const now = new Date();
+  const workspaceId = await requireWorkspaceId();
 
   const [deals, clientCount, upcomingEvents] = await Promise.all([
-    prisma.deal.findMany({ include: { client: true, contract: true }, orderBy: { updatedAt: "desc" } }),
-    prisma.client.count(),
-    prisma.calendarEvent.findMany({ where: { startTime: { gte: now } }, orderBy: { startTime: "asc" }, take: 5 }),
+    prisma.deal.findMany({ where: { workspaceId }, include: { client: true, contract: true }, orderBy: { updatedAt: "desc" } }),
+    prisma.client.count({ where: { workspaceId } }),
+    prisma.calendarEvent.findMany({ where: { workspaceId, startTime: { gte: now } }, orderBy: { startTime: "asc" }, take: 5 }),
   ]);
 
   const signedCount = deals.filter((d) => d.status === "signed").length;

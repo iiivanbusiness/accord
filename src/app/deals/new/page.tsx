@@ -3,6 +3,7 @@ import AppShell from "@/components/AppShell";
 import { prisma } from "@/lib/db";
 import { isExtractionConfigured } from "@/lib/extract-deal";
 import { isRecallConfigured } from "@/lib/recall";
+import { requireWorkspaceId } from "@/lib/workspace";
 import { createDeal, createDealFromTranscript, startCallBot } from "./actions";
 
 function Field({ label, name, placeholder, required }: { label: string; name: string; placeholder?: string; required?: boolean }) {
@@ -35,7 +36,8 @@ export default async function NewDealPage({
   const isManual = mode === "manual";
   const isLive = mode === "live";
   const isTranscript = !isManual && !isLive;
-  const templates = await prisma.contractTemplate.findMany({ orderBy: { name: "asc" } });
+  const workspaceId = await requireWorkspaceId();
+  const templates = await prisma.contractTemplate.findMany({ where: { workspaceId }, orderBy: { name: "asc" } });
   const extractionConfigured = isExtractionConfigured();
   const recallConfigured = isRecallConfigured();
 

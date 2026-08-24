@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import { prisma } from "@/lib/db";
+import { requireWorkspaceId } from "@/lib/workspace";
 
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -30,8 +31,10 @@ const STATUS_CHIP: Record<string, string> = {
 };
 
 export default async function DealsPage() {
-  const workspace = await prisma.workspace.findFirst();
+  const workspaceId = await requireWorkspaceId();
+  const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
   const deals = await prisma.deal.findMany({
+    where: { workspaceId },
     include: { client: true },
     orderBy: { updatedAt: "desc" },
   });

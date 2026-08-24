@@ -1,4 +1,5 @@
 import { AuthError } from "next-auth";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signIn } from "@/lib/auth";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -41,7 +42,12 @@ export default async function LoginPage({
           <BrandLogo height={24} />
         </div>
         <h1 className="mb-1 text-[24px] font-medium" style={{ letterSpacing: "-0.8px" }}>Sign in to SealMe</h1>
-        <p className="mb-6 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>Horizon Media workspace</p>
+        <p className="mb-6 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+          New here?{" "}
+          <Link href="/signup" className="font-medium" style={{ color: "var(--accent-blue)" }}>
+            Create a workspace
+          </Link>
+        </p>
 
         {error && (
           <div className="chip chip-warn mb-4 w-full justify-center py-2.5 text-[12.5px]">

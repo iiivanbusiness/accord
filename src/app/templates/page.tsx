@@ -1,9 +1,11 @@
 import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import { prisma } from "@/lib/db";
+import { requireWorkspaceId } from "@/lib/workspace";
 
 export default async function TemplatesPage() {
-  const templates = await prisma.contractTemplate.findMany({ orderBy: { name: "asc" } });
+  const workspaceId = await requireWorkspaceId();
+  const templates = await prisma.contractTemplate.findMany({ where: { workspaceId }, orderBy: { name: "asc" } });
 
   return (
     <AppShell active="/templates" screenLabel="Templates">

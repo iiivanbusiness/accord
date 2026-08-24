@@ -9,7 +9,7 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const contract = await prisma.contract.findUnique({
     where: { id },
-    include: { deal: { include: { client: true, fields: true } }, template: true },
+    include: { deal: { include: { client: true, fields: true, workspace: true } }, template: true },
   });
   if (!contract || !contract.template) notFound();
 
@@ -26,7 +26,7 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
           >
             S
           </div>
-          <span className="text-[14px] font-medium">Horizon Media</span>
+          <span className="text-[14px] font-medium">{contract.deal.workspace.name}</span>
           <span style={{ color: "var(--ink-muted)" }}>·</span>
           <span className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>via</span>
           <BrandLogo height={13} className="opacity-70" />
@@ -51,7 +51,7 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
         <div className="card px-[46px] py-[42px]">
           <div className="mb-1.5 text-[22px] font-medium" style={{ letterSpacing: "-0.6px" }}>{contract.template.name}</div>
           <div className="mb-7 border-b pb-[22px] text-[13.5px]" style={{ color: "var(--ink-muted)", borderColor: "var(--hairline-soft)" }}>
-            Between Horizon Media and {contract.deal.client.name}
+            Between {contract.deal.workspace.name} and {contract.deal.client.name}
           </div>
           {clauses.map((clause, i) => (
             <div key={clause.title} className="mb-5 max-w-[64ch]">

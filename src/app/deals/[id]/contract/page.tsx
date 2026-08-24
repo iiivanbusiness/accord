@@ -3,12 +3,14 @@ import { notFound } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import { prisma } from "@/lib/db";
 import { fillClauses } from "@/lib/contract";
+import { requireWorkspaceId } from "@/lib/workspace";
 
 export default async function ContractPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const deal = await prisma.deal.findUnique({
-    where: { id },
-    include: { client: true, template: true, fields: true, contract: true },
+  const workspaceId = await requireWorkspaceId();
+  const deal = await prisma.deal.findFirst({
+    where: { id, workspaceId },
+    include: { client: true, template: true, fields: true, contract: true, workspace: true },
   });
   if (!deal || !deal.contract || !deal.template) notFound();
 
@@ -50,7 +52,7 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
         <div className="card px-[46px] py-[42px]">
           <div className="mb-1.5 text-[21px] font-medium" style={{ letterSpacing: "-0.6px" }}>{deal.template.name}</div>
           <div className="mb-7 border-b pb-[22px] text-[13.5px]" style={{ color: "var(--ink-muted)", borderColor: "var(--hairline-soft)" }}>
-            Between Horizon Media and {deal.client.name}
+            Between {deal.workspace.name} and {deal.client.name}
           </div>
           {clauses.map((clause, i) => (
             <div key={clause.title} className="mb-5 max-w-[64ch]">

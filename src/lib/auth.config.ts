@@ -5,6 +5,14 @@ export const authConfig = {
   session: { strategy: "jwt" },
   providers: [],
   callbacks: {
+    jwt({ token, user }) {
+      if (user) token.workspaceId = user.workspaceId;
+      return token;
+    },
+    session({ session, token }) {
+      if (typeof token.workspaceId === "string") session.user.workspaceId = token.workspaceId;
+      return session;
+    },
     authorized({ auth, request }) {
       const isPublic =
         request.nextUrl.pathname === "/" ||

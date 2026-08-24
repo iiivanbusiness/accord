@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { extractDealFromTranscript, buildDealFieldRows } from "@/lib/extract-deal";
 import { extractPlaceholderKeys } from "@/lib/contract";
 import { createCallBot, detectPlatformFromUrl } from "@/lib/recall";
+import { requireWorkspaceId } from "@/lib/workspace";
 
 export async function createDeal(formData: FormData) {
   const clientName = String(formData.get("clientName") ?? "").trim();
@@ -18,16 +19,15 @@ export async function createDeal(formData: FormData) {
     throw new Error("Client, service, and fee are required");
   }
 
-  const workspace = await prisma.workspace.findFirst();
-  if (!workspace) throw new Error("No workspace found");
+  const workspaceId = await requireWorkspaceId();
 
   const client = await prisma.client.create({
-    data: { workspaceId: workspace.id, name: clientName, company, email },
+    data: { workspaceId, name: clientName, company, email },
   });
 
   const deal = await prisma.deal.create({
     data: {
-      workspaceId: workspace.id,
+      workspaceId,
       clientId: client.id,
       templateId,
       service,
@@ -45,7 +45,7 @@ export async function createDeal(formData: FormData) {
   });
 
   await prisma.workspace.update({
-    where: { id: workspace.id },
+    where: { id: workspaceId },
     data: { callsUsedThisMonth: { increment: 1 } },
   });
 
@@ -59,10 +59,9 @@ export async function createDealFromTranscript(formData: FormData) {
   if (!transcript) throw new Error("Paste a call transcript first");
   if (!templateId) throw new Error("Choose a template");
 
-  const workspace = await prisma.workspace.findFirst();
-  if (!workspace) throw new Error("No workspace found");
+  const workspaceId = await requireWorkspaceId();
 
-  const template = await prisma.contractTemplate.findUnique({ where: { id: templateId } });
+  const template = await prisma.contractTemplate.findFirst({ where: { id: templateId, workspaceId } });
   if (!template) throw new Error("Template not found");
 
   const placeholderKeys = extractPlaceholderKeys(template.clauses);
@@ -78,7 +77,7 @@ export async function createDealFromTranscript(formData: FormData) {
 
   const client = await prisma.client.create({
     data: {
-      workspaceId: workspace.id,
+      workspaceId,
       name: extracted.clientName,
       company: extracted.company ?? extracted.clientName,
       email: extracted.email,
@@ -87,7 +86,7 @@ export async function createDealFromTranscript(formData: FormData) {
 
   const deal = await prisma.deal.create({
     data: {
-      workspaceId: workspace.id,
+      workspaceId,
       clientId: client.id,
       templateId,
       service,
@@ -99,7 +98,7 @@ export async function createDealFromTranscript(formData: FormData) {
   });
 
   await prisma.workspace.update({
-    where: { id: workspace.id },
+    where: { id: workspaceId },
     data: { callsUsedThisMonth: { increment: 1 } },
   });
 
@@ -115,8 +114,7 @@ export async function startCallBot(formData: FormData) {
   if (!clientName) throw new Error("Enter who you're meeting with");
   if (!templateId) throw new Error("Choose a template");
 
-  const workspace = await prisma.workspace.findFirst();
-  if (!workspace) throw new Error("No workspace found");
+  const workspaceId = await requireWorkspaceId();
 
   let bot;
   try {
@@ -126,12 +124,12 @@ export async function startCallBot(formData: FormData) {
   }
 
   const client = await prisma.client.create({
-    data: { workspaceId: workspace.id, name: clientName, company: clientName },
+    data: { workspaceId, name: clientName, company: clientName },
   });
 
   const deal = await prisma.deal.create({
     data: {
-      workspaceId: workspace.id,
+      workspaceId,
       clientId: client.id,
       templateId,
       service: "",
@@ -143,7 +141,7 @@ export async function startCallBot(formData: FormData) {
   });
 
   await prisma.workspace.update({
-    where: { id: workspace.id },
+    where: { id: workspaceId },
     data: { callsUsedThisMonth: { increment: 1 } },
   });
 

@@ -1,5 +1,6 @@
 import AppShell from "@/components/AppShell";
 import { prisma } from "@/lib/db";
+import { requireWorkspaceId } from "@/lib/workspace";
 import { toggleWorkspaceFlag, updateWorkspaceName } from "./actions";
 
 function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notifyOnSigned" | "autoRemind" }) {
@@ -20,7 +21,8 @@ function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notify
 }
 
 export default async function SettingsPage() {
-  const workspace = await prisma.workspace.findFirst({ include: { users: true } });
+  const workspaceId = await requireWorkspaceId();
+  const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId }, include: { users: true } });
   const usagePct = workspace ? Math.round((workspace.callsUsedThisMonth / workspace.callsLimit) * 100) : 0;
   if (!workspace) return null;
   const notifyEmail = workspace.users[0]?.email ?? "your account email";

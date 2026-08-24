@@ -2,13 +2,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import { prisma } from "@/lib/db";
+import { requireWorkspaceId } from "@/lib/workspace";
 import { deleteTemplate } from "../actions";
 
 type Clause = { title: string; body: string };
 
 export default async function TemplateDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const template = await prisma.contractTemplate.findUnique({ where: { id }, include: { deals: true } });
+  const workspaceId = await requireWorkspaceId();
+  const template = await prisma.contractTemplate.findFirst({ where: { id, workspaceId }, include: { deals: true } });
   if (!template) notFound();
 
   const clauses = JSON.parse(template.clauses) as Clause[];

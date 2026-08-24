@@ -1,12 +1,14 @@
 import AppShell from "@/components/AppShell";
 import { prisma } from "@/lib/db";
+import { requireWorkspaceId } from "@/lib/workspace";
 
 function initials(name: string): string {
   return name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 }
 
 export default async function ClientsPage() {
-  const clients = await prisma.client.findMany({ include: { deals: true }, orderBy: { name: "asc" } });
+  const workspaceId = await requireWorkspaceId();
+  const clients = await prisma.client.findMany({ where: { workspaceId }, include: { deals: true }, orderBy: { name: "asc" } });
 
   return (
     <AppShell active="/clients" screenLabel="Clients">

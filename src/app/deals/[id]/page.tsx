@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import DealTermsCard from "@/components/DealTermsCard";
 import { prisma } from "@/lib/db";
+import { requireWorkspaceId } from "@/lib/workspace";
 import { fillMissingFields, generateContract, updateFieldValues } from "./actions";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -23,8 +24,9 @@ const STATUS_CHIP: Record<string, string> = {
 
 export default async function DealDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const deal = await prisma.deal.findUnique({
-    where: { id },
+  const workspaceId = await requireWorkspaceId();
+  const deal = await prisma.deal.findFirst({
+    where: { id, workspaceId },
     include: { client: true, fields: { orderBy: { orderIndex: "asc" } }, template: true, contract: true },
   });
   if (!deal) notFound();

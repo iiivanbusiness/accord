@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import { prisma } from "@/lib/db";
 import { isEmailConfigured } from "@/lib/email";
+import { requireWorkspaceId } from "@/lib/workspace";
 import { sendContractEmail } from "../actions";
 
 export default async function SendContractPage({
@@ -14,13 +15,14 @@ export default async function SendContractPage({
 }) {
   const { id } = await params;
   const { error } = await searchParams;
-  const deal = await prisma.deal.findUnique({
-    where: { id },
+  const workspaceId = await requireWorkspaceId();
+  const deal = await prisma.deal.findFirst({
+    where: { id, workspaceId },
     include: { client: true, template: true, contract: true },
   });
   if (!deal || !deal.contract || !deal.template) notFound();
 
-  const workspace = await prisma.workspace.findFirst();
+  const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
   const workspaceName = workspace?.name ?? "Your workspace";
   const configured = isEmailConfigured();
 

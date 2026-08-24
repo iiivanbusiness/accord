@@ -14,6 +14,7 @@ const styles = StyleSheet.create({
 
 export function ContractPdfDocument({
   templateName,
+  agencyName,
   clientName,
   clauses,
   signedBy,
@@ -21,6 +22,7 @@ export function ContractPdfDocument({
   signatureImage,
 }: {
   templateName: string;
+  agencyName: string;
   clientName: string;
   clauses: Clause[];
   signedBy?: string | null;
@@ -31,7 +33,7 @@ export function ContractPdfDocument({
     <Document>
       <Page size="A4" style={styles.page}>
         <Text style={styles.title}>{templateName}</Text>
-        <Text style={styles.parties}>Between Horizon Media and {clientName}</Text>
+        <Text style={styles.parties}>Between {agencyName} and {clientName}</Text>
         {clauses.map((clause, i) => (
           <View key={clause.title} style={styles.clause}>
             <Text style={styles.clauseTitle}>{i + 1}. {clause.title}</Text>

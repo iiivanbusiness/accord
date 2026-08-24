@@ -2,6 +2,7 @@ import Link from "next/link";
 import AppShell from "@/components/AppShell";
 import { prisma } from "@/lib/db";
 import { isGoogleCalendarConfigured } from "@/lib/google-calendar";
+import { requireWorkspaceId } from "@/lib/workspace";
 import { deleteEvent, disconnectGoogleCalendar, syncGoogleCalendarNow } from "./actions";
 
 function formatDay(date: Date): string {
@@ -31,11 +32,12 @@ export default async function CalendarPage({
   searchParams: Promise<{ error?: string; connected?: string; synced?: string }>;
 }) {
   const { error, connected, synced } = await searchParams;
-  const workspace = await prisma.workspace.findFirst();
+  const workspaceId = await requireWorkspaceId();
+  const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
   const isConnected = Boolean(workspace?.googleRefreshToken);
   const configured = isGoogleCalendarConfigured();
 
-  const events = await prisma.calendarEvent.findMany({ orderBy: { startTime: "asc" } });
+  const events = await prisma.calendarEvent.findMany({ where: { workspaceId }, orderBy: { startTime: "asc" } });
   const groups = new Map<string, typeof events>();
   for (const event of events) {
     const key = formatDay(event.startTime);

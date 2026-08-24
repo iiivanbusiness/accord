@@ -1,6 +1,7 @@
 import AppShell from "@/components/AppShell";
 import { prisma } from "@/lib/db";
 import { parseFee } from "@/lib/money";
+import { requireWorkspaceId } from "@/lib/workspace";
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -42,7 +43,8 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default async function AnalyticsPage() {
-  const deals = await prisma.deal.findMany({ include: { template: true, contract: true } });
+  const workspaceId = await requireWorkspaceId();
+  const deals = await prisma.deal.findMany({ where: { workspaceId }, include: { template: true, contract: true } });
 
   const total = deals.length;
   const signed = deals.filter((d) => d.status === "signed").length;

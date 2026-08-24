@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { signOut } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { requireWorkspace } from "@/lib/workspace";
 import ThemeToggle from "./ThemeToggle";
 import BrandLogo from "./BrandLogo";
 
@@ -29,8 +29,8 @@ export default async function AppShell({
   screenLabel: string;
   children: React.ReactNode;
 }) {
-  const workspace = await prisma.workspace.findFirst();
-  const workspaceName = workspace?.name ?? "Workspace";
+  const workspace = await requireWorkspace();
+  const workspaceName = workspace.name;
 
   return (
     <div className="sm-theme min-h-screen" style={{ background: "var(--canvas)" }}>
