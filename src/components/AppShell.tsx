@@ -5,6 +5,7 @@ import { isAdminEmail } from "@/lib/admin";
 import ThemeToggle from "./ThemeToggle";
 import BrandLogo from "./BrandLogo";
 import MobileNavDrawer from "./MobileNavDrawer";
+import AppFooter from "./AppFooter";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: DashboardIcon },
@@ -87,8 +88,8 @@ export default async function AppShell({
   );
 
   return (
-    <div className="sm-theme min-h-screen" style={{ background: "var(--canvas)" }}>
-      <div className="grid min-h-screen grid-cols-1 md:grid-cols-[232px_1fr]">
+    <div className="sm-theme min-h-dvh" style={{ background: "var(--canvas)" }}>
+      <div className="grid min-h-dvh grid-cols-1 md:grid-cols-[232px_1fr]">
         <nav
           className="m-3.5 hidden flex-col rounded-[20px] px-3.5 py-[22px] md:flex"
           style={{ background: "var(--surface-1)", border: "1px solid var(--hairline)", boxShadow: "var(--shadow-card)" }}
@@ -120,7 +121,8 @@ export default async function AppShell({
             <ThemeToggle />
           </header>
 
-          <main className="mx-auto w-full max-w-[1180px] flex-1 px-3.5 pb-16 pt-2 md:px-6">{children}</main>
+          <main className="mx-auto w-full max-w-[1180px] flex-1 px-3.5 pt-2 md:px-6">{children}</main>
+          <AppFooter />
         </div>
       </div>
     </div>
