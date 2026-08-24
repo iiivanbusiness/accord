@@ -34,12 +34,13 @@ export default function AppFooter() {
         style={{ height: "9vw", minHeight: 60, maxHeight: 170, background: "var(--canvas)" }}
         aria-hidden="true"
       >
-        <span
-          className="font-display absolute top-0 leading-none font-semibold tracking-tight"
-          style={{ fontSize: "20vw", color: "var(--surface-2)" }}
-        >
-          SealMe
-        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/wordmark.png"
+          alt=""
+          className="absolute top-0"
+          style={{ width: "46vw", minWidth: 320, maxWidth: 620, opacity: 0.06 }}
+        />
       </div>
     </footer>
   );
