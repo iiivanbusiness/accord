@@ -31,6 +31,7 @@ function formatEventTime(date: Date): string {
 const STATUS_LABEL: Record<string, string> = {
   processing: "Analyzing call…",
   missing_info: "Missing info",
+  extraction_failed: "Couldn't process call",
   ready: "Ready for review",
   sent: "Sent",
   signed: "Signed",
@@ -39,6 +40,7 @@ const STATUS_LABEL: Record<string, string> = {
 const STATUS_CHIP: Record<string, string> = {
   processing: "chip-neutral chip-live",
   missing_info: "chip-warn",
+  extraction_failed: "chip-warn",
   ready: "chip-active",
   sent: "chip-neutral",
   signed: "chip-success",

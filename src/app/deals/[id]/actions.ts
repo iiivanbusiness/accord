@@ -4,6 +4,23 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { sendContractEmail as sendEmail } from "@/lib/email";
 import { requireWorkspaceId } from "@/lib/workspace";
+import { applyExtractionToDeal } from "@/lib/deal-live";
+import { extractPlaceholderKeys } from "@/lib/contract";
+
+export async function retryExtraction(dealId: string) {
+  const workspaceId = await requireWorkspaceId();
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId }, include: { template: true } });
+  if (!deal || !deal.template) throw new Error("Deal not found");
+
+  try {
+    const placeholderKeys = extractPlaceholderKeys(deal.template.clauses);
+    await applyExtractionToDeal(dealId, deal.liveTranscript ?? "", placeholderKeys);
+  } catch {
+    await prisma.deal.update({ where: { id: dealId }, data: { status: "extraction_failed" } });
+  }
+
+  redirect(`/deals/${dealId}`);
+}
 
 export async function generateContract(dealId: string) {
   const workspaceId = await requireWorkspaceId();

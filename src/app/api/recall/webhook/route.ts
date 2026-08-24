@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   } catch (err) {
     console.error(`Recall webhook: failed to process bot ${botId}`, err);
     if (deal.status !== "sent" && deal.status !== "signed") {
-      await prisma.deal.update({ where: { id: deal.id }, data: { status: "missing_info" } });
+      await prisma.deal.update({ where: { id: deal.id }, data: { status: "extraction_failed" } });
     }
   }
 

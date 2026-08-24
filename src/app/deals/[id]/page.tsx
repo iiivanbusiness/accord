@@ -4,11 +4,12 @@ import AppShell from "@/components/AppShell";
 import DealTermsCard from "@/components/DealTermsCard";
 import { prisma } from "@/lib/db";
 import { requireWorkspaceId } from "@/lib/workspace";
-import { fillMissingFields, generateContract, updateFieldValues } from "./actions";
+import { fillMissingFields, generateContract, retryExtraction, updateFieldValues } from "./actions";
 
 const STATUS_LABEL: Record<string, string> = {
   processing: "Analyzing call…",
   missing_info: "Missing info",
+  extraction_failed: "Couldn't process call",
   ready: "Ready for review",
   sent: "Sent — awaiting signature",
   signed: "Signed",
@@ -17,6 +18,7 @@ const STATUS_LABEL: Record<string, string> = {
 const STATUS_CHIP: Record<string, string> = {
   processing: "chip-neutral chip-live",
   missing_info: "chip-warn",
+  extraction_failed: "chip-warn",
   ready: "chip-active",
   sent: "chip-neutral",
   signed: "chip-success",
@@ -70,6 +72,22 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               <span className="chip-dot h-1.5 w-1.5 rounded-full" style={{ background: "var(--ink-muted)" }} />
               Analyzing the call — terms appear here live as they're mentioned.
             </div>
+          ) : deal.status === "extraction_failed" ? (
+            <div className="card" style={{ borderColor: "rgba(245,185,77,.28)" }}>
+              <div className="rounded-t-[20px] border-b px-5 py-4" style={{ background: "var(--warn-soft)", borderColor: "rgba(245,185,77,.2)" }}>
+                <h2 className="text-[15px] font-medium" style={{ color: "var(--warn)" }}>Couldn&apos;t process this call</h2>
+              </div>
+              <div className="px-5 py-4">
+                <p className="mb-3 text-[13px]" style={{ color: "var(--ink-muted)" }}>
+                  Something went wrong while extracting deal terms — check your AI extraction setup (e.g. Anthropic billing) and try again.
+                </p>
+                <form action={retryExtraction.bind(null, deal.id)}>
+                  <button type="submit" className="btn btn-primary w-full justify-center">
+                    Try again
+                  </button>
+                </form>
+              </div>
+            </div>
           ) : missing.length > 0 ? (
             <div className="card" style={{ borderColor: "rgba(245,185,77,.28)" }}>
               <div className="rounded-t-[20px] border-b px-5 py-4" style={{ background: "var(--warn-soft)", borderColor: "rgba(245,185,77,.2)" }}>
@@ -101,7 +119,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               </Link>
             ) : (
               <form action={generateContract.bind(null, deal.id)}>
-                <button type="submit" disabled={missing.length > 0 || deal.status === "processing"} className="btn btn-primary w-full justify-center">
+                <button type="submit" disabled={missing.length > 0 || deal.status === "processing" || deal.status === "extraction_failed"} className="btn btn-primary w-full justify-center">
                   Generate contract
                 </button>
               </form>

@@ -37,6 +37,7 @@ function BarRow({ label, count, max }: { label: string; count: number; max: numb
 const STATUS_LABEL: Record<string, string> = {
   processing: "Analyzing call",
   missing_info: "Missing info",
+  extraction_failed: "Couldn't process call",
   ready: "Ready for review",
   sent: "Sent",
   signed: "Signed",
