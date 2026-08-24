@@ -1,7 +1,7 @@
 import AppShell from "@/components/AppShell";
 import { prisma } from "@/lib/db";
 import { requireWorkspaceId } from "@/lib/workspace";
-import { toggleWorkspaceFlag, updateWorkspaceName } from "./actions";
+import { requestUpgrade, toggleWorkspaceFlag, updateWorkspaceName } from "./actions";
 
 function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notifyOnSigned" | "autoRemind" }) {
   return (
@@ -26,6 +26,7 @@ export default async function SettingsPage() {
   const usagePct = workspace ? Math.round((workspace.callsUsedThisMonth / workspace.callsLimit) * 100) : 0;
   if (!workspace) return null;
   const notifyEmail = workspace.users[0]?.email ?? "your account email";
+  const pendingUpgrade = await prisma.upgradeRequest.findFirst({ where: { workspaceId, status: "pending" } });
 
   return (
     <AppShell active="/settings" screenLabel="Settings">
@@ -73,7 +74,7 @@ export default async function SettingsPage() {
       </div>
 
       <div className="card mb-4 max-w-[600px] px-[22px] py-2">
-        <div className="flex items-center justify-between gap-4 border-b py-[15px]" style={{ borderColor: "var(--hairline-soft)" }}>
+        <div className="flex items-center justify-between gap-4 py-[15px]">
           <div className="w-full">
             <div className="text-[13.5px] font-medium">Workspace name</div>
             <form action={updateWorkspaceName} className="mt-2 flex gap-2">
@@ -82,15 +83,42 @@ export default async function SettingsPage() {
             </form>
           </div>
         </div>
-        <div className="flex items-center justify-between gap-4 py-[15px]">
-          <div>
-            <div className="text-[13.5px] font-medium">Plan</div>
-            <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
-              {workspace.plan} — {workspace.callsUsedThisMonth} of {workspace.callsLimit} calls used this month
+      </div>
+
+      <div className="card mb-4 max-w-[600px]">
+        <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
+          <h2 className="text-[15px] font-medium">Plan &amp; usage</h2>
+        </div>
+        <div className="px-[22px] py-[18px]">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-[13.5px] font-medium">{workspace.plan}</div>
+              <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
+                {workspace.callsUsedThisMonth} of {workspace.callsLimit} calls used this month
+              </div>
             </div>
-            <div className="mt-2 h-2 w-[220px] overflow-hidden rounded-full" style={{ background: "var(--surface-2)" }}>
-              <div className="h-full rounded-full" style={{ width: `${usagePct}%`, background: "var(--primary)" }} />
-            </div>
+            <span className="chip chip-neutral">{usagePct}%</span>
+          </div>
+          <div className="mt-3 h-2 w-full overflow-hidden rounded-full" style={{ background: "var(--surface-2)" }}>
+            <div className="h-full rounded-full" style={{ width: `${Math.min(100, usagePct)}%`, background: usagePct >= 100 ? "#ff6b57" : "var(--primary)" }} />
+          </div>
+
+          <div className="mt-4 border-t pt-4" style={{ borderColor: "var(--hairline-soft)" }}>
+            {pendingUpgrade ? (
+              <div className="chip chip-warn w-full justify-start px-3.5 py-2.5 text-[12.5px]">
+                Upgrade requested — we&apos;ll be in touch soon.
+              </div>
+            ) : (
+              <form action={requestUpgrade} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <input
+                  name="note"
+                  placeholder="What do you need? (optional)"
+                  className="input flex-1"
+                  style={{ fontSize: "13px", padding: "8px 11px" }}
+                />
+                <button type="submit" className="btn btn-primary btn-sm">Request upgrade</button>
+              </form>
+            )}
           </div>
         </div>
       </div>

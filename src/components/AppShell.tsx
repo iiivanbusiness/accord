@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { signOut } from "@/lib/auth";
+import { auth, signOut } from "@/lib/auth";
 import { requireWorkspace } from "@/lib/workspace";
+import { isAdminEmail } from "@/lib/admin";
 import ThemeToggle from "./ThemeToggle";
 import BrandLogo from "./BrandLogo";
 import MobileNavDrawer from "./MobileNavDrawer";
@@ -15,6 +16,8 @@ const NAV_ITEMS = [
   { href: "/settings", label: "Settings", icon: SettingsIcon },
 ] as const;
 
+const ADMIN_ITEM = { href: "/admin", label: "Admin", icon: AdminIcon } as const;
+
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
@@ -26,16 +29,18 @@ export default async function AppShell({
   screenLabel,
   children,
 }: {
-  active: (typeof NAV_ITEMS)[number]["href"];
+  active: (typeof NAV_ITEMS)[number]["href"] | typeof ADMIN_ITEM["href"];
   screenLabel: string;
   children: React.ReactNode;
 }) {
-  const workspace = await requireWorkspace();
+  const [workspace, session] = await Promise.all([requireWorkspace(), auth()]);
   const workspaceName = workspace.name;
+  const isAdmin = isAdminEmail(session?.user?.email);
+  const items = isAdmin ? [...NAV_ITEMS, ADMIN_ITEM] : NAV_ITEMS;
 
   const navLinks = (
     <div className="flex flex-1 flex-col gap-1">
-      {NAV_ITEMS.map((item) => {
+      {items.map((item) => {
         const Icon = item.icon;
         const isActive = item.href === active;
         return (
@@ -191,6 +196,15 @@ function SettingsIcon() {
       <circle cx="10" cy="6" r="1.6" />
       <circle cx="10" cy="14" r="1.6" />
       <path d="M4 6h3.4M12.6 6H16M4 14h3.4M12.6 14H16M10 7.6v4.8" />
+    </svg>
+  );
+}
+
+function AdminIcon() {
+  return (
+    <svg {...iconProps()}>
+      <path d="M10 2.5l6 2.4v4.4c0 4-2.6 6.6-6 8.2-3.4-1.6-6-4.2-6-8.2V4.9l6-2.4z" />
+      <path d="M7.4 10l1.9 1.9L12.7 8" />
     </svg>
   );
 }

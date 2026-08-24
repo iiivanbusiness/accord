@@ -26,3 +26,15 @@ export async function updateWorkspaceName(formData: FormData) {
   await prisma.workspace.update({ where: { id: workspace.id }, data: { name } });
   revalidatePath("/settings");
 }
+
+export async function requestUpgrade(formData: FormData) {
+  const note = String(formData.get("note") ?? "").trim() || null;
+  const workspace = await requireWorkspace();
+
+  const existing = await prisma.upgradeRequest.findFirst({ where: { workspaceId: workspace.id, status: "pending" } });
+  if (!existing) {
+    await prisma.upgradeRequest.create({ data: { workspaceId: workspace.id, note } });
+  }
+
+  revalidatePath("/settings");
+}

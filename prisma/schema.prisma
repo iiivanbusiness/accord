@@ -29,11 +29,12 @@ model Workspace {
 
   createdAt          DateTime @default(now())
 
-  users          User[]
-  clients        Client[]
-  deals          Deal[]
-  templates      ContractTemplate[]
-  calendarEvents CalendarEvent[]
+  users           User[]
+  clients         Client[]
+  deals           Deal[]
+  templates       ContractTemplate[]
+  calendarEvents  CalendarEvent[]
+  upgradeRequests UpgradeRequest[]
 }
 
 model User {
@@ -131,6 +132,16 @@ model Contract {
   signerIp   String?
   signatureImage String? // base64 PNG data URL, drawn on the sign page
   createdAt  DateTime          @default(now())
+}
+
+model UpgradeRequest {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  note        String?
+  status      String    @default("pending") // pending | resolved
+  createdAt   DateTime  @default(now())
+  resolvedAt  DateTime?
 }
 
 model CalendarEvent {
