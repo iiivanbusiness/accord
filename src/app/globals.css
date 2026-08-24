@@ -57,6 +57,7 @@
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 10px rgba(0, 0, 0, 0.03);
   --shadow-pop: 0 8px 30px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.05);
   --overlay-hover: rgba(0, 0, 0, 0.035);
+  --wordmark-invert: 0;
 }
 :root[data-theme="dark"] .sm-theme {
   --primary: #ffffff;
@@ -76,6 +77,7 @@
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5);
   --shadow-pop: 0 8px 30px rgba(0, 0, 0, 0.5);
   --overlay-hover: rgba(255, 255, 255, 0.05);
+  --wordmark-invert: 1;
 }
 
 @theme inline {

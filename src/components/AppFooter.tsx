@@ -39,7 +39,7 @@ export default function AppFooter() {
           src="/wordmark.png"
           alt=""
           className="absolute top-0"
-          style={{ width: "46vw", minWidth: 320, maxWidth: 620, opacity: 0.06 }}
+          style={{ width: "46vw", minWidth: 320, maxWidth: 620, opacity: 0.06, filter: "invert(var(--wordmark-invert))" }}
         />
       </div>
     </footer>
