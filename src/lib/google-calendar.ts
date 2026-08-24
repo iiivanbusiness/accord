@@ -79,6 +79,14 @@ function detectPlatform(event: GoogleEvent): string {
   return "meet";
 }
 
+const URL_PATTERN = /https?:\/\/[^\s<>")]+/i;
+
+function extractMeetingUrl(event: GoogleEvent): string | null {
+  if (event.hangoutLink) return event.hangoutLink;
+  const match = event.location?.match(URL_PATTERN);
+  return match ? match[0] : null;
+}
+
 // Syncs the workspace's connected Google Calendar into CalendarEvent rows.
 // Refreshes the access token first if it's missing/expired.
 export async function syncWorkspaceCalendar(workspaceId: string): Promise<number> {
@@ -108,6 +116,8 @@ export async function syncWorkspaceCalendar(workspaceId: string): Promise<number
   if (!res.ok) throw new Error(`Google Calendar fetch failed: ${res.status} ${await res.text()}`);
   const data = (await res.json()) as { items?: GoogleEvent[] };
 
+  const ownDomain = workspace.googleAccountEmail?.split("@")[1]?.toLowerCase();
+
   let synced = 0;
   for (const event of data.items ?? []) {
     const start = event.start?.dateTime ?? event.start?.date;
@@ -115,7 +125,9 @@ export async function syncWorkspaceCalendar(workspaceId: string): Promise<number
     const startTime = new Date(start);
     const end = event.end?.dateTime ?? event.end?.date;
     const durationMinutes = end ? Math.max(5, Math.round((new Date(end).getTime() - startTime.getTime()) / 60000)) : 30;
-    const clientName = event.attendees?.find((a) => a.email && !a.email.endsWith("@horizonmedia.com"))?.displayName ?? null;
+    const clientName =
+      event.attendees?.find((a) => a.email && (!ownDomain || !a.email.toLowerCase().endsWith(`@${ownDomain}`)))?.displayName ?? null;
+    const meetingUrl = extractMeetingUrl(event);
 
     await prisma.calendarEvent.upsert({
       where: { googleEventId: event.id },
@@ -127,6 +139,7 @@ export async function syncWorkspaceCalendar(workspaceId: string): Promise<number
         startTime,
         durationMinutes,
         platform: detectPlatform(event),
+        meetingUrl,
       },
       update: {
         title: event.summary ?? "Untitled event",
@@ -134,6 +147,7 @@ export async function syncWorkspaceCalendar(workspaceId: string): Promise<number
         startTime,
         durationMinutes,
         platform: detectPlatform(event),
+        meetingUrl,
       },
     });
     synced++;

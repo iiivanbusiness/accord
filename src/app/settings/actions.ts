@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
+import { auth } from "@/lib/auth";
 import { requireWorkspace } from "@/lib/workspace";
 import { createSenderDomain, getSenderDomainStatus, removeSenderDomain } from "@/lib/sender-domain";
+import { sendTeammateInviteEmail } from "@/lib/email";
 
 type ToggleField = "requireApproval" | "notifyOnSigned" | "autoRemind" | "zoomConnected" | "meetConnected";
 
@@ -74,6 +76,49 @@ export async function disconnectSenderDomain() {
     data: { senderDomain: null, senderDomainId: null, senderDomainStatus: null, senderEmail: null },
   });
 
+  revalidatePath("/settings");
+}
+
+export async function inviteTeammate(formData: FormData) {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!email) throw new Error("Enter an email address");
+
+  const workspace = await requireWorkspace();
+  const session = await auth();
+
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    if (existing.workspaceId === workspace.id) {
+      throw new Error("They're already on this workspace");
+    }
+    throw new Error("That email is already tied to another SealMe workspace");
+  }
+
+  await prisma.user.create({
+    data: { workspaceId: workspace.id, name: email, email, passwordHash: null },
+  });
+
+  try {
+    await sendTeammateInviteEmail({
+      to: email,
+      inviterName: session?.user?.name ?? session?.user?.email ?? "A teammate",
+      workspaceName: workspace.name,
+      loginUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/login`,
+    });
+  } catch (err) {
+    console.error("Failed to send teammate invite email", err);
+  }
+
+  revalidatePath("/settings");
+}
+
+export async function removeTeammate(userId: string) {
+  const workspace = await requireWorkspace();
+
+  const count = await prisma.user.count({ where: { workspaceId: workspace.id } });
+  if (count <= 1) throw new Error("Can't remove the only member of a workspace");
+
+  await prisma.user.deleteMany({ where: { id: userId, workspaceId: workspace.id } });
   revalidatePath("/settings");
 }
 

@@ -139,6 +139,7 @@ model Contract {
   signerName String?
   signerIp   String?
   signatureImage String? // base64 PNG data URL, drawn on the sign page
+  reminderSentAt DateTime? // set once the 3-day "still unsigned" nudge has gone out
   createdAt  DateTime          @default(now())
 }
 
@@ -161,6 +162,7 @@ model CalendarEvent {
   startTime       DateTime
   durationMinutes Int       @default(30)
   platform        String    @default("zoom") // zoom | meet
+  meetingUrl      String? // Zoom/Meet link — lets a bot be scheduled to auto-join at startTime
   linkedDealId    String?
   googleEventId   String?   @unique // set when synced from Google Calendar; null for manually-added events
 }

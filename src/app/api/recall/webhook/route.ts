@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { fetchBotTranscript, verifyRecallWebhook } from "@/lib/recall";
 import { applyExtractionToDeal } from "@/lib/deal-live";
 import { extractPlaceholderKeys } from "@/lib/contract";
+import { autoGenerateAndSendContract } from "@/lib/auto-send";
 
 type RecallWebhookPayload = {
   event: string;
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
   }
 
   const botId = event.data.bot.id;
-  const deal = await prisma.deal.findUnique({ where: { recallBotId: botId }, include: { template: true } });
+  const deal = await prisma.deal.findUnique({ where: { recallBotId: botId }, include: { template: true, workspace: true } });
   if (!deal || !deal.template) return NextResponse.json({ ok: true });
 
   try {
@@ -33,7 +34,14 @@ export async function POST(req: Request) {
     // this is the final, authoritative pass, reconciling anything the live pass missed.
     const transcript = await fetchBotTranscript(botId);
     const placeholderKeys = extractPlaceholderKeys(deal.template.clauses);
-    await applyExtractionToDeal(deal.id, transcript, placeholderKeys);
+    const { hasMissing } = await applyExtractionToDeal(deal.id, transcript, placeholderKeys);
+
+    // "Require manual approval before sending" off means nobody has to review an
+    // unattended (scheduled/live) call's contract before it goes out — only safe
+    // to do this once every required field actually has a value.
+    if (!hasMissing && !deal.workspace.requireApproval) {
+      await autoGenerateAndSendContract(deal.id);
+    }
   } catch (err) {
     console.error(`Recall webhook: failed to process bot ${botId}`, err);
     if (deal.status !== "sent" && deal.status !== "signed") {

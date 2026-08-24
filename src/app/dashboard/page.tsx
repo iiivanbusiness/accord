@@ -110,7 +110,7 @@ export default async function DashboardPage() {
             Zoom
           </a>
           <Link href="/deals/new" className="btn btn-primary">
-            + Upload a call
+            + Start a call
           </Link>
         </div>
       </div>

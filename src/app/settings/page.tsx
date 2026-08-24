@@ -6,6 +6,8 @@ import {
   checkSenderDomainVerification,
   connectSenderDomain,
   disconnectSenderDomain,
+  inviteTeammate,
+  removeTeammate,
   requestUpgrade,
   toggleWorkspaceFlag,
   updateWorkspaceName,
@@ -33,7 +35,7 @@ export default async function SettingsPage() {
   const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId }, include: { users: true } });
   const usagePct = workspace ? Math.round((workspace.callsUsedThisMonth / workspace.callsLimit) * 100) : 0;
   if (!workspace) return null;
-  const notifyEmail = workspace.users[0]?.email ?? "your account email";
+  const notifyEmail = workspace.users.map((u) => u.email).join(", ") || "your account email";
   const pendingUpgrade = await prisma.upgradeRequest.findFirst({ where: { workspaceId, status: "pending" } });
 
   let senderRecords: SenderDomainRecord[] = [];
@@ -99,6 +101,43 @@ export default async function SettingsPage() {
               <input name="name" defaultValue={workspace.name} className="input flex-1" style={{ fontSize: "13px", padding: "8px 11px" }} />
               <button type="submit" className="btn btn-secondary btn-sm">Save</button>
             </form>
+          </div>
+        </div>
+      </div>
+
+      <div className="card mb-4 max-w-[600px]">
+        <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
+          <h2 className="text-[15px] font-medium">Team</h2>
+        </div>
+        <div className="px-[22px] py-2">
+          {workspace.users.map((u) => (
+            <div key={u.id} className="flex items-center justify-between gap-3.5 border-b py-3" style={{ borderColor: "var(--hairline-soft)" }}>
+              <div>
+                <div className="text-[13.5px] font-medium">{u.name}</div>
+                <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>{u.email}</div>
+              </div>
+              {workspace.users.length > 1 && (
+                <form action={removeTeammate.bind(null, u.id)}>
+                  <button type="submit" className="text-[12px] font-medium" style={{ color: "var(--ink-muted)" }}>
+                    Remove
+                  </button>
+                </form>
+              )}
+            </div>
+          ))}
+          <form action={inviteTeammate} className="flex flex-col gap-2 py-3.5 sm:flex-row sm:items-center">
+            <input
+              name="email"
+              type="email"
+              required
+              placeholder="teammate@company.com"
+              className="input flex-1"
+              style={{ fontSize: "13px", padding: "8px 11px" }}
+            />
+            <button type="submit" className="btn btn-secondary btn-sm">Invite</button>
+          </form>
+          <div className="pb-3 text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
+            They&apos;ll get an email — they need to sign in with Google using that address (no password yet for invited teammates).
           </div>
         </div>
       </div>

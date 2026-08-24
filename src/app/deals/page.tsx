@@ -51,7 +51,7 @@ export default async function DealsPage() {
           </div>
         </div>
         <Link href="/deals/new" className="btn btn-primary">
-          + Upload a call
+          + Start a call
         </Link>
       </div>
 

@@ -29,6 +29,13 @@ export default function NewEventPage() {
           <span className="text-[13px] font-medium">Date &amp; time</span>
           <input name="startTime" type="datetime-local" required className="input" />
         </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[13px] font-medium">Meeting link (optional)</span>
+          <input name="meetingUrl" placeholder="https://zoom.us/j/... or meet.google.com/..." className="input" />
+          <span className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
+            Add this to schedule a notetaker bot that joins automatically at the start time.
+          </span>
+        </label>
         <div className="grid grid-cols-2 gap-3">
           <label className="flex flex-col gap-1.5">
             <span className="text-[13px] font-medium">Duration (min)</span>

@@ -20,6 +20,7 @@ export const authConfig = {
         request.nextUrl.pathname.startsWith("/sign") ||
         request.nextUrl.pathname.startsWith("/api/contracts") ||
         request.nextUrl.pathname.startsWith("/api/recall") ||
+        request.nextUrl.pathname.startsWith("/api/cron") ||
         request.nextUrl.pathname.startsWith("/terms") ||
         request.nextUrl.pathname.startsWith("/privacy");
       if (isPublic) return true;

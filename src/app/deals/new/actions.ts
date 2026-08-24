@@ -105,6 +105,59 @@ export async function createDealFromTranscript(formData: FormData) {
   redirect(`/deals/${deal.id}`);
 }
 
+export async function startCallFromEvent(formData: FormData) {
+  const eventId = String(formData.get("eventId") ?? "").trim();
+  const templateId = String(formData.get("templateId") ?? "").trim();
+
+  if (!eventId) throw new Error("Choose a calendar event");
+  if (!templateId) throw new Error("Choose a template");
+
+  const workspaceId = await requireWorkspaceId();
+
+  const event = await prisma.calendarEvent.findFirst({ where: { id: eventId, workspaceId } });
+  if (!event || !event.meetingUrl) throw new Error("That event doesn't have a meeting link");
+
+  // Recall only guarantees an on-time join for bots scheduled >10 min ahead —
+  // anything closer (or already started) falls back to joining right away.
+  const tenMinFromNow = Date.now() + 10 * 60 * 1000;
+  const joinAt = event.startTime.getTime() > tenMinFromNow ? event.startTime : undefined;
+
+  let bot;
+  try {
+    bot = await createCallBot(event.meetingUrl, joinAt);
+  } catch (err) {
+    console.error("Failed to schedule call bot for calendar event", eventId, err);
+    redirect(`/deals/new?mode=live&error=${encodeURIComponent("Couldn't schedule the call bot — check the event's meeting link and try again.")}`);
+  }
+
+  const clientName = event.clientName || event.title;
+  const client = await prisma.client.create({
+    data: { workspaceId, name: clientName, company: clientName },
+  });
+
+  const deal = await prisma.deal.create({
+    data: {
+      workspaceId,
+      clientId: client.id,
+      templateId,
+      service: "",
+      feeDisplay: "",
+      status: "processing",
+      source: detectPlatformFromUrl(event.meetingUrl),
+      recallBotId: bot.id,
+    },
+  });
+
+  await prisma.calendarEvent.update({ where: { id: eventId }, data: { linkedDealId: deal.id } });
+
+  await prisma.workspace.update({
+    where: { id: workspaceId },
+    data: { callsUsedThisMonth: { increment: 1 } },
+  });
+
+  redirect(`/deals/${deal.id}`);
+}
+
 export async function startCallBot(formData: FormData) {
   const meetingUrl = String(formData.get("meetingUrl") ?? "").trim();
   const clientName = String(formData.get("clientName") ?? "").trim();
@@ -119,7 +172,8 @@ export async function startCallBot(formData: FormData) {
   let bot;
   try {
     bot = await createCallBot(meetingUrl);
-  } catch {
+  } catch (err) {
+    console.error("Failed to start call bot", err);
     redirect(`/deals/new?mode=live&error=${encodeURIComponent("Couldn't start the call bot — check the meeting link and try again.")}`);
   }
 

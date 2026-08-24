@@ -12,6 +12,7 @@ export async function createEvent(formData: FormData) {
   const startTimeRaw = String(formData.get("startTime") ?? "");
   const durationMinutes = Number(formData.get("durationMinutes") ?? 30);
   const platform = String(formData.get("platform") ?? "zoom");
+  const meetingUrl = String(formData.get("meetingUrl") ?? "").trim() || null;
 
   if (!title || !startTimeRaw) throw new Error("Title and start time are required");
 
@@ -25,6 +26,7 @@ export async function createEvent(formData: FormData) {
       startTime: new Date(startTimeRaw),
       durationMinutes,
       platform,
+      meetingUrl,
     },
   });
 

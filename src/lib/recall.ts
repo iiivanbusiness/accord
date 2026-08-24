@@ -17,7 +17,7 @@ export function detectPlatformFromUrl(meetingUrl: string): string {
   return meetingUrl.includes("zoom.us") ? "zoom" : "meet";
 }
 
-export async function createCallBot(meetingUrl: string): Promise<{ id: string }> {
+export async function createCallBot(meetingUrl: string, joinAt?: Date): Promise<{ id: string }> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
   const res = await fetch(`${API_BASE}/bot/`, {
     method: "POST",
@@ -25,6 +25,9 @@ export async function createCallBot(meetingUrl: string): Promise<{ id: string }>
     body: JSON.stringify({
       meeting_url: meetingUrl,
       bot_name: "SealMe Notetaker",
+      // Recall guarantees on-time joins for bots scheduled >10 min ahead — omit
+      // entirely for "join now" so it falls into the ad-hoc (immediate) pool instead.
+      ...(joinAt ? { join_at: joinAt.toISOString() } : {}),
       recording_config: {
         transcript: {
           // "prioritize_low_latency" only transcribes English. Auto-detecting the
