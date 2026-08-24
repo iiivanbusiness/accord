@@ -57,6 +57,7 @@ export async function applyExtractionToDeal(
       service: locked("service") ? deal.service : service || deal.service,
       feeDisplay: locked("fee") ? deal.feeDisplay : fee || deal.feeDisplay,
       status: hasMissing ? "missing_info" : "ready",
+      summary: extracted.summary ?? deal.summary,
       lastExtractedAt: new Date(),
     },
   });

@@ -1,0 +1,2 @@
+ALTER TABLE "Deal" ADD COLUMN "summary" TEXT;
+ALTER TABLE "Contract" ADD COLUMN "viewedAt" TIMESTAMP(3);

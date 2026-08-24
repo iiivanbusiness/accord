@@ -5,6 +5,17 @@ import { prisma } from "@/lib/db";
 import { fillClauses } from "@/lib/contract";
 import { requireWorkspaceId } from "@/lib/workspace";
 
+function timeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 export default async function ContractPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const workspaceId = await requireWorkspaceId();
@@ -43,8 +54,15 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
         </div>
       )}
       {deal.contract.status === "sent" && (
-        <div className="chip chip-warn mb-[18px] px-4 py-3 text-[13.5px]">
-          ✓ Sent to {deal.client.name} — awaiting signature
+        <div className="mb-[18px] flex flex-wrap items-center gap-3">
+          <div className="chip chip-warn px-4 py-3 text-[13.5px]">
+            ✓ Sent to {deal.client.name} — awaiting signature
+          </div>
+          {deal.contract.viewedAt && (
+            <span className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
+              👁 Viewed {timeAgo(deal.contract.viewedAt)}
+            </span>
+          )}
         </div>
       )}
 

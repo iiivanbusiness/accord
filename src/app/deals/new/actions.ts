@@ -92,6 +92,7 @@ export async function createDealFromTranscript(formData: FormData) {
       service,
       feeDisplay: fee,
       status: hasMissing ? "missing_info" : "ready",
+      summary: extracted.summary,
       source: "upload",
       fields: { create: fieldRows },
     },

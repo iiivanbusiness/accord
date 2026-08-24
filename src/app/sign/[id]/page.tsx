@@ -13,6 +13,10 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
   });
   if (!contract || !contract.template) notFound();
 
+  if (!contract.viewedAt) {
+    await prisma.contract.update({ where: { id: contract.id }, data: { viewedAt: new Date() } });
+  }
+
   const clauses = fillClauses(contract.template.clauses, contract.deal.fields);
   const signed = contract.status === "signed";
 

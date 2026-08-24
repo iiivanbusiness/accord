@@ -117,6 +117,7 @@ model Deal {
   status     String   @default("processing") // processing | missing_info | ready | sent | signed
   source     String   @default("manual") // zoom | meet | manual | upload
   callLength String?
+  summary    String? // 2-3 sentence "what happened on this call", from the same extraction pass as the fields
   recallBotId String? @unique // set when a Recall.ai bot is capturing this call
   liveTranscript  String?   // accumulated utterances while a live call is in progress
   lastExtractedAt DateTime? // throttles re-extraction during a live call
@@ -159,6 +160,7 @@ model Contract {
   signerIp   String?
   signatureImage String? // base64 PNG data URL, drawn on the sign page
   reminderSentAt DateTime? // set once the 3-day "still unsigned" nudge has gone out
+  viewedAt   DateTime? // first time the client actually opened the sign page
   createdAt  DateTime          @default(now())
 }
 

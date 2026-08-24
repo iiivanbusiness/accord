@@ -6,6 +6,17 @@ import { prisma } from "@/lib/db";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { fillMissingFields, generateContract, retryExtraction, updateFieldValues } from "./actions";
 
+function timeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 const STATUS_LABEL: Record<string, string> = {
   processing: "Analyzing call…",
   missing_info: "Missing info",
@@ -54,17 +65,34 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
             {deal.callLength ? ` · from a ${deal.callLength}` : ""}
           </div>
         </div>
-        <span className={`chip ${STATUS_CHIP[deal.status] ?? "chip-neutral"}`}>
-          <span className="chip-dot" />
-          {STATUS_LABEL[deal.status] ?? deal.status}
-        </span>
+        <div className="flex flex-none flex-col items-end gap-1.5">
+          <span className={`chip ${STATUS_CHIP[deal.status] ?? "chip-neutral"}`}>
+            <span className="chip-dot" />
+            {STATUS_LABEL[deal.status] ?? deal.status}
+          </span>
+          {deal.contract?.viewedAt && (
+            <span className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
+              👁 Viewed {timeAgo(deal.contract.viewedAt)}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-[18px] lg:grid-cols-[1fr_300px]">
-        <DealTermsCard
-          groups={[...groups.entries()].filter(([label]) => label !== "Missing")}
-          updateAction={updateFieldValues.bind(null, deal.id)}
-        />
+        <div className="flex flex-col gap-[18px]">
+          {deal.summary && (
+            <div className="card p-5">
+              <h2 className="mb-1.5 text-[12px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
+                Call summary
+              </h2>
+              <p className="text-[13.5px] leading-relaxed">{deal.summary}</p>
+            </div>
+          )}
+          <DealTermsCard
+            groups={[...groups.entries()].filter(([label]) => label !== "Missing")}
+            updateAction={updateFieldValues.bind(null, deal.id)}
+          />
+        </div>
 
         <div className="flex flex-col gap-4">
           {deal.status === "processing" ? (

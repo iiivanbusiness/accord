@@ -31,6 +31,7 @@ export type ExtractedDeal = {
   clientName: string;
   company: string | null;
   email: string | null;
+  summary: string | null;
   fields: ExtractedField[];
 };
 
@@ -62,6 +63,7 @@ export async function extractDealFromTranscript(transcript: string, placeholderK
             clientName: { type: "string", description: "The client contact's full name" },
             company: { type: "string", description: "The client's company name, if mentioned" },
             email: { type: "string", description: "The client's email address, if mentioned" },
+            summary: { type: "string", description: "A neutral 2-3 sentence summary of what was discussed on the call — the context, what the client needs, and any notable concerns raised. Not a restatement of the extracted fields." },
             fields: {
               type: "array",
               description: "One entry per requested field key, in the same order given.",
@@ -93,6 +95,7 @@ export async function extractDealFromTranscript(transcript: string, placeholderK
     clientName: string;
     company?: string;
     email?: string;
+    summary?: string;
     fields: { fieldKey: string; value: string; sourceQuote: string; confidence: number }[];
   };
 
@@ -100,6 +103,7 @@ export async function extractDealFromTranscript(transcript: string, placeholderK
     clientName: input.clientName,
     company: input.company?.trim() || null,
     email: input.email?.trim() || null,
+    summary: input.summary?.trim() || null,
     fields: input.fields.map((f) => ({
       fieldKey: f.fieldKey,
       value: f.value?.trim() || null,
