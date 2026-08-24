@@ -28,8 +28,16 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
       </div>
 
       {deal.contract.status === "signed" && (
-        <div className="chip chip-success mb-[18px] px-4 py-3 text-[13.5px]">
-          ✓ Signed by {deal.contract.signerName} on {deal.contract.signedAt?.toLocaleDateString()}
+        <div className="mb-[18px] flex flex-wrap items-center gap-3">
+          <div className="chip chip-success px-4 py-3 text-[13.5px]">
+            ✓ Signed by {deal.contract.signerName} on {deal.contract.signedAt?.toLocaleDateString()}
+          </div>
+          {deal.contract.signatureImage && (
+            <div className="card px-3 py-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={deal.contract.signatureImage} alt={`${deal.contract.signerName}'s signature`} style={{ height: 40 }} />
+            </div>
+          )}
         </div>
       )}
       {deal.contract.status === "sent" && (

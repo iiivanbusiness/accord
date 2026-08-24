@@ -129,6 +129,7 @@ model Contract {
   signedAt   DateTime?
   signerName String?
   signerIp   String?
+  signatureImage String? // base64 PNG data URL, drawn on the sign page
   createdAt  DateTime          @default(now())
 }
 

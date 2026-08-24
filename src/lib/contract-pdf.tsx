@@ -1,4 +1,4 @@
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, Text, View, Image, StyleSheet } from "@react-pdf/renderer";
 import type { Clause } from "./contract";
 
 const styles = StyleSheet.create({
@@ -8,6 +8,7 @@ const styles = StyleSheet.create({
   clause: { marginBottom: 16 },
   clauseTitle: { fontSize: 12, fontFamily: "Helvetica-Bold", marginBottom: 4 },
   clauseBody: { fontSize: 11, lineHeight: 1.5, color: "#3A403D" },
+  signatureImage: { width: 160, height: 50, marginTop: 6, marginBottom: 4 },
   footer: { position: "absolute", bottom: 40, left: 56, right: 56, fontSize: 9, color: "#9AA19C", textAlign: "center" },
 });
 
@@ -17,12 +18,14 @@ export function ContractPdfDocument({
   clauses,
   signedBy,
   signedAt,
+  signatureImage,
 }: {
   templateName: string;
   clientName: string;
   clauses: Clause[];
   signedBy?: string | null;
   signedAt?: Date | null;
+  signatureImage?: string | null;
 }) {
   return (
     <Document>
@@ -38,6 +41,7 @@ export function ContractPdfDocument({
         {signedBy && signedAt && (
           <View style={styles.clause}>
             <Text style={styles.clauseTitle}>Signature</Text>
+            {signatureImage && <Image style={styles.signatureImage} src={signatureImage} />}
             <Text style={styles.clauseBody}>Signed electronically by {signedBy} on {signedAt.toLocaleDateString()}.</Text>
           </View>
         )}

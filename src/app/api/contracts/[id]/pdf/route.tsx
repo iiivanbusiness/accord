@@ -22,6 +22,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       clauses={clauses}
       signedBy={contract.signerName}
       signedAt={contract.signedAt}
+      signatureImage={contract.signatureImage}
     />
   );
 

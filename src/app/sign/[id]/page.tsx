@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { fillClauses } from "@/lib/contract";
 import { signContract } from "./actions";
 import BrandLogo from "@/components/BrandLogo";
+import SignaturePad from "@/components/SignaturePad";
 
 export default async function SignPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -34,8 +35,16 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
 
       <main className="mx-auto max-w-[720px] px-6 py-10">
         {signed && (
-          <div className="chip chip-success mb-6 px-4 py-3 text-[13.5px]">
-            ✓ Signed by {contract.signerName} on {contract.signedAt?.toLocaleDateString()}
+          <div className="mb-6 flex flex-col gap-3">
+            <div className="chip chip-success px-4 py-3 text-[13.5px]">
+              ✓ Signed by {contract.signerName} on {contract.signedAt?.toLocaleDateString()}
+            </div>
+            {contract.signatureImage && (
+              <div className="card inline-block w-fit px-4 py-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={contract.signatureImage} alt={`${contract.signerName}'s signature`} style={{ height: 60 }} />
+              </div>
+            )}
           </div>
         )}
 
@@ -59,13 +68,14 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
           <div className="card mt-5 p-6">
             <h2 className="mb-1 text-[16px] font-medium">Review &amp; sign</h2>
             <p className="mb-4 text-[13px]" style={{ color: "var(--ink-muted)" }}>
-              Typing your name below and clicking Sign counts as your electronic signature on this agreement.
+              Draw your signature below and click Sign to complete this agreement.
             </p>
             <form action={signContract.bind(null, contract.id)} className="flex flex-col gap-3">
               <label className="flex flex-col gap-1.5">
                 <span className="text-[13px] font-medium">Full name</span>
                 <input name="signerName" required placeholder="Type your full name" className="input" />
               </label>
+              <SignaturePad name="signatureImage" />
               <label className="flex items-start gap-2 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
                 <input type="checkbox" required className="mt-0.5" />
                 I have reviewed the agreement above and agree to its terms.
