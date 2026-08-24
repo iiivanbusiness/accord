@@ -4,8 +4,9 @@ export function isEmailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY);
 }
 
-function fromAddress(): string {
-  return process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+function fromAddress(workspaceName: string): string {
+  const address = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+  return `${workspaceName} via SealMe <${address}>`;
 }
 
 export async function sendContractEmail(options: {
@@ -14,6 +15,7 @@ export async function sendContractEmail(options: {
   message: string;
   signLink: string;
   workspaceName: string;
+  replyTo?: string | null;
 }): Promise<void> {
   const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -33,10 +35,11 @@ export async function sendContractEmail(options: {
   `;
 
   const { error } = await resend.emails.send({
-    from: fromAddress(),
+    from: fromAddress(options.workspaceName),
     to: options.to,
     subject: options.subject,
     html,
+    ...(options.replyTo ? { replyTo: options.replyTo } : {}),
   });
 
   if (error) throw new Error(error.message);

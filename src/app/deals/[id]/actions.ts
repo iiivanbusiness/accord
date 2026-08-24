@@ -72,11 +72,12 @@ export async function sendContractEmail(dealId: string, formData: FormData) {
   const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { contract: true } });
   if (!deal || !deal.contract) throw new Error("Deal not found");
 
-  const workspace = await prisma.workspace.findFirst();
+  const workspace = await prisma.workspace.findFirst({ include: { users: true } });
   const signLink = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/sign/${deal.contract.id}`;
+  const replyTo = workspace?.users[0]?.email ?? null;
 
   try {
-    await sendEmail({ to, subject, message, signLink, workspaceName: workspace?.name ?? "Your workspace" });
+    await sendEmail({ to, subject, message, signLink, workspaceName: workspace?.name ?? "Your workspace", replyTo });
   } catch {
     redirect(`/deals/${dealId}/send?error=${encodeURIComponent("Couldn't send the email — check your Resend setup and try again.")}`);
   }

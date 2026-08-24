@@ -20,9 +20,10 @@ function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notify
 }
 
 export default async function SettingsPage() {
-  const workspace = await prisma.workspace.findFirst();
+  const workspace = await prisma.workspace.findFirst({ include: { users: true } });
   const usagePct = workspace ? Math.round((workspace.callsUsedThisMonth / workspace.callsLimit) * 100) : 0;
   if (!workspace) return null;
+  const notifyEmail = workspace.users[0]?.email ?? "your account email";
 
   return (
     <AppShell active="/settings" screenLabel="Settings">
@@ -103,7 +104,7 @@ export default async function SettingsPage() {
         <div className="flex items-center justify-between gap-4 border-b py-[15px]" style={{ borderColor: "var(--hairline-soft)" }}>
           <div>
             <div className="text-[13.5px] font-medium">Email me when a contract is signed</div>
-            <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>Sent to hello@horizonmedia.com</div>
+            <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>Sent to {notifyEmail}</div>
           </div>
           <Toggle on={workspace.notifyOnSigned} field="notifyOnSigned" />
         </div>
