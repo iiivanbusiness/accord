@@ -45,9 +45,7 @@ export default function MobileNavDrawer({ children }: { children: React.ReactNod
                 <path d="M5 5l10 10M15 5L5 15" />
               </svg>
             </button>
-            <div onClick={() => setOpen(false)} className="flex flex-1 flex-col">
-              {children}
-            </div>
+            <div className="flex flex-1 flex-col">{children}</div>
           </div>
         </div>
       )}
