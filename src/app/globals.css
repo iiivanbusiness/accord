@@ -125,7 +125,6 @@
 
 html, body {
   min-height: 100%;
-  overflow-x: hidden;
   overscroll-behavior: none;
 }
 

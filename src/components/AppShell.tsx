@@ -68,7 +68,10 @@ export default async function AppShell({ children }: { children: React.ReactNode
   return (
     <div className="sm-theme min-h-dvh" style={{ background: "var(--canvas)" }}>
       <div className="grid min-h-dvh grid-cols-1 md:grid-cols-[232px_1fr]">
-        <GlassPanel as="nav" className="m-3.5 hidden rounded-[28px] px-3.5 py-[22px] md:flex">
+        <GlassPanel
+          as="nav"
+          className="m-3.5 hidden rounded-[28px] px-3.5 py-[22px] md:flex md:sticky md:top-3.5 md:h-[calc(100dvh-28px)] md:self-start"
+        >
           <div className="mb-7 px-2">
             <BrandLogo height={20} />
           </div>
