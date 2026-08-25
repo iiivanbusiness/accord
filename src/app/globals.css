@@ -58,6 +58,11 @@
   --shadow-pop: 0 8px 30px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.05);
   --overlay-hover: rgba(0, 0, 0, 0.035);
   --wordmark-invert: 0;
+  /* minimalist "inverted" surface for hero/promo panels — deep black on light theme */
+  --surface-inverted: #1d1d1f;
+  --surface-inverted-2: #2c2c2e;
+  --on-surface-inverted: #ffffff;
+  --on-surface-inverted-muted: rgba(255, 255, 255, 0.6);
 }
 :root[data-theme="dark"] .sm-theme {
   --primary: #ffffff;
@@ -78,6 +83,11 @@
   --shadow-pop: 0 8px 30px rgba(0, 0, 0, 0.5);
   --overlay-hover: rgba(255, 255, 255, 0.05);
   --wordmark-invert: 1;
+  /* on dark theme, "inverted" panels flip to a soft light grey — not stark white */
+  --surface-inverted: #e4e4e9;
+  --surface-inverted-2: #d3d3d9;
+  --on-surface-inverted: #1d1d1f;
+  --on-surface-inverted-muted: rgba(29, 29, 31, 0.6);
 }
 
 @theme inline {
@@ -117,9 +127,22 @@ body {
 .sm-theme {
   color: var(--ink);
   background: var(--canvas);
+  transition: background-color .2s ease, color .2s ease;
 }
-.sm-theme, .sm-theme * {
-  transition: background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease;
+/* Scoped theme-transition (not a `*` selector) so switching themes doesn't force
+   style recalc across the whole subtree — only elements that actually carry
+   theme-driven colors animate. */
+.sm-theme .card,
+.sm-theme .surface-1,
+.sm-theme .surface-2,
+.sm-theme .btn,
+.sm-theme .chip,
+.sm-theme .input,
+.sm-theme nav,
+.sm-theme header,
+.sm-theme a,
+.sm-theme svg {
+  transition: background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease, opacity .15s ease;
 }
 
 h1, h2, h3 {
@@ -150,19 +173,56 @@ a {
   box-shadow: var(--shadow-card);
 }
 
+.card-hover {
+  transition: transform .18s cubic-bezier(.2,.7,.3,1), box-shadow .18s ease, border-color .18s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-pop);
+  border-color: var(--hairline);
+}
+
 .row-hover:hover { background: var(--overlay-hover); }
 
+/* ---------- theme toggle: sliding sun/moon pill ---------- */
 .theme-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 46px;
+  height: 26px;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  transition: background .2s ease, border-color .2s ease;
+  cursor: pointer;
+}
+.theme-toggle:hover { border-color: var(--ink-muted); }
+.theme-toggle .theme-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 29px;
-  height: 29px;
-  border-radius: 50%;
-  color: var(--ink-muted);
-  transition: background .15s ease, color .15s ease;
+  background: var(--primary);
+  color: var(--on-primary);
+  transform: translateX(0);
+  transition: transform .28s cubic-bezier(.34,1.4,.64,1), background .2s ease;
 }
-.theme-toggle:hover { background: var(--surface-2); color: var(--ink); }
+.theme-toggle[data-on="true"] .theme-toggle-thumb {
+  transform: translateX(20px);
+}
+.theme-toggle .theme-toggle-thumb svg {
+  transition: transform .28s ease, opacity .2s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .theme-toggle .theme-toggle-thumb { transition: none; }
+}
 
 /* ---------- theme-aware brand logo: swap image instead of recoloring ---------- */
 .brand-logo-light { display: block; }

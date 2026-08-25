@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { auth, signOut } from "@/lib/auth";
 import { requireWorkspace } from "@/lib/workspace";
 import { isAdminEmail } from "@/lib/admin";
@@ -6,6 +5,8 @@ import ThemeToggle from "./ThemeToggle";
 import BrandLogo from "./BrandLogo";
 import MobileNavDrawer from "./MobileNavDrawer";
 import AppFooter from "./AppFooter";
+import SidebarNav from "./SidebarNav";
+import UpgradeCard from "./UpgradeCard";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: DashboardIcon },
@@ -39,29 +40,12 @@ export default async function AppShell({
   const isAdmin = isAdminEmail(session?.user?.email);
   const items = isAdmin ? [...NAV_ITEMS, ADMIN_ITEM] : NAV_ITEMS;
 
-  const navLinks = (
-    <div className="flex flex-1 flex-col gap-1">
-      {items.map((item) => {
-        const Icon = item.icon;
-        const isActive = item.href === active;
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-[13.5px] font-medium transition-colors"
-            style={
-              isActive
-                ? { background: "var(--primary)", color: "var(--on-primary)" }
-                : { color: "var(--ink-muted)" }
-            }
-          >
-            <Icon />
-            {item.label}
-          </Link>
-        );
-      })}
-    </div>
-  );
+  const navItems = items.map((item) => {
+    const Icon = item.icon;
+    return { href: item.href, label: item.label, isActive: item.href === active, icon: <Icon /> };
+  });
+
+  const navLinks = <SidebarNav items={navItems} />;
 
   const workspaceFooter = (
     <div className="mt-4 flex flex-col gap-3 border-t pt-4" style={{ borderColor: "var(--hairline-soft)" }}>
@@ -98,6 +82,7 @@ export default async function AppShell({
             <BrandLogo height={20} />
           </div>
           {navLinks}
+          <UpgradeCard />
           {workspaceFooter}
         </nav>
 

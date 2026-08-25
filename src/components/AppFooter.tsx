@@ -1,3 +1,4 @@
+import Image from "next/image";
 import InstagramIcon from "./InstagramIcon";
 
 export default function AppFooter() {
@@ -34,12 +35,14 @@ export default function AppFooter() {
         style={{ height: "9vw", minHeight: 60, maxHeight: 170, background: "var(--canvas)" }}
         aria-hidden="true"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src="/wordmark.png"
           alt=""
+          width={1055}
+          height={240}
+          loading="lazy"
           className="absolute top-0"
-          style={{ width: "46vw", minWidth: 320, maxWidth: 620, opacity: 0.06, filter: "invert(var(--wordmark-invert))" }}
+          style={{ width: "46vw", minWidth: 320, maxWidth: 620, height: "auto", opacity: 0.06, filter: "invert(var(--wordmark-invert))" }}
         />
       </div>
     </footer>

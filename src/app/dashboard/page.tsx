@@ -48,7 +48,7 @@ const STATUS_CHIP: Record<string, string> = {
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="card p-5">
+    <div className="card card-hover p-5">
       <div className="text-[11px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
         {label}
       </div>
@@ -59,6 +59,29 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
         </div>
       )}
     </div>
+  );
+}
+
+function RingChart({ pct, size = 46, stroke = 5, color, track }: { pct: number; size?: number; stroke?: number; color: string; track: string }) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const offset = c * (1 - Math.min(100, Math.max(0, pct)) / 100);
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: "rotate(-90deg)", flex: "none" }}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={track} strokeWidth={stroke} />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke={color}
+        strokeWidth={stroke}
+        strokeLinecap="round"
+        strokeDasharray={c}
+        strokeDashoffset={offset}
+        style={{ transition: "stroke-dashoffset .7s cubic-bezier(.2,.7,.3,1)" }}
+      />
+    </svg>
   );
 }
 
@@ -90,6 +113,7 @@ export default async function DashboardPage() {
   }
   const maxMonthValue = Math.max(...months.map((m) => m.value), 1);
   const currentMonthKey = `${now.getFullYear()}-${now.getMonth()}`;
+  const signedRate = deals.length > 0 ? Math.round((signedCount / deals.length) * 100) : 0;
 
   const recentDeals = deals.slice(0, 5);
 
@@ -123,11 +147,26 @@ export default async function DashboardPage() {
       </div>
 
       <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr]">
-        <div className="card p-5">
-          <div className="mb-5 flex items-center justify-between">
+        <div
+          className="card-hover relative overflow-hidden rounded-[20px] p-5"
+          style={{ background: "var(--surface-inverted)", color: "var(--on-surface-inverted)", border: "1px solid transparent" }}
+        >
+          <div
+            className="pointer-events-none absolute -right-10 -top-16 h-52 w-52 rounded-full blur-3xl"
+            style={{ background: "radial-gradient(circle, var(--gradient-violet), transparent 70%)", opacity: 0.35 }}
+            aria-hidden="true"
+          />
+          <div className="relative mb-5 flex items-center justify-between">
             <h2 className="text-[15px] font-medium">Deal value by month</h2>
+            <div className="flex items-center gap-2.5">
+              <RingChart pct={signedRate} color="var(--on-surface-inverted)" track="var(--surface-inverted-2)" />
+              <div className="leading-tight">
+                <div className="font-mono-tab text-[15px] font-semibold">{signedRate}%</div>
+                <div className="text-[11px]" style={{ color: "var(--on-surface-inverted-muted)" }}>signed</div>
+              </div>
+            </div>
           </div>
-          <div className="flex h-[160px] items-end gap-3">
+          <div className="relative flex h-[160px] items-end gap-3">
             {months.map((m) => {
               const heightPct = maxMonthValue > 0 ? Math.max(4, Math.round((m.value / maxMonthValue) * 100)) : 4;
               const isCurrent = m.key === currentMonthKey;
@@ -135,15 +174,15 @@ export default async function DashboardPage() {
                 <div key={m.key} className="flex flex-1 flex-col items-center gap-2">
                   <div className="flex h-[120px] w-full items-end">
                     <div
-                      className="w-full rounded-t-[6px] transition-all"
+                      className="w-full rounded-t-[6px] transition-all duration-500 ease-out"
                       style={{
                         height: `${heightPct}%`,
-                        background: isCurrent ? "var(--primary)" : "var(--surface-2)",
+                        background: isCurrent ? "var(--on-surface-inverted)" : "var(--surface-inverted-2)",
                       }}
                       title={`€${m.value.toLocaleString()}`}
                     />
                   </div>
-                  <span className="text-[11.5px]" style={{ color: isCurrent ? "var(--ink)" : "var(--ink-muted)" }}>
+                  <span className="text-[11.5px]" style={{ color: isCurrent ? "var(--on-surface-inverted)" : "var(--on-surface-inverted-muted)" }}>
                     {m.label}
                   </span>
                 </div>
@@ -152,7 +191,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="card p-5">
+        <div className="card card-hover p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-[15px] font-medium">Upcoming calls</h2>
             <Link href="/calendar" className="text-[12.5px] font-medium" style={{ color: "var(--accent-blue)" }}>
@@ -186,7 +225,7 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <div className="card overflow-hidden">
+      <div className="card card-hover overflow-hidden">
         <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Recent deals</h2>
           <Link href="/deals" className="text-[12.5px] font-medium" style={{ color: "var(--accent-blue)" }}>
