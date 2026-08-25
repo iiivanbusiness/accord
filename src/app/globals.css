@@ -63,6 +63,11 @@
   --surface-inverted-2: #2c2c2e;
   --on-surface-inverted: #ffffff;
   --on-surface-inverted-muted: rgba(255, 255, 255, 0.6);
+  /* liquid-glass material: translucent, blurred, with a specular top edge */
+  --glass-tint: rgba(29, 29, 31, 0.8);
+  --glass-track: rgba(0, 0, 0, 0.05);
+  --glass-highlight: rgba(255, 255, 255, 0.4);
+  --glass-border: rgba(255, 255, 255, 0.16);
 }
 :root[data-theme="dark"] .sm-theme {
   --primary: #ffffff;
@@ -88,6 +93,10 @@
   --surface-inverted-2: #d3d3d9;
   --on-surface-inverted: #1d1d1f;
   --on-surface-inverted-muted: rgba(29, 29, 31, 0.6);
+  --glass-tint: rgba(255, 255, 255, 0.82);
+  --glass-track: rgba(255, 255, 255, 0.06);
+  --glass-highlight: rgba(255, 255, 255, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.22);
 }
 
 @theme inline {
@@ -184,7 +193,7 @@ a {
 
 .row-hover:hover { background: var(--overlay-hover); }
 
-/* ---------- theme toggle: sliding sun/moon pill ---------- */
+/* ---------- theme toggle: liquid-glass sliding sun/moon pill ---------- */
 .theme-toggle {
   position: relative;
   display: inline-flex;
@@ -193,8 +202,11 @@ a {
   height: 26px;
   padding: 3px;
   border-radius: var(--r-pill);
-  background: var(--surface-2);
+  background: var(--glass-track);
+  backdrop-filter: blur(8px) saturate(160%);
+  -webkit-backdrop-filter: blur(8px) saturate(160%);
   border: 1px solid var(--hairline);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
   transition: background .2s ease, border-color .2s ease;
   cursor: pointer;
 }
@@ -209,10 +221,14 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--primary);
+  background: var(--glass-tint);
+  backdrop-filter: blur(10px) saturate(180%);
+  -webkit-backdrop-filter: blur(10px) saturate(180%);
+  border: 1px solid var(--glass-border);
   color: var(--on-primary);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), inset 0 -3px 4px -2px rgba(0, 0, 0, 0.25), 0 2px 6px rgba(0, 0, 0, 0.18);
   transform: translateX(0);
-  transition: transform .28s cubic-bezier(.34,1.4,.64,1), background .2s ease;
+  transition: transform .32s cubic-bezier(.34,1.5,.55,1), background .2s ease;
 }
 .theme-toggle[data-on="true"] .theme-toggle-thumb {
   transform: translateX(20px);
@@ -222,6 +238,16 @@ a {
 }
 @media (prefers-reduced-motion: reduce) {
   .theme-toggle .theme-toggle-thumb { transition: none; }
+}
+
+/* ---------- sidebar: liquid-glass active-item pill ---------- */
+.nav-pill {
+  border-radius: var(--r-md);
+  background: var(--glass-tint);
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), inset 0 -8px 12px -8px rgba(0, 0, 0, 0.22), 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 /* ---------- theme-aware brand logo: swap image instead of recoloring ---------- */

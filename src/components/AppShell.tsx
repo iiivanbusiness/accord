@@ -1,24 +1,25 @@
 import { auth, signOut } from "@/lib/auth";
 import { requireWorkspace } from "@/lib/workspace";
 import { isAdminEmail } from "@/lib/admin";
+import { NAV_ITEMS, ADMIN_ITEM } from "@/lib/nav-config";
 import ThemeToggle from "./ThemeToggle";
 import BrandLogo from "./BrandLogo";
 import MobileNavDrawer from "./MobileNavDrawer";
 import AppFooter from "./AppFooter";
 import SidebarNav from "./SidebarNav";
 import UpgradeCard from "./UpgradeCard";
+import ScreenLabel from "./ScreenLabel";
 
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: DashboardIcon },
-  { href: "/deals", label: "Deals", icon: DealsIcon },
-  { href: "/calendar", label: "Calendar", icon: CalendarIcon },
-  { href: "/analytics", label: "Analytics", icon: AnalyticsIcon },
-  { href: "/clients", label: "Clients", icon: ClientsIcon },
-  { href: "/templates", label: "Templates", icon: TemplatesIcon },
-  { href: "/settings", label: "Settings", icon: SettingsIcon },
-] as const;
-
-const ADMIN_ITEM = { href: "/admin", label: "Admin", icon: AdminIcon } as const;
+const NAV_ICONS: Record<string, () => React.ReactNode> = {
+  "/dashboard": DashboardIcon,
+  "/deals": DealsIcon,
+  "/calendar": CalendarIcon,
+  "/analytics": AnalyticsIcon,
+  "/clients": ClientsIcon,
+  "/templates": TemplatesIcon,
+  "/settings": SettingsIcon,
+  "/admin": AdminIcon,
+};
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -26,23 +27,15 @@ function initials(name: string): string {
   return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
-export default async function AppShell({
-  active,
-  screenLabel,
-  children,
-}: {
-  active: (typeof NAV_ITEMS)[number]["href"] | typeof ADMIN_ITEM["href"];
-  screenLabel: string;
-  children: React.ReactNode;
-}) {
+export default async function AppShell({ children }: { children: React.ReactNode }) {
   const [workspace, session] = await Promise.all([requireWorkspace(), auth()]);
   const workspaceName = workspace.name;
   const isAdmin = isAdminEmail(session?.user?.email);
   const items = isAdmin ? [...NAV_ITEMS, ADMIN_ITEM] : NAV_ITEMS;
 
   const navItems = items.map((item) => {
-    const Icon = item.icon;
-    return { href: item.href, label: item.label, isActive: item.href === active, icon: <Icon /> };
+    const Icon = NAV_ICONS[item.href];
+    return { href: item.href, label: item.label, icon: <Icon /> };
   });
 
   const navLinks = <SidebarNav items={navItems} />;
@@ -99,9 +92,7 @@ export default async function AppShell({
                 {navLinks}
                 {workspaceFooter}
               </MobileNavDrawer>
-              <div className="truncate text-[14px] font-medium" style={{ letterSpacing: "-0.14px", color: "var(--ink)" }}>
-                {screenLabel}
-              </div>
+              <ScreenLabel />
             </div>
             <ThemeToggle />
           </header>
