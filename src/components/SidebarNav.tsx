@@ -19,12 +19,20 @@ export default function SidebarNav({ items }: { items: SidebarNavItem[] }) {
   const activeHref = items.find((item) => pathname === item.href || pathname.startsWith(item.href + "/"))?.href;
 
   useLayoutEffect(() => {
-    const el = activeHref ? itemRefs.current.get(activeHref) : null;
-    if (el) {
-      setPill({ top: el.offsetTop, height: el.offsetHeight });
-    } else {
-      setPill(null);
+    function measure() {
+      const el = activeHref ? itemRefs.current.get(activeHref) : null;
+      setPill(el ? { top: el.offsetTop, height: el.offsetHeight } : null);
     }
+    measure();
+
+    // Re-measure if the list's layout shifts after this first paint (e.g. the
+    // brand logo above it finishing its image load) — otherwise the pill can
+    // get stuck at a stale position instead of tracking the active item.
+    const container = containerRef.current;
+    if (!container || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    return () => observer.disconnect();
   }, [activeHref]);
 
   return (
