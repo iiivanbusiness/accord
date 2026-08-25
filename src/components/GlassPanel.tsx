@@ -9,6 +9,7 @@ export default function GlassPanel({
 }) {
   return (
     <Tag className={`glass-nav relative flex-col ${className}`}>
+      <div className="glass-nav-blur" aria-hidden="true" />
       <div className="glass-glow-layer" aria-hidden="true">
         <div className="glass-glow glass-glow-1" />
         <div className="glass-glow glass-glow-2" />

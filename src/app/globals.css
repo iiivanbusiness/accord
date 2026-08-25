@@ -199,7 +199,11 @@ a {
 
 .row-hover:hover { background: var(--overlay-hover); }
 
-/* ---------- theme toggle: liquid-glass sliding sun/moon pill ---------- */
+/* ---------- theme toggle: liquid-glass sliding sun/moon pill ----------
+   Same split as .glass-nav/.nav-pill-wrap: WebKit won't reliably clip
+   backdrop-filter to a rounded corner on the same element, so the rounded,
+   clipping box (track, thumb) never carries backdrop-filter itself — the
+   blur lives on a plain absolutely-filled child instead. */
 .theme-toggle {
   position: relative;
   display: inline-flex;
@@ -208,38 +212,55 @@ a {
   height: 26px;
   padding: 3px;
   border-radius: var(--r-pill);
+  border: 1px solid var(--hairline);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  isolation: isolate;
+  transition: border-color .2s ease;
+  cursor: pointer;
+}
+.theme-toggle-track-blur {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   background: var(--glass-track);
   backdrop-filter: blur(8px) saturate(160%);
   -webkit-backdrop-filter: blur(8px) saturate(160%);
-  border: 1px solid var(--hairline);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
-  transition: background .2s ease, border-color .2s ease;
-  cursor: pointer;
 }
 .theme-toggle:hover { border-color: var(--ink-muted); }
 .theme-toggle .theme-toggle-thumb {
   position: absolute;
   top: 2px;
   left: 2px;
+  z-index: 1;
   width: 20px;
   height: 20px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--glass-tint);
-  backdrop-filter: blur(10px) saturate(180%);
-  -webkit-backdrop-filter: blur(10px) saturate(180%);
   border: 1px solid var(--glass-border);
   color: var(--on-primary);
   box-shadow: inset 0 1px 0 var(--glass-highlight), inset 0 -3px 4px -2px rgba(0, 0, 0, 0.25), 0 2px 6px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  isolation: isolate;
   transform: translateX(0);
-  transition: transform .32s cubic-bezier(.34,1.5,.55,1), background .2s ease;
+  transition: transform .32s cubic-bezier(.34,1.5,.55,1);
+}
+.theme-toggle-thumb-blur {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--glass-tint);
+  backdrop-filter: blur(10px) saturate(180%);
+  -webkit-backdrop-filter: blur(10px) saturate(180%);
 }
 .theme-toggle[data-on="true"] .theme-toggle-thumb {
   transform: translateX(20px);
 }
 .theme-toggle .theme-toggle-thumb svg {
+  position: relative;
+  z-index: 1;
   transition: transform .28s ease, opacity .2s ease;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -252,24 +273,32 @@ a {
    on backdrop-filter to reveal whatever plain page background sits behind it,
    so the glass reads clearly regardless of what the sidebar happens to float over. */
 .glass-nav {
+  border: 1px solid var(--glass-panel-border);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 12px 40px rgba(0, 0, 0, 0.14);
+  /* WebKit renders backdrop-filter as its own unclipped rectangle when the
+     filter and the border-radius live on the same element (Safari/WKWebView,
+     which is what the desktop app uses) — overflow:hidden on that same
+     element isn't reliably enough to fix it. The robust fix is to never put
+     backdrop-filter and border-radius on the same element: this box only
+     rounds + clips; the actual blur lives on the separate .glass-nav-blur
+     layer below, which WebKit can then clip like any normal child. */
+  overflow: hidden;
+  isolation: isolate;
+}
+.glass-nav-blur {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   background: var(--glass-panel-bg);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid var(--glass-panel-border);
-  box-shadow: inset 0 1px 0 var(--glass-highlight), inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 12px 40px rgba(0, 0, 0, 0.14);
-  /* WebKit can render backdrop-filter past the element's own rounded corners
-     unless overflow is also clipped on this same element (Safari/WKWebView,
-     which is what the desktop app uses) — without this the corners show
-     square blur/glow bleeding past the curve. */
-  overflow: hidden;
-  isolation: isolate;
 }
 .glass-glow-layer {
   position: absolute;
   inset: 0;
   overflow: hidden;
   border-radius: inherit;
-  z-index: 0;
+  z-index: 1;
   pointer-events: none;
 }
 .glass-glow {
@@ -282,14 +311,24 @@ a {
 .glass-glow-3 { bottom: -70px; left: -50px; width: 210px; height: 210px; background: var(--gradient-orange); opacity: 0.38; }
 :root[data-theme="dark"] .sm-theme .glass-glow { opacity: 0.5; filter: blur(52px); }
 
-/* ---------- sidebar: liquid-glass active-item pill ---------- */
-.nav-pill {
+/* ---------- sidebar: liquid-glass active-item pill ----------
+   Same split as .glass-nav: the outer box only rounds + clips, the blur
+   lives on a separate absolutely-filled inner layer — WebKit won't reliably
+   clip a rounded corner that has backdrop-filter on the very same element. */
+.nav-pill-wrap {
+  position: relative;
   border-radius: var(--r-md);
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), inset 0 -8px 12px -8px rgba(0, 0, 0, 0.22), 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+.nav-pill {
+  position: absolute;
+  inset: 0;
   background: var(--glass-tint);
   backdrop-filter: blur(14px) saturate(180%);
   -webkit-backdrop-filter: blur(14px) saturate(180%);
-  border: 1px solid var(--glass-border);
-  box-shadow: inset 0 1px 0 var(--glass-highlight), inset 0 -8px 12px -8px rgba(0, 0, 0, 0.22), 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 /* ---------- theme-aware brand logo: swap image instead of recoloring ---------- */

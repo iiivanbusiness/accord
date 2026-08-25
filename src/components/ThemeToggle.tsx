@@ -34,7 +34,9 @@ export default function ThemeToggle() {
       aria-checked={isDark}
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
     >
+      <span className="theme-toggle-track-blur" aria-hidden="true" />
       <span className="theme-toggle-thumb">
+        <span className="theme-toggle-thumb-blur" aria-hidden="true" />
         {isDark ? (
           <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
             <circle cx="10" cy="10" r="4" />

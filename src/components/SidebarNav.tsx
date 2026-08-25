@@ -32,9 +32,11 @@ export default function SidebarNav({ items }: { items: SidebarNavItem[] }) {
       {pill && (
         <div
           aria-hidden="true"
-          className="nav-pill absolute left-0 right-0 transition-[top,height] duration-300 ease-out"
+          className="nav-pill-wrap absolute left-0 right-0 transition-[top,height] duration-300 ease-out"
           style={{ top: pill.top, height: pill.height }}
-        />
+        >
+          <div className="nav-pill" />
+        </div>
       )}
       {items.map((item) => {
         const isActive = item.href === activeHref;
