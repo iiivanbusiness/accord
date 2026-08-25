@@ -9,6 +9,7 @@ import AppFooter from "./AppFooter";
 import SidebarNav from "./SidebarNav";
 import UpgradeCard from "./UpgradeCard";
 import ScreenLabel from "./ScreenLabel";
+import GlassPanel from "./GlassPanel";
 
 const NAV_ICONS: Record<string, () => React.ReactNode> = {
   "/dashboard": DashboardIcon,
@@ -67,17 +68,14 @@ export default async function AppShell({ children }: { children: React.ReactNode
   return (
     <div className="sm-theme min-h-dvh" style={{ background: "var(--canvas)" }}>
       <div className="grid min-h-dvh grid-cols-1 md:grid-cols-[232px_1fr]">
-        <nav
-          className="m-3.5 hidden flex-col rounded-[20px] px-3.5 py-[22px] md:flex"
-          style={{ background: "var(--surface-1)", border: "1px solid var(--hairline)", boxShadow: "var(--shadow-card)" }}
-        >
+        <GlassPanel as="nav" className="m-3.5 hidden rounded-[28px] px-3.5 py-[22px] md:flex">
           <div className="mb-7 px-2">
             <BrandLogo height={20} />
           </div>
           {navLinks}
           <UpgradeCard />
           {workspaceFooter}
-        </nav>
+        </GlassPanel>
 
         <div className="flex min-w-0 flex-col">
           <header
@@ -90,6 +88,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
                   <BrandLogo height={20} />
                 </div>
                 {navLinks}
+                <UpgradeCard />
                 {workspaceFooter}
               </MobileNavDrawer>
               <ScreenLabel />

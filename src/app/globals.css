@@ -68,6 +68,9 @@
   --glass-track: rgba(0, 0, 0, 0.05);
   --glass-highlight: rgba(255, 255, 255, 0.4);
   --glass-border: rgba(255, 255, 255, 0.16);
+  /* the sidebar's own glass panel — lighter/more transparent than the active pill */
+  --glass-panel-bg: rgba(255, 255, 255, 0.5);
+  --glass-panel-border: rgba(255, 255, 255, 0.5);
 }
 :root[data-theme="dark"] .sm-theme {
   --primary: #ffffff;
@@ -97,6 +100,8 @@
   --glass-track: rgba(255, 255, 255, 0.06);
   --glass-highlight: rgba(255, 255, 255, 0.6);
   --glass-border: rgba(255, 255, 255, 0.22);
+  --glass-panel-bg: rgba(28, 28, 30, 0.55);
+  --glass-panel-border: rgba(255, 255, 255, 0.14);
 }
 
 @theme inline {
@@ -241,6 +246,36 @@ a {
 @media (prefers-reduced-motion: reduce) {
   .theme-toggle .theme-toggle-thumb { transition: none; }
 }
+
+/* ---------- sidebar: liquid-glass panel ----------
+   A translucent, blurred capsule with soft color glows bleeding through it —
+   the glows are painted *inside* the panel (self-contained) rather than relying
+   on backdrop-filter to reveal whatever plain page background sits behind it,
+   so the glass reads clearly regardless of what the sidebar happens to float over. */
+.glass-nav {
+  background: var(--glass-panel-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--glass-panel-border);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 12px 40px rgba(0, 0, 0, 0.14);
+}
+.glass-glow-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  z-index: 0;
+  pointer-events: none;
+}
+.glass-glow {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(46px);
+}
+.glass-glow-1 { top: -70px; left: -60px; width: 220px; height: 220px; background: var(--gradient-violet); opacity: 0.55; }
+.glass-glow-2 { top: 38%; right: -80px; width: 200px; height: 200px; background: var(--gradient-coral); opacity: 0.42; }
+.glass-glow-3 { bottom: -70px; left: -50px; width: 210px; height: 210px; background: var(--gradient-orange); opacity: 0.38; }
+:root[data-theme="dark"] .sm-theme .glass-glow { opacity: 0.5; filter: blur(52px); }
 
 /* ---------- sidebar: liquid-glass active-item pill ---------- */
 .nav-pill {
