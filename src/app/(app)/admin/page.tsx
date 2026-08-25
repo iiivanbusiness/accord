@@ -27,22 +27,23 @@ function StatCard({ label, value }: { label: string; value: string }) {
 export default async function AdminPage() {
   await requireAdmin();
 
-  const workspaces = await prisma.workspace.findMany({
-    include: { users: true },
-    orderBy: { createdAt: "desc" },
-  });
+  const [workspaces, pendingRequests] = await Promise.all([
+    prisma.workspace.findMany({
+      include: { users: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.upgradeRequest.findMany({
+      where: { status: "pending" },
+      include: { workspace: true },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
 
   const activity = await Promise.all(
     workspaces.map((w) =>
       prisma.deal.aggregate({ where: { workspaceId: w.id }, _max: { updatedAt: true }, _count: true })
     )
   );
-
-  const pendingRequests = await prisma.upgradeRequest.findMany({
-    where: { status: "pending" },
-    include: { workspace: true },
-    orderBy: { createdAt: "desc" },
-  });
 
   const totalUsers = workspaces.reduce((sum, w) => sum + w.users.length, 0);
   const totalDeals = activity.reduce((sum, a) => sum + a._count, 0);

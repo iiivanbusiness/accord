@@ -45,17 +45,19 @@ export default async function NewDealPage({
   const isTranscript = !isManual && !isLive;
   const isScheduled = isLive && source === "calendar";
   const workspaceId = await requireWorkspaceId();
-  const templates = await prisma.contractTemplate.findMany({ where: { workspaceId }, orderBy: { name: "asc" } });
   const extractionConfigured = isExtractionConfigured();
   const recallConfigured = isRecallConfigured();
 
-  const upcomingEvents = isLive
-    ? await prisma.calendarEvent.findMany({
-        where: { workspaceId, startTime: { gte: new Date() }, meetingUrl: { not: null }, linkedDealId: null },
-        orderBy: { startTime: "asc" },
-        take: 10,
-      })
-    : [];
+  const [templates, upcomingEvents] = await Promise.all([
+    prisma.contractTemplate.findMany({ where: { workspaceId }, orderBy: { name: "asc" } }),
+    isLive
+      ? prisma.calendarEvent.findMany({
+          where: { workspaceId, startTime: { gte: new Date() }, meetingUrl: { not: null }, linkedDealId: null },
+          orderBy: { startTime: "asc" },
+          take: 10,
+        })
+      : Promise.resolve([]),
+  ]);
 
   return (
     <>

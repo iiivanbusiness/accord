@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { requireWorkspaceId } from "@/lib/workspace";
+import { requireWorkspace, requireWorkspaceId } from "@/lib/workspace";
 
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -62,12 +62,14 @@ export default async function DealsPage({
   const { view } = await searchParams;
   const isBoard = view === "board";
   const workspaceId = await requireWorkspaceId();
-  const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
-  const deals = await prisma.deal.findMany({
-    where: { workspaceId },
-    include: { client: true },
-    orderBy: { updatedAt: "desc" },
-  });
+  const [workspace, deals] = await Promise.all([
+    requireWorkspace(),
+    prisma.deal.findMany({
+      where: { workspaceId },
+      include: { client: true },
+      orderBy: { updatedAt: "desc" },
+    }),
+  ]);
 
   const byColumn = new Map<string, typeof deals>();
   for (const col of BOARD_COLUMNS) byColumn.set(col, []);
