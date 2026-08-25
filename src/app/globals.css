@@ -257,6 +257,12 @@ a {
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   border: 1px solid var(--glass-panel-border);
   box-shadow: inset 0 1px 0 var(--glass-highlight), inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 12px 40px rgba(0, 0, 0, 0.14);
+  /* WebKit can render backdrop-filter past the element's own rounded corners
+     unless overflow is also clipped on this same element (Safari/WKWebView,
+     which is what the desktop app uses) — without this the corners show
+     square blur/glow bleeding past the curve. */
+  overflow: hidden;
+  isolation: isolate;
 }
 .glass-glow-layer {
   position: absolute;
