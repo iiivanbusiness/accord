@@ -4,6 +4,7 @@ import { fillClauses } from "@/lib/contract";
 import { signContract } from "./actions";
 import BrandLogo from "@/components/BrandLogo";
 import SignaturePad from "@/components/SignaturePad";
+import DownloadContractButton from "@/components/DownloadContractButton";
 
 export default async function SignPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -102,9 +103,7 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
           </div>
         )}
 
-        <a href={`/api/contracts/${contract.id}/pdf`} className="btn btn-secondary mt-5 w-full justify-center">
-          Download PDF
-        </a>
+        <DownloadContractButton contractId={contract.id} className="btn btn-secondary mt-5 w-full justify-center" />
       </main>
     </div>
   );

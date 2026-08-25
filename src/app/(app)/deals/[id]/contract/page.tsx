@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { fillClauses } from "@/lib/contract";
 import { requireWorkspaceId } from "@/lib/workspace";
+import DownloadContractButton from "@/components/DownloadContractButton";
 
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -104,9 +105,7 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
               </div>
             </>
           )}
-          <a href={`/api/contracts/${deal.contract.id}/pdf`} className="btn btn-secondary w-full justify-center">
-            Download PDF
-          </a>
+          <DownloadContractButton contractId={deal.contract.id} className="btn btn-secondary w-full justify-center" />
         </div>
       </aside>
     </div>
