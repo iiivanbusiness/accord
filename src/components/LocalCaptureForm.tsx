@@ -8,6 +8,11 @@ import { startLocalCapture } from "@/app/(app)/deals/new/actions";
 type Template = { id: string; name: string };
 
 export const LOCAL_CAPTURE_STORAGE_KEY = "sealme:local-capture";
+// AppShell (and the banner inside it) is a persistent layout — it doesn't
+// remount on client-side navigation, so a plain mount-time localStorage read
+// in the banner would never notice a session that starts after the app's
+// first page load. This event tells it to re-check right away instead.
+export const LOCAL_CAPTURE_EVENT = "sealme:local-capture-changed";
 
 export default function LocalCaptureForm({ templates }: { templates: Template[] }) {
   const router = useRouter();
@@ -45,6 +50,7 @@ export default function LocalCaptureForm({ templates }: { templates: Template[] 
         LOCAL_CAPTURE_STORAGE_KEY,
         JSON.stringify({ dealId: result.dealId, token: result.token, startedAt: Date.now() })
       );
+      window.dispatchEvent(new Event(LOCAL_CAPTURE_EVENT));
       router.push(`/deals/${result.dealId}`);
     } catch (err) {
       await invoke("discard_local_capture").catch(() => {});

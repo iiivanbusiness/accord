@@ -2,10 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LOCAL_CAPTURE_STORAGE_KEY } from "./LocalCaptureForm";
+import { LOCAL_CAPTURE_STORAGE_KEY, LOCAL_CAPTURE_EVENT } from "./LocalCaptureForm";
 
 type Session = { dealId: string; token: string; startedAt: number };
 type StopResult = { ok: boolean; error?: string };
+
+function readSession(): Session | null {
+  try {
+    const raw = localStorage.getItem(LOCAL_CAPTURE_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Session) : null;
+  } catch {
+    // Corrupt/unavailable localStorage — just don't show the banner.
+    return null;
+  }
+}
 
 export default function LocalCaptureBanner() {
   const router = useRouter();
@@ -14,12 +24,13 @@ export default function LocalCaptureBanner() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(LOCAL_CAPTURE_STORAGE_KEY);
-      if (raw) setSession(JSON.parse(raw) as Session);
-    } catch {
-      // Corrupt/unavailable localStorage — just don't show the banner.
-    }
+    setSession(readSession());
+    // AppShell is a persistent layout that doesn't remount on navigation —
+    // without this listener, a recording started after the first page load
+    // would never make the banner appear.
+    const onChange = () => setSession(readSession());
+    window.addEventListener(LOCAL_CAPTURE_EVENT, onChange);
+    return () => window.removeEventListener(LOCAL_CAPTURE_EVENT, onChange);
   }, []);
 
   async function handleStop() {

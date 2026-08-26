@@ -7,7 +7,18 @@ fn main() {
         build_audio_bridge();
     }
 
-    tauri_build::build()
+    // Custom app commands need ACL permissions generated for them too, same
+    // as plugin commands — otherwise the webview's IPC rejects them with
+    // "not allowed" even though they're registered in invoke_handler.
+    tauri_build::try_build(
+        tauri_build::Attributes::new().app_manifest(tauri_build::AppManifest::new().commands(&[
+            "start_local_capture",
+            "is_local_capturing",
+            "discard_local_capture",
+            "stop_local_capture_and_upload",
+        ])),
+    )
+    .expect("failed to run tauri-build");
 }
 
 /// Compiles the native/audio_capture.swift ScreenCaptureKit bridge into a
@@ -43,11 +54,15 @@ fn build_audio_bridge() {
     println!("cargo:rustc-link-lib=static=sealme_audio");
 
     println!("cargo:rustc-link-search=native=/usr/lib/swift");
+    // -L only helps the linker resolve symbols at build time — without an
+    // explicit rpath, dyld has no idea where to find these at runtime and
+    // the app fails to launch with "Library not loaded".
+    println!("cargo:rustc-link-arg=-Wl,-rpath,/usr/lib/swift");
     for swift_lib in ["swiftCore", "swiftFoundation", "swiftDispatch", "swiftDarwin", "swiftObjectiveC"] {
         println!("cargo:rustc-link-lib=dylib={swift_lib}");
     }
 
-    for framework in ["ScreenCaptureKit", "AVFoundation", "CoreMedia", "Foundation", "CoreAudio"] {
+    for framework in ["ScreenCaptureKit", "AVFoundation", "CoreMedia", "Foundation", "CoreAudio", "AudioToolbox"] {
         println!("cargo:rustc-link-lib=framework={framework}");
     }
 }

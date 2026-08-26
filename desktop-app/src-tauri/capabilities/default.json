@@ -8,6 +8,10 @@
   },
   "permissions": [
     "core:default",
-    "opener:default"
+    "opener:default",
+    "allow-start-local-capture",
+    "allow-is-local-capturing",
+    "allow-discard-local-capture",
+    "allow-stop-local-capture-and-upload"
   ]
 }
