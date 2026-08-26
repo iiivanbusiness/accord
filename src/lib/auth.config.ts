@@ -24,6 +24,7 @@ export const authConfig = {
         request.nextUrl.pathname.startsWith("/reset-password") ||
         request.nextUrl.pathname.startsWith("/api/contracts") ||
         request.nextUrl.pathname.startsWith("/api/recall") ||
+        request.nextUrl.pathname.startsWith("/api/local-capture") ||
         request.nextUrl.pathname.startsWith("/api/cron") ||
         request.nextUrl.pathname.startsWith("/terms") ||
         request.nextUrl.pathname.startsWith("/privacy");

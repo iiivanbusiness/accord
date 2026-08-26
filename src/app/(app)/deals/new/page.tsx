@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { isExtractionConfigured } from "@/lib/extract-deal";
 import { isRecallConfigured } from "@/lib/recall";
 import { requireWorkspaceId } from "@/lib/workspace";
+import LocalCaptureForm from "@/components/LocalCaptureForm";
 import { createDeal, createDealFromTranscript, startCallBot, startCallFromEvent } from "./actions";
 
 function formatEventWhen(date: Date): string {
@@ -42,7 +43,8 @@ export default async function NewDealPage({
   const { mode, source, error } = await searchParams;
   const isManual = mode === "manual";
   const isLive = mode === "live";
-  const isTranscript = !isManual && !isLive;
+  const isLocal = mode === "local";
+  const isTranscript = !isManual && !isLive && !isLocal;
   const isScheduled = isLive && source === "calendar";
   const workspaceId = await requireWorkspaceId();
   const extractionConfigured = isExtractionConfigured();
@@ -70,14 +72,17 @@ export default async function NewDealPage({
       <div className="mt-1 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
         {isLive
           ? "A notetaker joins the call — deal terms land here automatically once it ends."
-          : isManual
-            ? "Enter what the call covered and it'll drop straight into the review flow."
-            : "Paste the call transcript and Claude will pull out the deal terms for you to review."}
+          : isLocal
+            ? "SealMe records your system audio for the call — nothing joins as a visible participant."
+            : isManual
+              ? "Enter what the call covered and it'll drop straight into the review flow."
+              : "Paste the call transcript and Claude will pull out the deal terms for you to review."}
       </div>
     </div>
 
     <div className="mb-5 flex gap-2">
       <ModeTab href="/deals/new?mode=live" active={isLive}>Start a live call</ModeTab>
+      <ModeTab href="/deals/new?mode=local" active={isLocal}>Record locally</ModeTab>
       <ModeTab href="/deals/new" active={isTranscript}>Paste a transcript</ModeTab>
       <ModeTab href="/deals/new?mode=manual" active={isManual}>Enter manually</ModeTab>
     </div>
@@ -210,6 +215,19 @@ export default async function NewDealPage({
             </form>
           )}
         </>
+      )
+    ) : isLocal ? (
+      !extractionConfigured ? (
+        <div className="card max-w-[560px] p-6 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+          Local recording isn&apos;t fully set up yet — it needs an <span className="font-mono-tab">ANTHROPIC_API_KEY</span> in{" "}
+          <span className="font-mono-tab">.env</span>. Use{" "}
+          <Link href="/deals/new?mode=manual" className="font-medium" style={{ color: "var(--accent-blue)" }}>
+            manual entry
+          </Link>{" "}
+          for now.
+        </div>
+      ) : (
+        <LocalCaptureForm templates={templates} />
       )
     ) : !extractionConfigured ? (
       <div className="card max-w-[560px] p-6 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>

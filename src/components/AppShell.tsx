@@ -11,6 +11,7 @@ import UpgradeCard from "./UpgradeCard";
 import ScreenLabel from "./ScreenLabel";
 import GlassPanel from "./GlassPanel";
 import EmailVerifyBanner from "./EmailVerifyBanner";
+import LocalCaptureBanner from "./LocalCaptureBanner";
 
 const NAV_ICONS: Record<string, () => React.ReactNode> = {
   "/dashboard": DashboardIcon,
@@ -101,6 +102,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
           </header>
 
           <EmailVerifyBanner />
+          <LocalCaptureBanner />
 
           <main className="mx-auto w-full max-w-[1180px] flex-1 px-3.5 pt-2 md:px-6">{children}</main>
           <AppFooter />

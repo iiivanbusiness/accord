@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { extractDealFromTranscript, buildDealFieldRows } from "@/lib/extract-deal";
 import { extractPlaceholderKeys } from "@/lib/contract";
@@ -174,6 +175,61 @@ export async function startCallFromEvent(formData: FormData) {
   });
 
   redirect(`/deals/${deal.id}`);
+}
+
+// Desktop-app-only: starts a deal backed by a locally-recorded call instead
+// of a Recall bot. Unlike the other actions here, this one returns a value
+// instead of redirecting — the caller is a client component that still needs
+// to kick off native audio capture (via Tauri) before navigating, and needs
+// the upload token back to authenticate that capture's later upload.
+export async function startLocalCapture(formData: FormData): Promise<{ dealId: string; token: string } | { error: string }> {
+  const clientName = String(formData.get("clientName") ?? "").trim();
+  const templateId = String(formData.get("templateId") ?? "").trim();
+
+  if (!clientName) return { error: "Enter who you're meeting with" };
+  if (!templateId) return { error: "Choose a template" };
+
+  const workspace = await requireWorkspace();
+  if (workspace.callsUsedThisMonth >= workspace.callsLimit) {
+    return { error: "You've used all your calls for this billing period — upgrade your plan to start more." };
+  }
+  const workspaceId = workspace.id;
+
+  const client = await prisma.client.create({
+    data: { workspaceId, name: clientName, company: clientName },
+  });
+
+  const deal = await prisma.deal.create({
+    data: {
+      workspaceId,
+      clientId: client.id,
+      templateId,
+      service: "",
+      feeDisplay: "",
+      status: "processing",
+      source: "local",
+    },
+  });
+
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+  await prisma.localCaptureToken.create({
+    data: {
+      workspaceId,
+      dealId: deal.id,
+      tokenHash,
+      // 4h covers even an unusually long call — the token is single-use and
+      // burned the moment the recording is uploaded, well before that.
+      expiresAt: new Date(Date.now() + 4 * 60 * 60 * 1000),
+    },
+  });
+
+  await prisma.workspace.update({
+    where: { id: workspaceId },
+    data: { callsUsedThisMonth: { increment: 1 } },
+  });
+
+  return { dealId: deal.id, token: rawToken };
 }
 
 export async function startCallBot(formData: FormData) {

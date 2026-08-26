@@ -1,0 +1,73 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { LOCAL_CAPTURE_STORAGE_KEY } from "./LocalCaptureForm";
+
+type Session = { dealId: string; token: string; startedAt: number };
+type StopResult = { ok: boolean; error?: string };
+
+export default function LocalCaptureBanner() {
+  const router = useRouter();
+  const [session, setSession] = useState<Session | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LOCAL_CAPTURE_STORAGE_KEY);
+      if (raw) setSession(JSON.parse(raw) as Session);
+    } catch {
+      // Corrupt/unavailable localStorage — just don't show the banner.
+    }
+  }, []);
+
+  async function handleStop() {
+    if (!session) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const result = await invoke<StopResult>("stop_local_capture_and_upload", { token: session.token });
+      if (!result.ok) {
+        setError(result.error ?? "Something went wrong stopping the recording");
+        setBusy(false);
+        return;
+      }
+      localStorage.removeItem(LOCAL_CAPTURE_STORAGE_KEY);
+      const dealId = session.dealId;
+      setSession(null);
+      router.push(`/deals/${dealId}`);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong stopping the recording");
+      setBusy(false);
+    }
+  }
+
+  if (!session) return null;
+
+  return (
+    <div
+      className="mx-3.5 mb-0 mt-3.5 flex flex-wrap items-center gap-3 rounded-[14px] px-4 py-3 text-[13px]"
+      style={{ background: "var(--success-soft)", color: "var(--success)" }}
+    >
+      <span className="inline-flex h-2 w-2 shrink-0 animate-pulse rounded-full" style={{ background: "var(--success)" }} />
+      <span className="font-medium">Recording your call locally</span>
+      {error && (
+        <span className="text-[12px]" style={{ color: "var(--warn)" }}>
+          {error}
+        </span>
+      )}
+      <button
+        type="button"
+        disabled={busy}
+        onClick={handleStop}
+        className="btn btn-sm ml-auto"
+        style={{ background: "var(--success)", color: "var(--on-primary, #fff)" }}
+      >
+        {busy ? "Finishing…" : "Stop & finish"}
+      </button>
+    </div>
+  );
+}

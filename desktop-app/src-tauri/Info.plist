@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>SealMe records your microphone during a call you start recording, so it can transcribe the call and pull out deal terms.</string>
+	<key>NSScreenCaptureDescription</key>
+	<string>SealMe captures system audio during a call you start recording, so it can transcribe the call and pull out deal terms. No video or screen content is captured.</string>
+</dict>
+</plist>

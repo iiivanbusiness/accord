@@ -50,6 +50,7 @@ model Workspace {
   upgradeRequests   UpgradeRequest[]
   onboardingProfile OnboardingProfile?
   auditLogs         AuditLog[]
+  localCaptureTokens LocalCaptureToken[]
 }
 
 // Answers from the pre-signup onboarding screens. Captured client-side and
@@ -237,6 +238,24 @@ model RateLimitHit {
   createdAt DateTime @default(now())
 
   @@index([key, createdAt])
+}
+
+// Short-lived, single-use token minted (server-side, while the user is
+// authenticated in the desktop app's webview) so the native Rust process can
+// upload a locally-recorded call straight to the transcribe endpoint without
+// ever holding a session cookie or an API key of its own — same hashed-token
+// pattern as password reset / email verification.
+model LocalCaptureToken {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  dealId      String    @unique
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([workspaceId])
 }
 
 // Security-relevant event trail — logins, sends, signatures, plan/team
