@@ -7,6 +7,7 @@ import { signIn } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 import { buildDefaultTemplates } from "@/lib/default-templates";
 import { attachOnboardingProfile } from "@/lib/onboarding";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function signup(formData: FormData) {
   const companyName = String(formData.get("companyName") ?? "").trim();
@@ -19,6 +20,12 @@ export async function signup(formData: FormData) {
   }
   if (password.length < 8) {
     redirect(`/signup?error=${encodeURIComponent("Password must be at least 8 characters.")}`);
+  }
+
+  const ip = await getClientIp();
+  const allowed = await checkRateLimit(`signup:${ip}`, 5, 60 * 60 * 1000);
+  if (!allowed) {
+    redirect(`/signup?error=${encodeURIComponent("Too many signups from this connection — try again in a bit.")}`);
   }
 
   const existing = await prisma.user.findUnique({ where: { email } });

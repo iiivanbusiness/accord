@@ -204,3 +204,15 @@ model CalendarEvent {
   linkedDealId    String?
   googleEventId   String?   @unique // set when synced from Google Calendar; null for manually-added events
 }
+
+// A simple hit-counter for rate limiting public, unauthenticated endpoints
+// (signup, login, password reset) — one row per attempt, counted within a
+// sliding window. Rows are cheap and short-lived by nature of the check
+// (old ones just stop counting), no cleanup job needed yet.
+model RateLimitHit {
+  id        String   @id @default(cuid())
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+}

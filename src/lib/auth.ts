@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { verifyPassword } from "@/lib/password";
 import { buildDefaultTemplates } from "@/lib/default-templates";
 import { attachOnboardingProfile } from "@/lib/onboarding";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -19,6 +20,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const email = credentials?.email as string | undefined;
         const password = credentials?.password as string | undefined;
         if (!email || !password) return null;
+
+        const allowed = await checkRateLimit(`login:${email.toLowerCase()}`, 10, 15 * 60 * 1000);
+        if (!allowed) return null;
 
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user || !user.passwordHash) return null;
