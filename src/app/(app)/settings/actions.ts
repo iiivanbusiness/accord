@@ -1,11 +1,13 @@
 "use server";
 
+import { randomBytes, createHash } from "crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { requireWorkspace } from "@/lib/workspace";
 import { createSenderDomain, getSenderDomainStatus, removeSenderDomain } from "@/lib/sender-domain";
-import { sendTeammateInviteEmail } from "@/lib/email";
+import { sendTeammateInviteEmail, sendVerificationEmail } from "@/lib/email";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 type ToggleField = "requireApproval" | "notifyOnSigned" | "autoRemind" | "zoomConnected" | "meetConnected";
 
@@ -142,6 +144,33 @@ export async function removeLogo() {
   const workspace = await requireWorkspace();
   await prisma.workspace.update({ where: { id: workspace.id }, data: { logoImage: null } });
   revalidatePath("/settings");
+}
+
+export async function resendVerificationEmail() {
+  const session = await auth();
+  const email = session?.user?.email;
+  if (!email) return;
+
+  const allowed = await checkRateLimit(`resend-verify:${email.toLowerCase()}`, 3, 60 * 60 * 1000);
+  if (!allowed) return;
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user || user.emailVerifiedAt) return;
+
+  const rawToken = randomBytes(32).toString("hex");
+  const tokenHash = createHash("sha256").update(rawToken).digest("hex");
+  await prisma.emailVerificationToken.create({
+    data: { userId: user.id, tokenHash, expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) },
+  });
+
+  try {
+    await sendVerificationEmail({
+      to: email,
+      verifyUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/verify-email/${rawToken}`,
+    });
+  } catch (err) {
+    console.error("Failed to resend verification email", err);
+  }
 }
 
 export async function requestUpgrade(formData: FormData) {

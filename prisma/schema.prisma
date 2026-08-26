@@ -68,15 +68,29 @@ model OnboardingProfile {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  workspaceId  String
-  workspace    Workspace @relation(fields: [workspaceId], references: [id])
-  name         String
-  email        String    @unique
-  passwordHash String? // null for accounts created via Google sign-in
-  createdAt    DateTime  @default(now())
+  id              String    @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace @relation(fields: [workspaceId], references: [id])
+  name            String
+  email           String    @unique
+  passwordHash    String? // null for accounts created via Google sign-in
+  emailVerifiedAt DateTime? // set immediately for Google sign-ins (already verified); via emailed link for credentials sign-ups
+  createdAt       DateTime  @default(now())
 
-  resetTokens PasswordResetToken[]
+  resetTokens             PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+}
+
+// tokenHash stores SHA-256 of the raw token emailed to the user — same
+// reasoning as PasswordResetToken, never store the usable value.
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
 }
 
 // tokenHash stores SHA-256 of the raw token emailed to the user — the raw

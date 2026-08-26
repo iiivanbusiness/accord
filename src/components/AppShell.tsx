@@ -10,6 +10,7 @@ import SidebarNav from "./SidebarNav";
 import UpgradeCard from "./UpgradeCard";
 import ScreenLabel from "./ScreenLabel";
 import GlassPanel from "./GlassPanel";
+import EmailVerifyBanner from "./EmailVerifyBanner";
 
 const NAV_ICONS: Record<string, () => React.ReactNode> = {
   "/dashboard": DashboardIcon,
@@ -98,6 +99,8 @@ export default async function AppShell({ children }: { children: React.ReactNode
             </div>
             <ThemeToggle />
           </header>
+
+          <EmailVerifyBanner />
 
           <main className="mx-auto w-full max-w-[1180px] flex-1 px-3.5 pt-2 md:px-6">{children}</main>
           <AppFooter />

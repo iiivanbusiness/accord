@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes, createHash } from "crypto";
 import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { prisma } from "@/lib/db";
@@ -8,6 +9,9 @@ import { hashPassword } from "@/lib/password";
 import { buildDefaultTemplates } from "@/lib/default-templates";
 import { attachOnboardingProfile } from "@/lib/onboarding";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { sendVerificationEmail } from "@/lib/email";
+
+const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export async function signup(formData: FormData) {
   const companyName = String(formData.get("companyName") ?? "").trim();
@@ -37,7 +41,7 @@ export async function signup(formData: FormData) {
     data: { name: companyName },
   });
 
-  await prisma.user.create({
+  const user = await prisma.user.create({
     data: { workspaceId: workspace.id, name, email, passwordHash: hashPassword(password) },
   });
 
@@ -46,6 +50,20 @@ export async function signup(formData: FormData) {
     data: templates.map((t) => ({ ...t, workspaceId: workspace.id })),
   });
   await attachOnboardingProfile(workspace.id);
+
+  const rawToken = randomBytes(32).toString("hex");
+  const tokenHash = createHash("sha256").update(rawToken).digest("hex");
+  await prisma.emailVerificationToken.create({
+    data: { userId: user.id, tokenHash, expiresAt: new Date(Date.now() + VERIFICATION_TTL_MS) },
+  });
+  try {
+    await sendVerificationEmail({
+      to: email,
+      verifyUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/verify-email/${rawToken}`,
+    });
+  } catch (err) {
+    console.error("Failed to send verification email", err);
+  }
 
   try {
     await signIn("credentials", { email, password, redirectTo: "/dashboard" });

@@ -56,7 +56,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           const name = (profile.name as string | undefined) ?? email;
           const workspace = await prisma.workspace.create({ data: { name: `${name}'s Workspace` } });
           user = await prisma.user.create({
-            data: { workspaceId: workspace.id, name, email, passwordHash: null },
+            data: { workspaceId: workspace.id, name, email, passwordHash: null, emailVerifiedAt: new Date() },
           });
           const templates = buildDefaultTemplates(workspace.name);
           await prisma.contractTemplate.createMany({

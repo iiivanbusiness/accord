@@ -137,6 +137,20 @@ export async function sendTeammateInviteEmail(options: {
   });
 }
 
+export async function sendVerificationEmail(options: { to: string; verifyUrl: string }): Promise<void> {
+  await sendSystemEmail({
+    to: [options.to],
+    subject: "Verify your email for SealMe",
+    bodyHtml: `
+      <p style="margin:0 0 14px;">One quick step — confirm this is your email address to finish setting up SealMe.</p>
+      <a href="${options.verifyUrl}" style="display:inline-block;margin:0 0 20px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
+        Verify email
+      </a>
+      <p style="margin:0;font-size:12.5px;color:#6e6e73;">If you didn&apos;t create a SealMe account, you can ignore this email.</p>
+    `,
+  });
+}
+
 export async function sendPasswordResetEmail(options: { to: string; resetUrl: string }): Promise<void> {
   await sendSystemEmail({
     to: [options.to],
