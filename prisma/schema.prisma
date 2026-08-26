@@ -42,12 +42,29 @@ model Workspace {
 
   createdAt          DateTime @default(now())
 
-  users           User[]
-  clients         Client[]
-  deals           Deal[]
-  templates       ContractTemplate[]
-  calendarEvents  CalendarEvent[]
-  upgradeRequests UpgradeRequest[]
+  users             User[]
+  clients           Client[]
+  deals             Deal[]
+  templates         ContractTemplate[]
+  calendarEvents    CalendarEvent[]
+  upgradeRequests   UpgradeRequest[]
+  onboardingProfile OnboardingProfile?
+}
+
+// Answers from the pre-signup onboarding screens. Captured client-side and
+// attached here right after the workspace is created (both the
+// email/password and Google sign-up paths write this) — this is the raw
+// material for building an ideal-customer profile over time, viewed in the
+// admin panel.
+model OnboardingProfile {
+  id             String   @id @default(cuid())
+  workspaceId    String   @unique
+  workspace      Workspace @relation(fields: [workspaceId], references: [id])
+  role           String // Q1: what best describes you
+  callVolume     String // Q3: sales calls per month
+  handoff        String // Q4: what happens after a prospect says yes
+  biggestProblem String // Q5: biggest problem
+  createdAt      DateTime @default(now())
 }
 
 model User {

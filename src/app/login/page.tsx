@@ -50,7 +50,7 @@ export default async function LoginPage({
         <h1 className="mb-1 text-[24px] font-medium" style={{ letterSpacing: "-0.8px" }}>Sign in to SealMe</h1>
         <p className="mb-6 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
           New here?{" "}
-          <Link href="/signup" className="font-medium" style={{ color: "var(--accent-blue)" }}>
+          <Link href="/onboarding" className="font-medium" style={{ color: "var(--accent-blue)" }}>
             Create a workspace
           </Link>
         </p>

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { signIn } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 import { buildDefaultTemplates } from "@/lib/default-templates";
+import { attachOnboardingProfile } from "@/lib/onboarding";
 
 export async function signup(formData: FormData) {
   const companyName = String(formData.get("companyName") ?? "").trim();
@@ -37,6 +38,7 @@ export async function signup(formData: FormData) {
   await prisma.contractTemplate.createMany({
     data: templates.map((t) => ({ ...t, workspaceId: workspace.id })),
   });
+  await attachOnboardingProfile(workspace.id);
 
   try {
     await signIn("credentials", { email, password, redirectTo: "/dashboard" });

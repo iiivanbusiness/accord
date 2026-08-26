@@ -27,13 +27,17 @@ function StatCard({ label, value }: { label: string; value: string }) {
 export default async function AdminPage() {
   await requireAdmin();
 
-  const [workspaces, pendingRequests] = await Promise.all([
+  const [workspaces, pendingRequests, onboardingProfiles] = await Promise.all([
     prisma.workspace.findMany({
       include: { users: true },
       orderBy: { createdAt: "desc" },
     }),
     prisma.upgradeRequest.findMany({
       where: { status: "pending" },
+      include: { workspace: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.onboardingProfile.findMany({
       include: { workspace: true },
       orderBy: { createdAt: "desc" },
     }),
@@ -94,6 +98,48 @@ export default async function AdminPage() {
               </form>
             </div>
           ))}
+        </div>
+      </div>
+    )}
+
+    {onboardingProfiles.length > 0 && (
+      <div className="card mb-6 overflow-hidden">
+        <div className="border-b px-5 py-4" style={{ borderColor: "var(--hairline)" }}>
+          <h2 className="text-[15px] font-medium">Client profiles</h2>
+          <div className="mt-0.5 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
+            Onboarding answers — raw material for figuring out who your ideal customer actually is
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                {["Workspace", "Role", "Calls / month", "After a \"yes\"", "Biggest problem", "Signed up"].map((h) => (
+                  <th
+                    key={h}
+                    className="border-b px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wide"
+                    style={{ color: "var(--ink-muted)", borderColor: "var(--hairline)" }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {onboardingProfiles.map((p) => (
+                <tr key={p.id} className="row-hover transition-colors">
+                  <td className="border-b px-5 py-3.5 font-medium" style={{ borderColor: "var(--hairline-soft)" }}>{p.workspace.name}</td>
+                  <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)" }}>{p.role}</td>
+                  <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)" }}>{p.callVolume}</td>
+                  <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)" }}>{p.handoff}</td>
+                  <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)" }}>{p.biggestProblem}</td>
+                  <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)", color: "var(--ink-muted)" }}>
+                    {timeAgo(p.createdAt)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     )}

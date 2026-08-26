@@ -5,6 +5,7 @@ import { authConfig } from "@/lib/auth.config";
 import { prisma } from "@/lib/db";
 import { verifyPassword } from "@/lib/password";
 import { buildDefaultTemplates } from "@/lib/default-templates";
+import { attachOnboardingProfile } from "@/lib/onboarding";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -57,6 +58,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           await prisma.contractTemplate.createMany({
             data: templates.map((t) => ({ ...t, workspaceId: workspace.id })),
           });
+          await attachOnboardingProfile(workspace.id);
         }
 
         token.workspaceId = user.workspaceId;
