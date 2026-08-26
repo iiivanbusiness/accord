@@ -5,7 +5,18 @@ import { prisma } from "@/lib/db";
 import { extractDealFromTranscript, buildDealFieldRows } from "@/lib/extract-deal";
 import { extractPlaceholderKeys } from "@/lib/contract";
 import { createCallBot, detectPlatformFromUrl } from "@/lib/recall";
-import { requireWorkspaceId } from "@/lib/workspace";
+import { requireWorkspace } from "@/lib/workspace";
+
+// Every path here costs real money one way or another (Anthropic tokens for
+// extraction, a live Recall bot-minute for calls) — callsLimit was tracked
+// and shown in the UI but never actually enforced, so a workspace could run
+// past its plan indefinitely. This is the one place all four entry points
+// funnel through before doing anything billable.
+function assertUnderCallLimit(workspace: { callsUsedThisMonth: number; callsLimit: number }) {
+  if (workspace.callsUsedThisMonth >= workspace.callsLimit) {
+    redirect(`/deals/new?error=${encodeURIComponent("You've used all your calls for this billing period — upgrade your plan to start more.")}`);
+  }
+}
 
 export async function createDeal(formData: FormData) {
   const clientName = String(formData.get("clientName") ?? "").trim();
@@ -19,7 +30,9 @@ export async function createDeal(formData: FormData) {
     throw new Error("Client, service, and fee are required");
   }
 
-  const workspaceId = await requireWorkspaceId();
+  const workspace = await requireWorkspace();
+  assertUnderCallLimit(workspace);
+  const workspaceId = workspace.id;
 
   const client = await prisma.client.create({
     data: { workspaceId, name: clientName, company, email },
@@ -59,7 +72,9 @@ export async function createDealFromTranscript(formData: FormData) {
   if (!transcript) throw new Error("Paste a call transcript first");
   if (!templateId) throw new Error("Choose a template");
 
-  const workspaceId = await requireWorkspaceId();
+  const workspace = await requireWorkspace();
+  assertUnderCallLimit(workspace);
+  const workspaceId = workspace.id;
 
   const template = await prisma.contractTemplate.findFirst({ where: { id: templateId, workspaceId } });
   if (!template) throw new Error("Template not found");
@@ -113,7 +128,9 @@ export async function startCallFromEvent(formData: FormData) {
   if (!eventId) throw new Error("Choose a calendar event");
   if (!templateId) throw new Error("Choose a template");
 
-  const workspaceId = await requireWorkspaceId();
+  const workspace = await requireWorkspace();
+  assertUnderCallLimit(workspace);
+  const workspaceId = workspace.id;
 
   const event = await prisma.calendarEvent.findFirst({ where: { id: eventId, workspaceId } });
   if (!event || !event.meetingUrl) throw new Error("That event doesn't have a meeting link");
@@ -168,7 +185,9 @@ export async function startCallBot(formData: FormData) {
   if (!clientName) throw new Error("Enter who you're meeting with");
   if (!templateId) throw new Error("Choose a template");
 
-  const workspaceId = await requireWorkspaceId();
+  const workspace = await requireWorkspace();
+  assertUnderCallLimit(workspace);
+  const workspaceId = workspace.id;
 
   let bot;
   try {
