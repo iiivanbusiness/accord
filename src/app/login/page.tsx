@@ -7,7 +7,7 @@ import BrandLogo from "@/components/BrandLogo";
 import GoogleIcon from "@/components/GoogleIcon";
 
 const ERROR_MESSAGE: Record<string, string> = {
-  CredentialsSignin: "Wrong email or password.",
+  CredentialsSignin: "Wrong email, password, or 2FA code.",
 };
 
 export default async function LoginPage({
@@ -23,6 +23,7 @@ export default async function LoginPage({
       await signIn("credentials", {
         email: formData.get("email"),
         password: formData.get("password"),
+        code: formData.get("code"),
         redirectTo: callbackUrl || "/dashboard",
       });
     } catch (err) {
@@ -93,6 +94,10 @@ export default async function LoginPage({
                 </Link>
               </div>
               <input name="password" type="password" required placeholder="••••••••" className="input" />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[13px] font-medium">2FA code <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>(if enabled)</span></span>
+              <input name="code" inputMode="numeric" placeholder="123456 or backup code" className="input" />
             </label>
             <button type="submit" className="btn btn-primary mt-2 w-full justify-center">
               Sign in

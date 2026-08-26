@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/db";
+import { auth } from "@/lib/auth";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { getSenderDomainStatus, type SenderDomainRecord } from "@/lib/sender-domain";
+import TwoFactorSettings from "@/components/TwoFactorSettings";
 import {
   checkSenderDomainVerification,
   connectSenderDomain,
@@ -33,9 +35,13 @@ function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notify
 
 export default async function SettingsPage() {
   const workspaceId = await requireWorkspaceId();
-  const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId }, include: { users: true } });
+  const [workspace, session] = await Promise.all([
+    prisma.workspace.findUnique({ where: { id: workspaceId }, include: { users: true } }),
+    auth(),
+  ]);
   const usagePct = workspace ? Math.round((workspace.callsUsedThisMonth / workspace.callsLimit) * 100) : 0;
   if (!workspace) return null;
+  const currentUser = workspace.users.find((u) => u.email === session?.user?.email);
   const notifyEmail = workspace.users.map((u) => u.email).join(", ") || "your account email";
   const pendingUpgrade = await prisma.upgradeRequest.findFirst({ where: { workspaceId, status: "pending" } });
 
@@ -165,6 +171,17 @@ export default async function SettingsPage() {
         </div>
       </div>
     </div>
+
+    {currentUser?.passwordHash && (
+      <div className="card mb-4 max-w-[600px]">
+        <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
+          <h2 className="text-[15px] font-medium">Two-factor authentication</h2>
+        </div>
+        <div className="px-[22px] py-4">
+          <TwoFactorSettings enabled={currentUser.twoFactorEnabled} />
+        </div>
+      </div>
+    )}
 
     <div className="card mb-4 max-w-[600px]">
       <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>

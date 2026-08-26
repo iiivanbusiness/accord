@@ -78,6 +78,13 @@ model User {
   emailVerifiedAt DateTime? // set immediately for Google sign-ins (already verified); via emailed link for credentials sign-ups
   createdAt       DateTime  @default(now())
 
+  // twoFactorSecret is set as soon as setup starts (QR shown) but
+  // twoFactorEnabled only flips to true once the user proves they can
+  // generate a valid code — an unconfirmed secret can't be used to log in.
+  twoFactorEnabled     Boolean  @default(false)
+  twoFactorSecret      String?
+  twoFactorBackupCodes String? // JSON array of {hash, usedAt} — same SHA-256-hash pattern as reset tokens
+
   resetTokens             PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
 }

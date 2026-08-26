@@ -8,6 +8,7 @@ import { buildDefaultTemplates } from "@/lib/default-templates";
 import { attachOnboardingProfile } from "@/lib/onboarding";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { verifyTotpCode, consumeBackupCode, type BackupCode } from "@/lib/two-factor";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -16,10 +17,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        code: { label: "2FA code", type: "text" },
       },
       authorize: async (credentials) => {
         const email = credentials?.email as string | undefined;
         const password = credentials?.password as string | undefined;
+        const code = (credentials?.code as string | undefined)?.trim();
         if (!email || !password) return null;
 
         const allowed = await checkRateLimit(`login:${email.toLowerCase()}`, 10, 15 * 60 * 1000);
@@ -38,6 +41,27 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!valid) {
           await logAudit({ workspaceId: user.workspaceId, actorEmail: email, action: "login.failure", metadata: { reason: "wrong_password" } });
           return null;
+        }
+
+        if (user.twoFactorEnabled) {
+          if (!code) {
+            await logAudit({ workspaceId: user.workspaceId, actorEmail: email, action: "login.failure", metadata: { reason: "missing_2fa_code" } });
+            return null;
+          }
+
+          const totpValid = user.twoFactorSecret ? await verifyTotpCode(code, user.twoFactorSecret) : false;
+          if (!totpValid) {
+            // Not a valid TOTP code — try it as a one-time backup code instead.
+            const stored: BackupCode[] = user.twoFactorBackupCodes ? JSON.parse(user.twoFactorBackupCodes) : [];
+            const updated = consumeBackupCode(code, stored);
+            if (!updated) {
+              await logAudit({ workspaceId: user.workspaceId, actorEmail: email, action: "login.failure", metadata: { reason: "invalid_2fa_code" } });
+              return null;
+            }
+            await prisma.user.update({ where: { id: user.id }, data: { twoFactorBackupCodes: JSON.stringify(updated) } });
+            await logAudit({ workspaceId: user.workspaceId, actorEmail: email, action: "login.success", metadata: { provider: "credentials", via: "backup_code" } });
+            return { id: user.id, name: user.name, email: user.email, workspaceId: user.workspaceId };
+          }
         }
 
         await logAudit({ workspaceId: user.workspaceId, actorEmail: email, action: "login.success", metadata: { provider: "credentials" } });
