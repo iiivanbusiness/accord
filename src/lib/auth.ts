@@ -7,6 +7,7 @@ import { verifyPassword } from "@/lib/password";
 import { buildDefaultTemplates } from "@/lib/default-templates";
 import { attachOnboardingProfile } from "@/lib/onboarding";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { logAudit } from "@/lib/audit";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -22,14 +23,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!email || !password) return null;
 
         const allowed = await checkRateLimit(`login:${email.toLowerCase()}`, 10, 15 * 60 * 1000);
-        if (!allowed) return null;
+        if (!allowed) {
+          await logAudit({ actorEmail: email, action: "login.rate_limited" });
+          return null;
+        }
 
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user || !user.passwordHash) return null;
+        if (!user || !user.passwordHash) {
+          await logAudit({ actorEmail: email, action: "login.failure", metadata: { reason: "no_such_account" } });
+          return null;
+        }
 
         const valid = verifyPassword(password, user.passwordHash);
-        if (!valid) return null;
+        if (!valid) {
+          await logAudit({ workspaceId: user.workspaceId, actorEmail: email, action: "login.failure", metadata: { reason: "wrong_password" } });
+          return null;
+        }
 
+        await logAudit({ workspaceId: user.workspaceId, actorEmail: email, action: "login.success", metadata: { provider: "credentials" } });
         return { id: user.id, name: user.name, email: user.email, workspaceId: user.workspaceId };
       },
     }),
@@ -63,8 +74,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             data: templates.map((t) => ({ ...t, workspaceId: workspace.id })),
           });
           await attachOnboardingProfile(workspace.id);
+          await logAudit({ workspaceId: workspace.id, actorEmail: email, action: "workspace.created", metadata: { provider: "google" } });
+        } else if (!user.emailVerifiedAt) {
+          // An invited teammate has no password, so Google is their only way
+          // in — every sign-in already re-confirms the address with Google,
+          // so there's no separate "click a link" step for them to do.
+          user = await prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: new Date() } });
         }
 
+        await logAudit({ workspaceId: user.workspaceId, actorEmail: email, action: "login.success", metadata: { provider: "google" } });
         token.workspaceId = user.workspaceId;
       }
 

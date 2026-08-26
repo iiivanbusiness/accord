@@ -6,6 +6,8 @@ import { sendContractEmail as sendEmail } from "@/lib/email";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { applyExtractionToDeal } from "@/lib/deal-live";
 import { extractPlaceholderKeys } from "@/lib/contract";
+import { auth } from "@/lib/auth";
+import { logAudit } from "@/lib/audit";
 
 export async function retryExtraction(dealId: string) {
   const workspaceId = await requireWorkspaceId();
@@ -107,5 +109,16 @@ export async function sendContractEmail(dealId: string, formData: FormData) {
 
   await prisma.contract.update({ where: { dealId }, data: { status: "sent", sentAt: new Date() } });
   await prisma.deal.update({ where: { id: dealId }, data: { status: "sent" } });
+
+  const session = await auth();
+  await logAudit({
+    workspaceId,
+    actorEmail: session?.user?.email,
+    action: "contract.sent",
+    targetType: "Deal",
+    targetId: dealId,
+    metadata: { to },
+  });
+
   redirect(`/deals/${dealId}/contract`);
 }

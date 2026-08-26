@@ -4,6 +4,7 @@ import { createHash } from "crypto";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
+import { logAudit } from "@/lib/audit";
 
 export async function resetPassword(token: string, formData: FormData) {
   const password = String(formData.get("password") ?? "");
@@ -18,8 +19,9 @@ export async function resetPassword(token: string, formData: FormData) {
     redirect(`/reset-password/${token}?error=${encodeURIComponent("This reset link is invalid or has expired — request a new one.")}`);
   }
 
-  await prisma.user.update({ where: { id: resetToken.userId }, data: { passwordHash: hashPassword(password) } });
+  const user = await prisma.user.update({ where: { id: resetToken.userId }, data: { passwordHash: hashPassword(password) } });
   await prisma.passwordResetToken.update({ where: { id: resetToken.id }, data: { usedAt: new Date() } });
+  await logAudit({ workspaceId: user.workspaceId, actorEmail: user.email, action: "password.reset" });
 
   redirect("/login?reset=1");
 }

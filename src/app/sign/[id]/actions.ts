@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { sendSignedNotificationEmail } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { logAudit } from "@/lib/audit";
 
 export async function signContract(contractId: string, formData: FormData) {
   const signerName = String(formData.get("signerName") ?? "").trim();
@@ -39,6 +40,14 @@ export async function signContract(contractId: string, formData: FormData) {
   });
 
   await prisma.deal.update({ where: { id: contract.dealId }, data: { status: "signed" } });
+  await logAudit({
+    workspaceId: contract.deal.workspaceId,
+    actorEmail: signerName,
+    action: "contract.signed",
+    targetType: "Contract",
+    targetId: contract.id,
+    ip,
+  });
 
   if (contract.deal.workspace.notifyOnSigned) {
     try {

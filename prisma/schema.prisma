@@ -49,6 +49,7 @@ model Workspace {
   calendarEvents    CalendarEvent[]
   upgradeRequests   UpgradeRequest[]
   onboardingProfile OnboardingProfile?
+  auditLogs         AuditLog[]
 }
 
 // Answers from the pre-signup onboarding screens. Captured client-side and
@@ -229,4 +230,25 @@ model RateLimitHit {
   createdAt DateTime @default(now())
 
   @@index([key, createdAt])
+}
+
+// Security-relevant event trail — logins, sends, signatures, plan/team
+// changes. workspaceId is nullable because a few events (e.g. a failed
+// login for an email that doesn't exist) have no workspace to attach to
+// yet. actorEmail is denormalized so entries stay readable even if the
+// user is later removed.
+model AuditLog {
+  id          String    @id @default(cuid())
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  actorEmail  String?
+  action      String
+  targetType  String?
+  targetId    String?
+  metadata    String?
+  ip          String?
+  createdAt   DateTime  @default(now())
+
+  @@index([workspaceId, createdAt])
+  @@index([action, createdAt])
 }

@@ -13,6 +13,26 @@ function timeAgo(date: Date): string {
   return `${days}d ago`;
 }
 
+const AUDIT_ACTION_LABEL: Record<string, string> = {
+  "login.success": "Signed in",
+  "login.failure": "Failed sign-in",
+  "login.rate_limited": "Sign-in rate-limited",
+  "workspace.created": "Workspace created",
+  "password.reset": "Password reset",
+  "contract.sent": "Contract sent",
+  "contract.signed": "Contract signed",
+  "teammate.invited": "Teammate invited",
+  "teammate.removed": "Teammate removed",
+  "admin.plan_changed": "Plan changed",
+};
+
+const AUDIT_ACTION_CHIP: Record<string, string> = {
+  "login.failure": "chip-warn",
+  "login.rate_limited": "chip-warn",
+  "contract.signed": "chip-success",
+  "workspace.created": "chip-success",
+};
+
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="card p-5">
@@ -27,7 +47,7 @@ function StatCard({ label, value }: { label: string; value: string }) {
 export default async function AdminPage() {
   await requireAdmin();
 
-  const [workspaces, pendingRequests, onboardingProfiles] = await Promise.all([
+  const [workspaces, pendingRequests, onboardingProfiles, auditLogs] = await Promise.all([
     prisma.workspace.findMany({
       include: { users: true },
       orderBy: { createdAt: "desc" },
@@ -40,6 +60,11 @@ export default async function AdminPage() {
     prisma.onboardingProfile.findMany({
       include: { workspace: true },
       orderBy: { createdAt: "desc" },
+    }),
+    prisma.auditLog.findMany({
+      include: { workspace: true },
+      orderBy: { createdAt: "desc" },
+      take: 100,
     }),
   ]);
 
@@ -190,6 +215,72 @@ export default async function AdminPage() {
         </table>
       </div>
     </div>
+
+    {auditLogs.length > 0 && (
+      <div className="card mt-6 overflow-hidden">
+        <div className="border-b px-5 py-4" style={{ borderColor: "var(--hairline)" }}>
+          <h2 className="text-[15px] font-medium">Recent activity</h2>
+          <div className="mt-0.5 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
+            Security-relevant events across every workspace — last 100
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                {["When", "Workspace", "Actor", "Event", "Details"].map((h) => (
+                  <th
+                    key={h}
+                    className="border-b px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wide"
+                    style={{ color: "var(--ink-muted)", borderColor: "var(--hairline)" }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {auditLogs.map((entry) => {
+                let details = "";
+                if (entry.metadata) {
+                  try {
+                    const parsed = JSON.parse(entry.metadata) as Record<string, unknown>;
+                    details = Object.entries(parsed)
+                      .map(([k, v]) => `${k}: ${v}`)
+                      .join(", ");
+                  } catch {
+                    // ignore malformed metadata
+                  }
+                }
+                return (
+                  <tr key={entry.id} className="row-hover transition-colors">
+                    <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)", color: "var(--ink-muted)" }}>
+                      {timeAgo(entry.createdAt)}
+                    </td>
+                    <td className="border-b px-5 py-3.5 text-[13px] font-medium" style={{ borderColor: "var(--hairline-soft)" }}>
+                      {entry.workspace?.name ?? "—"}
+                    </td>
+                    <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)", color: "var(--ink-muted)" }}>
+                      {entry.actorEmail ?? "—"}
+                    </td>
+                    <td className="border-b px-5 py-3.5" style={{ borderColor: "var(--hairline-soft)" }}>
+                      <span className={`chip ${AUDIT_ACTION_CHIP[entry.action] ?? "chip-neutral"}`}>
+                        <span className="chip-dot" />
+                        {AUDIT_ACTION_LABEL[entry.action] ?? entry.action}
+                      </span>
+                    </td>
+                    <td className="border-b px-5 py-3.5 text-[12.5px]" style={{ borderColor: "var(--hairline-soft)", color: "var(--ink-muted)" }}>
+                      {details}
+                      {entry.ip ? ` · ${entry.ip}` : ""}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )}
     </>
   );
 }

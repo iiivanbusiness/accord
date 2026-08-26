@@ -10,6 +10,7 @@ import { buildDefaultTemplates } from "@/lib/default-templates";
 import { attachOnboardingProfile } from "@/lib/onboarding";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { sendVerificationEmail } from "@/lib/email";
+import { logAudit } from "@/lib/audit";
 
 const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -50,6 +51,7 @@ export async function signup(formData: FormData) {
     data: templates.map((t) => ({ ...t, workspaceId: workspace.id })),
   });
   await attachOnboardingProfile(workspace.id);
+  await logAudit({ workspaceId: workspace.id, actorEmail: email, action: "workspace.created", ip, metadata: { provider: "credentials" } });
 
   const rawToken = randomBytes(32).toString("hex");
   const tokenHash = createHash("sha256").update(rawToken).digest("hex");

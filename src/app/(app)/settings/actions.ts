@@ -8,6 +8,7 @@ import { requireWorkspace } from "@/lib/workspace";
 import { createSenderDomain, getSenderDomainStatus, removeSenderDomain } from "@/lib/sender-domain";
 import { sendTeammateInviteEmail, sendVerificationEmail } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { logAudit } from "@/lib/audit";
 
 type ToggleField = "requireApproval" | "notifyOnSigned" | "autoRemind" | "zoomConnected" | "meetConnected";
 
@@ -99,6 +100,12 @@ export async function inviteTeammate(formData: FormData) {
   await prisma.user.create({
     data: { workspaceId: workspace.id, name: email, email, passwordHash: null },
   });
+  await logAudit({
+    workspaceId: workspace.id,
+    actorEmail: session?.user?.email,
+    action: "teammate.invited",
+    metadata: { invitedEmail: email },
+  });
 
   try {
     await sendTeammateInviteEmail({
@@ -116,11 +123,19 @@ export async function inviteTeammate(formData: FormData) {
 
 export async function removeTeammate(userId: string) {
   const workspace = await requireWorkspace();
+  const session = await auth();
 
   const count = await prisma.user.count({ where: { workspaceId: workspace.id } });
   if (count <= 1) throw new Error("Can't remove the only member of a workspace");
 
+  const removed = await prisma.user.findFirst({ where: { id: userId, workspaceId: workspace.id } });
   await prisma.user.deleteMany({ where: { id: userId, workspaceId: workspace.id } });
+  await logAudit({
+    workspaceId: workspace.id,
+    actorEmail: session?.user?.email,
+    action: "teammate.removed",
+    metadata: { removedEmail: removed?.email },
+  });
   revalidatePath("/settings");
 }
 
