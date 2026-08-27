@@ -20,7 +20,10 @@ const CHANNEL_LABELS = ["Client", "You"];
 // already on separate channels (system audio vs. mic), so we get reliable
 // "who said what" from the channel index instead of guessed diarization.
 export async function transcribeWav(wavBytes: Buffer): Promise<string> {
-  const res = await fetch("https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&punctuate=true&multichannel=true", {
+  // detect_language rather than a hardcoded language — calls happen in
+  // whatever language the user and client actually speak, not just English.
+  // Works per-channel with multichannel, and Nova-3 covers Serbian (sr).
+  const res = await fetch("https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&punctuate=true&multichannel=true&detect_language=true", {
     method: "POST",
     headers: {
       Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`,
