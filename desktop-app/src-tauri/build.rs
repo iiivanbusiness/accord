@@ -13,6 +13,7 @@ fn main() {
     tauri_build::try_build(
         tauri_build::Attributes::new().app_manifest(tauri_build::AppManifest::new().commands(&[
             "start_local_capture",
+            "begin_live_updates",
             "is_local_capturing",
             "discard_local_capture",
             "stop_local_capture_and_upload",

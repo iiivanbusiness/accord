@@ -46,6 +46,11 @@ export default function LocalCaptureForm({ templates }: { templates: Template[] 
         setBusy(false);
         return;
       }
+      // Deal terms fill in live while the call is still going, same as the
+      // Recall bot flow — starts a background loop that uploads a chunk of
+      // the recording every minute or so.
+      await invoke("begin_live_updates", { token: result.token });
+
       localStorage.setItem(
         LOCAL_CAPTURE_STORAGE_KEY,
         JSON.stringify({ dealId: result.dealId, token: result.token, startedAt: Date.now() })
@@ -79,6 +84,11 @@ export default function LocalCaptureForm({ templates }: { templates: Template[] 
       <label className="flex flex-col gap-1.5">
         <span className="text-[13px] font-medium">Who are you meeting with?</span>
         <input name="clientName" placeholder="Acme Fitness" required className="input" />
+      </label>
+
+      <label className="flex flex-col gap-1.5">
+        <span className="text-[13px] font-medium">Client email <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>(optional)</span></span>
+        <input name="clientEmail" type="email" placeholder="hello@client.com" className="input" />
       </label>
 
       <label className="flex flex-col gap-1.5">

@@ -34,6 +34,7 @@ private let captureSampleRate: Double = 16000
 final class MicCapture {
     private let engine = AVAudioEngine()
     private var pcm16 = Data()
+    private var exportedSamples = 0
     private let lock = NSLock()
     private(set) var running = false
 
@@ -43,6 +44,7 @@ final class MicCapture {
         }
 
         pcm16 = Data()
+        exportedSamples = 0
         let input = engine.inputNode
         let inputFormat = input.inputFormat(forBus: 0)
 
@@ -105,6 +107,20 @@ final class MicCapture {
         lock.unlock()
         return result
     }
+
+    /// Returns only what's arrived since the last snapshot (or start), and
+    /// advances the checkpoint — non-destructive otherwise, capture keeps
+    /// running. Used for periodic live transcription passes so each pass
+    /// only pays for new audio instead of re-transcribing the whole call.
+    func snapshotDelta() -> Data {
+        lock.lock()
+        defer { lock.unlock() }
+        let totalSamples = pcm16.count / MemoryLayout<Int16>.size
+        guard totalSamples > exportedSamples else { return Data() }
+        let delta = pcm16.suffix(from: exportedSamples * MemoryLayout<Int16>.size)
+        exportedSamples = totalSamples
+        return delta
+    }
 }
 
 // MARK: - System audio + mic orchestration
@@ -114,6 +130,7 @@ final class CaptureSession: NSObject, SCStreamOutput, SCStreamDelegate {
 
     private var stream: SCStream?
     private var systemPcm16 = Data()
+    private var systemExportedSamples = 0
     private let lock = NSLock()
     private(set) var capturing = false
     private let mic = MicCapture()
@@ -122,6 +139,7 @@ final class CaptureSession: NSObject, SCStreamOutput, SCStreamDelegate {
         if capturing { return -100 }
 
         systemPcm16 = Data()
+        systemExportedSamples = 0
 
         let sem = DispatchSemaphore(value: 0)
         var result: Int32 = 0
@@ -193,6 +211,30 @@ final class CaptureSession: NSObject, SCStreamOutput, SCStreamDelegate {
 
         guard !sysSamples.isEmpty || !micSamples.isEmpty else { return nil }
         return CaptureSession.makeStereoWavFile(systemPcm: sysSamples, micPcm: micSamples, sampleRate: UInt32(captureSampleRate))
+    }
+
+    /// Non-destructive: returns only the audio captured since the last
+    /// snapshot (or since start), on both channels, and advances the
+    /// checkpoint. Capture keeps running — used for periodic live
+    /// transcription passes during the call, mirroring how the Recall bot
+    /// flow updates deal terms live instead of only at the very end.
+    func snapshotDeltaWav() -> Data? {
+        guard capturing else { return nil }
+
+        lock.lock()
+        let totalSamples = systemPcm16.count / MemoryLayout<Int16>.size
+        let sysDelta: Data
+        if totalSamples > systemExportedSamples {
+            sysDelta = systemPcm16.suffix(from: systemExportedSamples * MemoryLayout<Int16>.size)
+            systemExportedSamples = totalSamples
+        } else {
+            sysDelta = Data()
+        }
+        lock.unlock()
+
+        let micDelta = mic.snapshotDelta()
+        guard !sysDelta.isEmpty || !micDelta.isEmpty else { return nil }
+        return CaptureSession.makeStereoWavFile(systemPcm: sysDelta, micPcm: micDelta, sampleRate: UInt32(captureSampleRate))
     }
 
     // MARK: - SCStreamOutput
@@ -311,4 +353,18 @@ public func sealme_audio_stop_wav(_ outPtr: UnsafeMutablePointer<UnsafeMutablePo
 @_cdecl("sealme_audio_free")
 public func sealme_audio_free(_ ptr: UnsafeMutablePointer<UInt8>?, _ len: Int) {
     ptr?.deallocate()
+}
+
+@_cdecl("sealme_audio_snapshot_wav")
+public func sealme_audio_snapshot_wav(_ outPtr: UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>, _ outLen: UnsafeMutablePointer<Int>) -> Int32 {
+    guard let wav = CaptureSession.shared.snapshotDeltaWav() else {
+        outPtr.pointee = nil
+        outLen.pointee = 0
+        return -1
+    }
+    let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: wav.count)
+    wav.copyBytes(to: buffer, count: wav.count)
+    outPtr.pointee = buffer
+    outLen.pointee = wav.count
+    return 0
 }

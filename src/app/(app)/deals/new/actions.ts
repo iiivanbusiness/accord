@@ -184,6 +184,7 @@ export async function startCallFromEvent(formData: FormData) {
 // the upload token back to authenticate that capture's later upload.
 export async function startLocalCapture(formData: FormData): Promise<{ dealId: string; token: string } | { error: string }> {
   const clientName = String(formData.get("clientName") ?? "").trim();
+  const clientEmail = String(formData.get("clientEmail") ?? "").trim() || null;
   const templateId = String(formData.get("templateId") ?? "").trim();
 
   if (!clientName) return { error: "Enter who you're meeting with" };
@@ -196,7 +197,7 @@ export async function startLocalCapture(formData: FormData): Promise<{ dealId: s
   const workspaceId = workspace.id;
 
   const client = await prisma.client.create({
-    data: { workspaceId, name: clientName, company: clientName },
+    data: { workspaceId, name: clientName, company: clientName, email: clientEmail },
   });
 
   const deal = await prisma.deal.create({

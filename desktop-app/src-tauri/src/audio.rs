@@ -7,6 +7,7 @@ extern "C" {
     fn sealme_audio_is_capturing() -> i32;
     fn sealme_audio_stop_wav(out_ptr: *mut *mut u8, out_len: *mut usize) -> i32;
     fn sealme_audio_free(ptr: *mut u8, len: usize);
+    fn sealme_audio_snapshot_wav(out_ptr: *mut *mut u8, out_len: *mut usize) -> i32;
 }
 
 #[cfg(target_os = "macos")]
@@ -44,6 +45,26 @@ pub fn stop_capture_wav() -> Result<Option<Vec<u8>>, String> {
     Ok(Some(wav))
 }
 
+/// Non-destructive: returns only the audio captured since the last snapshot
+/// (or since start) on both channels, and advances the checkpoint. Capture
+/// keeps running — used for periodic live transcription passes during the
+/// call, mirroring how the Recall bot flow updates deal terms live instead
+/// of only once at the end. Returns `Ok(None)` if nothing new has arrived.
+#[cfg(target_os = "macos")]
+pub fn snapshot_delta_wav() -> Result<Option<Vec<u8>>, String> {
+    let mut ptr: *mut u8 = std::ptr::null_mut();
+    let mut len: usize = 0;
+
+    let code = unsafe { sealme_audio_snapshot_wav(&mut ptr, &mut len) };
+    if code != 0 || ptr.is_null() {
+        return Ok(None);
+    }
+
+    let wav = unsafe { std::slice::from_raw_parts(ptr, len).to_vec() };
+    unsafe { sealme_audio_free(ptr, len) };
+    Ok(Some(wav))
+}
+
 #[cfg(not(target_os = "macos"))]
 pub fn start_capture() -> Result<(), String> {
     Err("Local call capture is only supported on macOS right now".to_string())
@@ -56,5 +77,10 @@ pub fn is_capturing() -> bool {
 
 #[cfg(not(target_os = "macos"))]
 pub fn stop_capture_wav() -> Result<Option<Vec<u8>>, String> {
+    Err("Local call capture is only supported on macOS right now".to_string())
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn snapshot_delta_wav() -> Result<Option<Vec<u8>>, String> {
     Err("Local call capture is only supported on macOS right now".to_string())
 }

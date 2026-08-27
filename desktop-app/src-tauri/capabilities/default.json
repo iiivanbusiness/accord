@@ -10,6 +10,7 @@
     "core:default",
     "opener:default",
     "allow-start-local-capture",
+    "allow-begin-live-updates",
     "allow-is-local-capturing",
     "allow-discard-local-capture",
     "allow-stop-local-capture-and-upload"
