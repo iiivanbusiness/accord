@@ -35,10 +35,39 @@ export type ExtractedDeal = {
   fields: ExtractedField[];
 };
 
-export async function extractDealFromTranscript(transcript: string, placeholderKeys: string[]): Promise<ExtractedDeal> {
+// previousTranscript, when given, should be exactly what liveTranscript was
+// on the last extraction pass for this deal (Deal.lastExtractedTranscript).
+// Live calls re-run this on the whole transcript-so-far roughly once a
+// minute — caching only helps if the cached block's bytes are identical to
+// last time, so the transcript is split into a stable block (whatever
+// hasn't changed since the last pass, cached) and a plain block for
+// whatever's new. Anthropic's caching is a straight prefix match on a
+// block's own content — appending to a single growing block invalidates the
+// whole thing, so the split has to be structural, not just a cache_control
+// flag on one ever-growing string.
+export async function extractDealFromTranscript(
+  transcript: string,
+  placeholderKeys: string[],
+  previousTranscript?: string | null
+): Promise<ExtractedDeal> {
   const client = new Anthropic();
 
   const fieldKeys = [...new Set(["service", "fee", ...placeholderKeys])];
+
+  const hasValidPrefix = Boolean(previousTranscript) && transcript.startsWith(previousTranscript as string);
+  const stablePart = hasValidPrefix ? (previousTranscript as string) : transcript;
+  const newPart = hasValidPrefix ? transcript.slice((previousTranscript as string).length) : "";
+
+  const content: Array<{ type: "text"; text: string; cache_control?: { type: "ephemeral" } }> = [
+    {
+      type: "text",
+      text: `Extract the deal terms from this call transcript:\n\n${stablePart}`,
+      cache_control: { type: "ephemeral" },
+    },
+  ];
+  if (newPart) {
+    content.push({ type: "text", text: newPart });
+  }
 
   const response = await client.messages.create({
     model: "claude-sonnet-5",
@@ -50,7 +79,7 @@ export async function extractDealFromTranscript(transcript: string, placeholderK
     messages: [
       {
         role: "user",
-        content: `Extract the deal terms from this call transcript:\n\n${transcript}`,
+        content,
       },
     ],
     tools: [

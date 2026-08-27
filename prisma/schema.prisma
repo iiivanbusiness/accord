@@ -161,6 +161,11 @@ model Deal {
   recallBotId String? @unique // set when a Recall.ai bot is capturing this call
   liveTranscript  String?   // accumulated utterances while a live call is in progress
   lastExtractedAt DateTime? // throttles re-extraction during a live call
+  // Exactly what liveTranscript was the last time extraction ran — kept as
+  // its own field (not derived) so the extraction prompt can send it as a
+  // byte-identical, separately-cached block; only the text added since then
+  // needs to be paid for at full price on the next pass.
+  lastExtractedTranscript String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

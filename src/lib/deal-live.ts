@@ -14,7 +14,7 @@ export async function applyExtractionToDeal(
   if (!deal) throw new Error("Deal not found");
   if (deal.status === "sent" || deal.status === "signed") return { hasMissing: false };
 
-  const extracted = await extractDealFromTranscript(transcript, placeholderKeys);
+  const extracted = await extractDealFromTranscript(transcript, placeholderKeys, deal.lastExtractedTranscript);
   const { fieldRows, service, fee } = buildDealFieldRows(extracted, placeholderKeys);
 
   const existing = await prisma.dealField.findMany({ where: { dealId } });
@@ -59,6 +59,9 @@ export async function applyExtractionToDeal(
       status: hasMissing ? "missing_info" : "ready",
       summary: extracted.summary ?? deal.summary,
       lastExtractedAt: new Date(),
+      // Baseline for next pass's cache split — becomes the "stable" block
+      // extractDealFromTranscript will look for verbatim next time.
+      lastExtractedTranscript: transcript,
     },
   });
 
