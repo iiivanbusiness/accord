@@ -56,6 +56,24 @@ export default function LocalCaptureBanner() {
     }
   }
 
+  // Recovery path for a stuck banner — e.g. the app was closed (or crashed)
+  // before Stop & finish was ever pressed, leaving this session sitting in
+  // localStorage on next launch with a token that may no longer be valid.
+  // Clears local state unconditionally regardless of whether the native
+  // side has anything to stop.
+  async function handleDiscard() {
+    if (!confirm("Discard this recording? This can't be undone.")) return;
+    setBusy(true);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("discard_local_capture").catch(() => {});
+    } finally {
+      localStorage.removeItem(LOCAL_CAPTURE_STORAGE_KEY);
+      setSession(null);
+      setBusy(false);
+    }
+  }
+
   if (!session) return null;
 
   return (
@@ -78,6 +96,15 @@ export default function LocalCaptureBanner() {
         style={{ background: "var(--success)", color: "var(--on-primary, #fff)" }}
       >
         {busy ? "Finishing…" : "Stop & finish"}
+      </button>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={handleDiscard}
+        className="text-[12px] font-medium underline decoration-dotted underline-offset-2"
+        style={{ color: "var(--success)" }}
+      >
+        Discard
       </button>
     </div>
   );
