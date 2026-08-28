@@ -131,10 +131,56 @@ async fn upload_chunk(app: &tauri::AppHandle, token: &str, wav_bytes: Vec<u8>, i
     }
 }
 
+// Checks https://app.sealme.net/updates/latest.json on startup and, if a
+// newer version is signed and available, downloads and installs it, then
+// restarts so it takes effect. Entirely on the Rust side — the webview never
+// gets a say in whether/when this happens, since it's just the remote page,
+// not something we want triggering updates.
+#[cfg(desktop)]
+async fn check_for_update(app: tauri::AppHandle) {
+    use tauri_plugin_updater::UpdaterExt;
+
+    let updater = match app.updater() {
+        Ok(u) => u,
+        Err(e) => {
+            eprintln!("updater unavailable: {e}");
+            return;
+        }
+    };
+
+    match updater.check().await {
+        Ok(Some(update)) => {
+            let install = update.download_and_install(|_chunk, _total| {}, || {}).await;
+            match install {
+                Ok(()) => {
+                    tauri::process::restart(&app.env());
+                }
+                Err(e) => eprintln!("update install failed: {e}"),
+            }
+        }
+        Ok(None) => {}
+        Err(e) => eprintln!("update check failed: {e}"),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
+    let mut builder = tauri::Builder::default().plugin(tauri_plugin_opener::init());
+
+    // Updater is desktop-only — there's no mobile build of this app today,
+    // but gating it keeps that true if one is ever added later.
+    #[cfg(desktop)]
+    {
+        builder = builder
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .setup(|app| {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(check_for_update(handle));
+                Ok(())
+            });
+    }
+
+    builder
         .invoke_handler(tauri::generate_handler![
             start_local_capture,
             begin_live_updates,

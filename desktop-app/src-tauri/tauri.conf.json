@@ -23,7 +23,8 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["app"],
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -31,5 +32,11 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY0RDJCNkJENjU5RUI5NjIKUldSaXVaNWx2YmJTWkFHQ0NIdTJrRE5HWWxRL1hsOTNCOXJzRGVDYW5oV200UHovczh3S1Z6UlAK",
+      "endpoints": ["https://app.sealme.net/updates/latest.json"]
+    }
   }
 }
