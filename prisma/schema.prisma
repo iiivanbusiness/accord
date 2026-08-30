@@ -88,6 +88,8 @@ model User {
 
   resetTokens             PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
+  feedbackPosts           FeedbackPost[]
+  feedbackVotes           FeedbackVote[]
 }
 
 // tokenHash stores SHA-256 of the raw token emailed to the user — same
@@ -261,6 +263,35 @@ model LocalCaptureToken {
   createdAt   DateTime  @default(now())
 
   @@index([workspaceId])
+}
+
+// Public, product-wide feature-request board — deliberately NOT scoped by
+// workspaceId. Every other model in this schema is tenant-isolated because
+// it holds one workspace's business data; this one is meant to be shared
+// across all of SealMe's customers, same as Canny/Frill-style boards, so
+// everyone sees and votes on the same list. Don't copy the workspaceId
+// pattern here without re-reading this comment.
+model FeedbackPost {
+  id          String   @id @default(cuid())
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id])
+  title       String
+  description String
+  status      String   @default("open") // open | planned | in_progress | done | closed
+  createdAt   DateTime @default(now())
+
+  votes FeedbackVote[]
+}
+
+model FeedbackVote {
+  id        String       @id @default(cuid())
+  postId    String
+  post      FeedbackPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+
+  @@unique([postId, userId])
 }
 
 // Security-relevant event trail — logins, sends, signatures, plan/team

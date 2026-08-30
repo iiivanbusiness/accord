@@ -5,6 +5,7 @@ export const NAV_ITEMS = [
   { href: "/analytics", label: "Analytics" },
   { href: "/clients", label: "Clients" },
   { href: "/templates", label: "Templates" },
+  { href: "/feedback", label: "Feedback" },
   { href: "/settings", label: "Settings" },
 ] as const;
 
@@ -26,6 +27,7 @@ const SCREEN_LABELS: { test: (path: string) => boolean; label: string }[] = [
   { test: (p) => /^\/templates\/[^/]+\/edit$/.test(p), label: "Edit template" },
   { test: (p) => /^\/templates\/[^/]+$/.test(p), label: "Template" },
   { test: (p) => p === "/templates", label: "Templates" },
+  { test: (p) => p === "/feedback", label: "Feedback" },
   { test: (p) => p === "/settings", label: "Settings" },
   { test: (p) => p === "/admin", label: "Admin" },
 ];

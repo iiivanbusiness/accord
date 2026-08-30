@@ -20,6 +20,7 @@ const NAV_ICONS: Record<string, () => React.ReactNode> = {
   "/analytics": AnalyticsIcon,
   "/clients": ClientsIcon,
   "/templates": TemplatesIcon,
+  "/feedback": FeedbackIcon,
   "/settings": SettingsIcon,
   "/admin": AdminIcon,
 };
@@ -171,6 +172,17 @@ function TemplatesIcon() {
     <svg {...iconProps()}>
       <rect x="4.5" y="2.5" width="11" height="15" rx="1.4" />
       <path d="M7 7h6M7 10h6M7 13h3.5" />
+    </svg>
+  );
+}
+
+function FeedbackIcon() {
+  return (
+    <svg {...iconProps()}>
+      <path d="M3 5.5c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v6.2c0 1.1-.9 2-2 2H9.4L5.5 17v-3.3H5c-1.1 0-2-.9-2-2V5.5z" />
+      <circle cx="7.3" cy="8.5" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="10.6" cy="8.5" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="13.9" cy="8.5" r="0.9" fill="currentColor" stroke="none" />
     </svg>
   );
 }
