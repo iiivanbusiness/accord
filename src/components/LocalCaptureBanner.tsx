@@ -22,6 +22,7 @@ export default function LocalCaptureBanner() {
   const [session, setSession] = useState<Session | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
 
   useEffect(() => {
     setSession(readSession());
@@ -60,9 +61,10 @@ export default function LocalCaptureBanner() {
   // before Stop & finish was ever pressed, leaving this session sitting in
   // localStorage on next launch with a token that may no longer be valid.
   // Clears local state unconditionally regardless of whether the native
-  // side has anything to stop.
+  // side has anything to stop. Confirmation is inline, not window.confirm() —
+  // Tauri's WKWebView doesn't reliably surface native JS dialogs, so that
+  // silently did nothing when clicked.
   async function handleDiscard() {
-    if (!confirm("Discard this recording? This can't be undone.")) return;
     setBusy(true);
     try {
       const { invoke } = await import("@tauri-apps/api/core");
@@ -71,6 +73,7 @@ export default function LocalCaptureBanner() {
       localStorage.removeItem(LOCAL_CAPTURE_STORAGE_KEY);
       setSession(null);
       setBusy(false);
+      setConfirmingDiscard(false);
     }
   }
 
@@ -88,24 +91,50 @@ export default function LocalCaptureBanner() {
           {error}
         </span>
       )}
-      <button
-        type="button"
-        disabled={busy}
-        onClick={handleStop}
-        className="btn btn-sm ml-auto"
-        style={{ background: "var(--success)", color: "var(--on-primary, #fff)" }}
-      >
-        {busy ? "Finishing…" : "Stop & finish"}
-      </button>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={handleDiscard}
-        className="text-[12px] font-medium underline decoration-dotted underline-offset-2"
-        style={{ color: "var(--success)" }}
-      >
-        Discard
-      </button>
+      {confirmingDiscard ? (
+        <span className="ml-auto flex items-center gap-2.5">
+          <span className="text-[12.5px] font-medium">Discard this recording?</span>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={handleDiscard}
+            className="btn btn-sm"
+            style={{ background: "var(--warn)", color: "var(--on-primary, #fff)" }}
+          >
+            {busy ? "Discarding…" : "Yes, discard"}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setConfirmingDiscard(false)}
+            className="text-[12px] font-medium"
+            style={{ color: "var(--success)" }}
+          >
+            Cancel
+          </button>
+        </span>
+      ) : (
+        <>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={handleStop}
+            className="btn btn-sm ml-auto"
+            style={{ background: "var(--success)", color: "var(--on-primary, #fff)" }}
+          >
+            {busy ? "Finishing…" : "Stop & finish"}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setConfirmingDiscard(true)}
+            className="text-[12px] font-medium underline decoration-dotted underline-offset-2"
+            style={{ color: "var(--success)" }}
+          >
+            Discard
+          </button>
+        </>
+      )}
     </div>
   );
 }
