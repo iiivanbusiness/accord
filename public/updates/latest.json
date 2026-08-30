@@ -1,10 +1,10 @@
 {
-  "version": "0.1.0",
-  "notes": "Initial version with auto-update support.",
-  "pub_date": "2026-08-28T23:36:57Z",
+  "version": "0.1.1",
+  "notes": "Bug fixes and stability improvements.",
+  "pub_date": "2026-08-30T19:30:34Z",
   "platforms": {
     "darwin-aarch64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSaXVaNWx2YmJTWkNxMmZFbUlwbWJ2OVBJcUF0WTB4OHhNOVBxU2F1cmFnWVFZWmlHWnpzR215bkVwT0JIZXhnUjlzMGJMUC9wUzVvdnpiTjdmNm1NNUluUFRPaEIxTkF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg3OTYwMDQ3CWZpbGU6U2VhbE1lLmFwcC50YXIuZ3oKTkI0THNQbUx5RXpPb3FYSlVWem9FNTZMbU5iU1lMUm1zSFllYjRhdjUzR0djaC9qM2M0c3MyNTMwa2g3Zm5TUERPLzRnREVZQ1FHUVZ5TXc5RnNDQ2c9PQo=",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSaXVaNWx2YmJTWkxFbnRTVmZ2YnFNMHdqSGdId3B5OWtnSEhGT04zc1N3TndJdE1VRHlsSktxR0lqMmFaRkw5a0x2bEZDRU5yQmdUNXpGWGVyZFBENXJRVlNuSzcydlFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4MTE4MTg3CWZpbGU6U2VhbE1lLmFwcC50YXIuZ3oKTFV5VzV0MkhpZTZHVTk4Q3J5N0FJOFEwQ1U1UFBWTDNybFlhR1dSR2tlOXJXUCs2SlJFY0gyRzFqNGJLRm9qcG5uamkwVlJWVTJiczh6V0JJWnl3QkE9PQo=",
       "url": "https://app.sealme.net/updates/SealMe.app.tar.gz"
     }
   }

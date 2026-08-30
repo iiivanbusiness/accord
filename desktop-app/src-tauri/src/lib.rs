@@ -148,18 +148,21 @@ async fn check_for_update(app: tauri::AppHandle) {
         }
     };
 
+    eprintln!("[updater] checking...");
     match updater.check().await {
         Ok(Some(update)) => {
+            eprintln!("[updater] update found: {} -> {}", update.current_version, update.version);
             let install = update.download_and_install(|_chunk, _total| {}, || {}).await;
             match install {
                 Ok(()) => {
+                    eprintln!("[updater] installed, restarting");
                     tauri::process::restart(&app.env());
                 }
-                Err(e) => eprintln!("update install failed: {e}"),
+                Err(e) => eprintln!("[updater] install failed: {e}"),
             }
         }
-        Ok(None) => {}
-        Err(e) => eprintln!("update check failed: {e}"),
+        Ok(None) => eprintln!("[updater] no update available"),
+        Err(e) => eprintln!("[updater] check failed: {e}"),
     }
 }
 
