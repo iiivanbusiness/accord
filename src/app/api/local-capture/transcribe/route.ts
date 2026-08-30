@@ -46,6 +46,10 @@ export async function POST(req: Request) {
   // the final call actually burns it.
   if (isFinal) {
     await prisma.localCaptureToken.update({ where: { id: record.id }, data: { usedAt: new Date() } });
+    // Set unconditionally here, not after transcription/extraction below —
+    // the call itself ended the moment this request arrived, regardless of
+    // whether transcribing this last chunk succeeds.
+    await prisma.call.update({ where: { id: record.callId }, data: { endedAt: new Date() } });
   }
 
   const deal = await prisma.deal.findUnique({ where: { id: record.dealId }, include: { template: true, workspace: true } });
@@ -67,6 +71,11 @@ export async function POST(req: Request) {
       const chunkTranscript = await transcribeWav(audioBuffer);
       if (chunkTranscript) {
         await prisma.$executeRaw`UPDATE "Deal" SET "liveTranscript" = COALESCE("liveTranscript", '') || ${`\n${chunkTranscript}`} WHERE id = ${deal.id}`;
+        // Same append, scoped to just this call — Deal.liveTranscript stays
+        // the input extraction actually reads; Call.transcript exists so the
+        // negotiation timeline can show "here's what was said in call N"
+        // without re-splitting one giant string.
+        await prisma.$executeRaw`UPDATE "Call" SET "transcript" = "transcript" || ${`\n${chunkTranscript}`} WHERE id = ${record.callId}`;
       }
     }
 

@@ -111,6 +111,7 @@ export async function createDealFromTranscript(formData: FormData) {
       summary: extracted.summary,
       source: "upload",
       fields: { create: fieldRows },
+      calls: { create: { transcript, source: "upload", endedAt: new Date() } },
     },
   });
 
@@ -212,18 +213,8 @@ export async function startLocalCapture(formData: FormData): Promise<{ dealId: s
     },
   });
 
-  const rawToken = crypto.randomBytes(32).toString("hex");
-  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
-  await prisma.localCaptureToken.create({
-    data: {
-      workspaceId,
-      dealId: deal.id,
-      tokenHash,
-      // 4h covers even an unusually long call — the token is single-use and
-      // burned the moment the recording is uploaded, well before that.
-      expiresAt: new Date(Date.now() + 4 * 60 * 60 * 1000),
-    },
-  });
+  const call = await prisma.call.create({ data: { dealId: deal.id, source: "local" } });
+  const rawToken = await mintLocalCaptureToken(workspaceId, deal.id, call.id);
 
   await prisma.workspace.update({
     where: { id: workspaceId },
@@ -231,6 +222,49 @@ export async function startLocalCapture(formData: FormData): Promise<{ dealId: s
   });
 
   return { dealId: deal.id, token: rawToken };
+}
+
+// Shared by startLocalCapture (brand-new deal) and continueLocalCapture (a
+// follow-up call on an existing deal) — one Call, one token, always.
+async function mintLocalCaptureToken(workspaceId: string, dealId: string, callId: string): Promise<string> {
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+  await prisma.localCaptureToken.create({
+    data: {
+      workspaceId,
+      dealId,
+      callId,
+      tokenHash,
+      // 4h covers even an unusually long call — the token is single-use and
+      // burned the moment the recording is uploaded, well before that.
+      expiresAt: new Date(Date.now() + 4 * 60 * 60 * 1000),
+    },
+  });
+  return rawToken;
+}
+
+// Attaches a follow-up call to a deal that already exists, instead of
+// spawning a new deal + client for what's really a continuation of the
+// same negotiation. Reuses the deal's existing template.
+export async function continueLocalCapture(dealId: string): Promise<{ dealId: string; token: string } | { error: string }> {
+  const workspace = await requireWorkspace();
+  if (workspace.callsUsedThisMonth >= workspace.callsLimit) {
+    return { error: "You've used all your calls for this billing period — upgrade your plan to start more." };
+  }
+
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId: workspace.id } });
+  if (!deal) return { error: "Deal not found" };
+  if (deal.status === "signed") return { error: "This deal is already signed — start a new deal instead" };
+
+  const call = await prisma.call.create({ data: { dealId, source: "local" } });
+  const rawToken = await mintLocalCaptureToken(workspace.id, dealId, call.id);
+
+  await prisma.workspace.update({
+    where: { id: workspace.id },
+    data: { callsUsedThisMonth: { increment: 1 } },
+  });
+
+  return { dealId, token: rawToken };
 }
 
 export async function startCallBot(formData: FormData) {

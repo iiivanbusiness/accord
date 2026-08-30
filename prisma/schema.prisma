@@ -173,6 +173,28 @@ model Deal {
 
   fields   DealField[]
   contract Contract?
+  calls    Call[]
+}
+
+// One row per recording session attached to a deal — a deal that started
+// as a single call can pick up follow-up calls later (see
+// startLocalCapture / continueLocalCapture) instead of always spawning a
+// new deal. Deal.liveTranscript / lastExtractedTranscript are untouched by
+// this — they stay the running input to extraction exactly as before; Call
+// exists purely to let the UI show "here's what was said, call by call"
+// (the negotiation timeline) without re-deriving it from one giant string.
+model Call {
+  id         String    @id @default(cuid())
+  dealId     String
+  deal       Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  transcript String    @default("")
+  source     String // local | upload
+  startedAt  DateTime  @default(now())
+  endedAt    DateTime?
+
+  localCaptureTokens LocalCaptureToken[]
+
+  @@index([dealId])
 }
 
 // One row per deal-term shown in the Deal Detail screen — mirrors the
@@ -256,13 +278,20 @@ model LocalCaptureToken {
   id          String    @id @default(cuid())
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  dealId      String    @unique
+  // dealId is denormalized (also reachable via call.dealId) purely so the
+  // transcribe endpoint's hot path doesn't need an extra join — a deal can
+  // now have more than one call, so this is no longer unique on its own;
+  // callId is the actual one-token-per-recording-session key.
+  dealId      String
+  callId      String    @unique
+  call        Call      @relation(fields: [callId], references: [id], onDelete: Cascade)
   tokenHash   String    @unique
   expiresAt   DateTime
   usedAt      DateTime?
   createdAt   DateTime  @default(now())
 
   @@index([workspaceId])
+  @@index([dealId])
 }
 
 // Public, product-wide feature-request board — deliberately NOT scoped by

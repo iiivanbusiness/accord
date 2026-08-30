@@ -1,9 +1,20 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import DealTermsCard from "@/components/DealTermsCard";
+import ContinueCallButton from "@/components/ContinueCallButton";
 import { prisma } from "@/lib/db";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { fillMissingFields, generateContract, retryExtraction, updateFieldValues } from "./actions";
+
+const CALL_SOURCE_LABEL: Record<string, string> = {
+  local: "Recorded locally",
+  upload: "Pasted transcript",
+};
+
+function callPreview(transcript: string): string {
+  const clean = transcript.trim().replace(/\s+/g, " ");
+  return clean.length > 160 ? `${clean.slice(0, 160)}…` : clean || "No transcript captured.";
+}
 
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -39,7 +50,13 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
   const workspaceId = await requireWorkspaceId();
   const deal = await prisma.deal.findFirst({
     where: { id, workspaceId },
-    include: { client: true, fields: { orderBy: { orderIndex: "asc" } }, template: true, contract: true },
+    include: {
+      client: true,
+      fields: { orderBy: { orderIndex: "asc" } },
+      template: true,
+      contract: true,
+      calls: { orderBy: { startedAt: "asc" } },
+    },
   });
   if (!deal) notFound();
 
@@ -91,13 +108,39 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
           groups={[...groups.entries()].filter(([label]) => label !== "Missing")}
           updateAction={updateFieldValues.bind(null, deal.id)}
         />
+
+        {deal.calls.length > 0 && (
+          <div className="card p-5">
+            <h2 className="mb-3 text-[12px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
+              Negotiation timeline
+            </h2>
+            <div className="flex flex-col gap-3">
+              {deal.calls.map((call, i) => (
+                <div key={call.id} className="border-b pb-3 last:border-b-0 last:pb-0" style={{ borderColor: "var(--hairline-soft)" }}>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="text-[13px] font-medium">Call {i + 1} — {CALL_SOURCE_LABEL[call.source] ?? call.source}</span>
+                    <span className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
+                      {call.startedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                      {!call.endedAt && call.id === deal.calls[deal.calls.length - 1].id ? " · in progress" : ""}
+                    </span>
+                  </div>
+                  <p className="text-[12.5px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>
+                    {callPreview(call.transcript)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-4">
+        {deal.status !== "signed" && <ContinueCallButton dealId={deal.id} />}
+
         {deal.status === "processing" ? (
           <div className="card flex items-center gap-2.5 px-5 py-4 text-[13.5px] font-medium" style={{ color: "var(--ink-muted)" }}>
             <span className="chip-dot h-1.5 w-1.5 rounded-full" style={{ background: "var(--ink-muted)" }} />
-            Analyzing the call — terms appear here live as they're mentioned.
+            Analyzing the call — terms appear here live as they&apos;re mentioned.
           </div>
         ) : deal.status === "extraction_failed" ? (
           <div className="card" style={{ borderColor: "rgba(245,185,77,.28)" }}>
