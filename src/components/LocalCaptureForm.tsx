@@ -69,10 +69,9 @@ export default function LocalCaptureForm({ templates }: { templates: Template[] 
   if (!isTauri) {
     return (
       <div className="card max-w-[560px] p-6 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-        Recording locally only works inside the SealMe desktop app — it captures your call&apos;s audio directly from
-        your computer instead of using a bot.{" "}
-        <Link href="/deals/new?mode=live" className="font-medium" style={{ color: "var(--accent-blue)" }}>
-          Use a notetaker bot
+        Recording locally only works inside the SealMe desktop app.{" "}
+        <Link href="/deals/new" className="font-medium" style={{ color: "var(--accent-blue)" }}>
+          Paste a transcript
         </Link>{" "}
         here instead.
       </div>
