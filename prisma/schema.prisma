@@ -167,7 +167,7 @@ model Deal {
 
   service    String
   feeDisplay String
-  status     String   @default("processing") // processing | missing_info | ready | sent | signed
+  status     String   @default("processing") // processing | missing_info | ready | pending_approval | changes_requested | sent | signed
   source     String   @default("manual") // zoom | meet | manual | upload
   callLength String?
   summary    String? // 2-3 sentence "what happened on this call", from the same extraction pass as the fields
@@ -265,6 +265,13 @@ model Contract {
   reminderSentAt DateTime? // set once the 3-day "still unsigned" nudge has gone out
   viewedAt   DateTime? // first time the client actually opened the sign page
   createdAt  DateTime          @default(now())
+
+  // The email a human composed on the Send page, held here while the
+  // workspace's approval chain runs — sent for real, verbatim, the moment
+  // the last step approves. Cleared once actually sent.
+  pendingTo      String?
+  pendingSubject String?
+  pendingMessage String?
 
   approvals ContractApproval[]
 }

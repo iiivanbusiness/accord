@@ -3,7 +3,10 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { fillClauses } from "@/lib/contract";
 import { requireWorkspaceId } from "@/lib/workspace";
+import { currentUserWithRole } from "@/lib/permissions";
 import DownloadContractButton from "@/components/DownloadContractButton";
+import ApprovalStepper from "@/components/ApprovalStepper";
+import { decideApproval } from "../approval-actions";
 
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -19,13 +22,24 @@ function timeAgo(date: Date): string {
 export default async function ContractPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const workspaceId = await requireWorkspaceId();
-  const deal = await prisma.deal.findFirst({
-    where: { id, workspaceId },
-    include: { client: true, template: true, fields: true, contract: true, workspace: true },
-  });
+  const [deal, currentUser] = await Promise.all([
+    prisma.deal.findFirst({
+      where: { id, workspaceId },
+      include: {
+        client: true,
+        template: true,
+        fields: true,
+        contract: { include: { approvals: { include: { role: true, decidedByUser: true }, orderBy: { order: "asc" } } } },
+        workspace: true,
+      },
+    }),
+    currentUserWithRole(),
+  ]);
   if (!deal || !deal.contract || !deal.template) notFound();
 
   const clauses = fillClauses(deal.template.clauses, deal.fields);
+  const showApprovalStepper = deal.contract.approvals.length > 0 && (deal.contract.status === "pending_approval" || deal.contract.status === "changes_requested");
+  const canResend = deal.contract.status === "draft" || deal.contract.status === "changes_requested";
 
   return (
     <>
@@ -51,6 +65,20 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
             <img src={deal.contract.signatureImage} alt={`${deal.contract.signerName}'s signature`} style={{ height: 40 }} />
           </div>
         )}
+      </div>
+    )}
+    {deal.contract.status === "pending_approval" && (
+      <div className="mb-[18px] flex flex-wrap items-center gap-3">
+        <div className="chip chip-neutral px-4 py-3 text-[13.5px]">
+          Waiting on approval before this goes to {deal.client.name}
+        </div>
+      </div>
+    )}
+    {deal.contract.status === "changes_requested" && (
+      <div className="mb-[18px] flex flex-wrap items-center gap-3">
+        <div className="chip chip-warn px-4 py-3 text-[13.5px]">
+          Changes requested — make edits, then send again
+        </div>
       </div>
     )}
     {deal.contract.status === "sent" && (
@@ -91,10 +119,14 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
           {deal.template.name}
         </div>
         <div className="flex flex-col gap-2.5 p-5 pt-2">
-          {deal.contract.status === "draft" ? (
+          {canResend ? (
             <Link href={`/deals/${deal.id}/send`} className="btn btn-primary w-full justify-center">
-              Send to client
+              {deal.contract.status === "changes_requested" ? "Send again" : "Send to client"}
             </Link>
+          ) : deal.contract.status === "pending_approval" ? (
+            <button disabled className="btn btn-primary w-full justify-center">
+              Awaiting approval
+            </button>
           ) : (
             <>
               <button disabled className="btn btn-primary w-full justify-center">
@@ -109,6 +141,27 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
         </div>
       </aside>
     </div>
+
+    {showApprovalStepper && (
+      <div className="mt-[18px] max-w-[600px]">
+        <ApprovalStepper
+          dealId={deal.id}
+          approvals={deal.contract.approvals.map((a) => ({
+            id: a.id,
+            order: a.order,
+            status: a.status,
+            roleId: a.roleId,
+            roleName: a.role.name,
+            decidedByName: a.decidedByUser?.name ?? null,
+            decidedAt: a.decidedAt,
+            note: a.note,
+          }))}
+          currentUserRoleId={currentUser.roleId}
+          currentUserCanApprove={Boolean(currentUser.role?.canApproveContracts)}
+          decideAction={decideApproval}
+        />
+      </div>
+    )}
     </>
   );
 }

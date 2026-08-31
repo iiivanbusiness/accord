@@ -2,12 +2,11 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { sendContractEmail as sendEmail } from "@/lib/email";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { applyExtractionToDeal } from "@/lib/deal-live";
 import { extractPlaceholderKeys } from "@/lib/contract";
 import { auth } from "@/lib/auth";
-import { logAudit } from "@/lib/audit";
+import { requestOrSendContract } from "@/lib/approval";
 
 export async function retryExtraction(dealId: string) {
   const workspaceId = await requireWorkspaceId();
@@ -38,7 +37,7 @@ export async function generateContract(dealId: string) {
     update: {},
   });
 
-  if (deal.status !== "sent" && deal.status !== "signed") {
+  if (deal.status !== "sent" && deal.status !== "signed" && deal.status !== "pending_approval") {
     await prisma.deal.update({ where: { id: dealId }, data: { status: "ready" } });
   }
 
@@ -101,29 +100,12 @@ export async function sendContractEmail(dealId: string, formData: FormData) {
   const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId }, include: { contract: true } });
   if (!deal || !deal.contract) throw new Error("Deal not found");
 
-  const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId }, include: { users: true } });
-  const signLink = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/sign/${deal.contract.id}`;
-  const replyTo = workspace?.users[0]?.email ?? null;
-  const verifiedSenderEmail = workspace?.senderDomainStatus === "verified" ? workspace.senderEmail : null;
-
+  const session = await auth();
   try {
-    await sendEmail({ to, subject, message, signLink, workspaceName: workspace?.name ?? "Your workspace", replyTo, verifiedSenderEmail });
+    await requestOrSendContract(dealId, { to, subject, message }, session?.user?.email);
   } catch {
     redirect(`/deals/${dealId}/send?error=${encodeURIComponent("Couldn't send the email — check your Resend setup and try again.")}`);
   }
-
-  await prisma.contract.update({ where: { dealId }, data: { status: "sent", sentAt: new Date() } });
-  await prisma.deal.update({ where: { id: dealId }, data: { status: "sent" } });
-
-  const session = await auth();
-  await logAudit({
-    workspaceId,
-    actorEmail: session?.user?.email,
-    action: "contract.sent",
-    targetType: "Deal",
-    targetId: dealId,
-    metadata: { to },
-  });
 
   redirect(`/deals/${dealId}/contract`);
 }

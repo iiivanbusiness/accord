@@ -5,6 +5,7 @@ import { getSenderDomainStatus, type SenderDomainRecord } from "@/lib/sender-dom
 import TwoFactorSettings from "@/components/TwoFactorSettings";
 import RolesManager from "@/components/RolesManager";
 import RoleSelect from "@/components/RoleSelect";
+import ApprovalChainManager from "@/components/ApprovalChainManager";
 import {
   checkSenderDomainVerification,
   connectSenderDomain,
@@ -18,6 +19,7 @@ import {
   uploadLogo,
 } from "./actions";
 import { assignUserRole, createRole, deleteRole, updateRole } from "./roles-actions";
+import { addApprovalStep, moveApprovalStep, removeApprovalStep } from "./approval-actions";
 
 function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notifyOnSigned" | "autoRemind" }) {
   return (
@@ -38,18 +40,21 @@ function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notify
 
 export default async function SettingsPage() {
   const workspaceId = await requireWorkspaceId();
-  const [workspace, session, roles] = await Promise.all([
+  const [workspace, session, roles, approvalSteps] = await Promise.all([
     prisma.workspace.findUnique({ where: { id: workspaceId }, include: { users: { include: { role: true } } } }),
     auth(),
     prisma.role.findMany({ where: { workspaceId }, include: { _count: { select: { users: true } } }, orderBy: [{ isOwner: "desc" }, { createdAt: "asc" }] }),
+    prisma.approvalStep.findMany({ where: { workspaceId }, include: { role: true }, orderBy: { order: "asc" } }),
   ]);
   const usagePct = workspace ? Math.round((workspace.callsUsedThisMonth / workspace.callsLimit) * 100) : 0;
   if (!workspace) return null;
   const currentUser = workspace.users.find((u) => u.email === session?.user?.email);
   const canManageTeam = Boolean(currentUser?.role?.canManageTeam);
+  const canManageWorkspacePerm = Boolean(currentUser?.role?.canManageWorkspace);
   const notifyEmail = workspace.users.map((u) => u.email).join(", ") || "your account email";
   const pendingUpgrade = await prisma.upgradeRequest.findFirst({ where: { workspaceId, status: "pending" } });
   const roleOptions = roles.map((r) => ({ id: r.id, name: r.name }));
+  const eligibleApproverRoles = roles.filter((r) => r.canApproveContracts).map((r) => ({ id: r.id, name: r.name }));
 
   let senderRecords: SenderDomainRecord[] = [];
   if (workspace.senderDomainId && workspace.senderDomainStatus !== "verified") {
@@ -207,6 +212,24 @@ export default async function SettingsPage() {
           createRoleAction={createRole}
           updateRoleAction={updateRole}
           deleteRoleAction={deleteRole}
+        />
+      </div>
+    )}
+
+    {canManageWorkspacePerm && (
+      <div className="card mb-4 max-w-[600px]">
+        <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
+          <h2 className="text-[15px] font-medium">Approval chain</h2>
+          <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
+            Contracts wait for every role below to approve, in order, before they go out to the client.
+          </div>
+        </div>
+        <ApprovalChainManager
+          steps={approvalSteps.map((s) => ({ id: s.id, order: s.order, roleId: s.roleId, roleName: s.role.name }))}
+          eligibleRoles={eligibleApproverRoles}
+          addStepAction={addApprovalStep}
+          removeStepAction={removeApprovalStep}
+          moveStepAction={moveApprovalStep}
         />
       </div>
     )}

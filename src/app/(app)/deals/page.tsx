@@ -18,6 +18,8 @@ const STATUS_LABEL: Record<string, string> = {
   missing_info: "Missing info",
   extraction_failed: "Couldn't process call",
   ready: "Ready for review",
+  pending_approval: "Awaiting approval",
+  changes_requested: "Changes requested",
   sent: "Sent — awaiting signature",
   signed: "Signed",
 };
@@ -27,17 +29,21 @@ const STATUS_CHIP: Record<string, string> = {
   missing_info: "chip-warn",
   extraction_failed: "chip-warn",
   ready: "chip-active",
+  pending_approval: "chip-neutral",
+  changes_requested: "chip-warn",
   sent: "chip-neutral",
   signed: "chip-success",
 };
 
-const BOARD_COLUMNS = ["processing", "missing_info", "extraction_failed", "ready", "sent", "signed"] as const;
+const BOARD_COLUMNS = ["processing", "missing_info", "extraction_failed", "ready", "pending_approval", "changes_requested", "sent", "signed"] as const;
 
 const BOARD_COLUMN_LABEL: Record<string, string> = {
   processing: "Analyzing",
   missing_info: "Missing info",
   extraction_failed: "Couldn't process",
   ready: "Ready",
+  pending_approval: "Awaiting approval",
+  changes_requested: "Changes requested",
   sent: "Sent",
   signed: "Signed",
 };

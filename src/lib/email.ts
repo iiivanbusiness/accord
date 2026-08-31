@@ -137,6 +137,46 @@ export async function sendTeammateInviteEmail(options: {
   });
 }
 
+export async function sendApprovalRequestedEmail(options: {
+  to: string[];
+  clientName: string;
+  templateName: string;
+  dealUrl: string;
+  roleName: string;
+}): Promise<void> {
+  await sendSystemEmail({
+    to: options.to,
+    subject: `Approval needed: ${options.clientName} — ${options.templateName}`,
+    bodyHtml: `
+      <p style="margin:0 0 14px;">A contract for <strong>${escapeHtml(options.clientName)}</strong> (${escapeHtml(options.templateName)}) is waiting on the <strong>${escapeHtml(options.roleName)}</strong> step before it can go out.</p>
+      <a href="${options.dealUrl}" style="display:inline-block;margin:0 0 20px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
+        Review &amp; decide
+      </a>
+    `,
+  });
+}
+
+export async function sendChangesRequestedEmail(options: {
+  to: string[];
+  clientName: string;
+  templateName: string;
+  dealUrl: string;
+  decidedByName: string;
+  note?: string | null;
+}): Promise<void> {
+  await sendSystemEmail({
+    to: options.to,
+    subject: `Changes requested: ${options.clientName} — ${options.templateName}`,
+    bodyHtml: `
+      <p style="margin:0 0 14px;">${escapeHtml(options.decidedByName)} requested changes on the contract for <strong>${escapeHtml(options.clientName)}</strong> before it can be sent.</p>
+      ${options.note ? `<p style="margin:0 0 14px;font-style:italic;">&ldquo;${escapeHtml(options.note)}&rdquo;</p>` : ""}
+      <a href="${options.dealUrl}" style="display:inline-block;margin:0 0 20px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
+        View deal
+      </a>
+    `,
+  });
+}
+
 export async function sendVerificationEmail(options: { to: string; verifyUrl: string }): Promise<void> {
   await sendSystemEmail({
     to: [options.to],
