@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { requireWorkspace } from "@/lib/workspace";
+import { requirePermission } from "@/lib/permissions";
 import { createSenderDomain, getSenderDomainStatus, removeSenderDomain } from "@/lib/sender-domain";
 import { sendTeammateInviteEmail, sendVerificationEmail } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -13,6 +14,7 @@ import { logAudit } from "@/lib/audit";
 type ToggleField = "requireApproval" | "notifyOnSigned" | "autoRemind" | "zoomConnected" | "meetConnected";
 
 export async function toggleWorkspaceFlag(field: ToggleField) {
+  await requirePermission("canManageWorkspace");
   const workspace = await requireWorkspace();
 
   await prisma.workspace.update({
@@ -27,6 +29,7 @@ export async function updateWorkspaceName(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return;
 
+  await requirePermission("canManageWorkspace");
   const workspace = await requireWorkspace();
 
   await prisma.workspace.update({ where: { id: workspace.id }, data: { name } });
@@ -38,6 +41,7 @@ export async function connectSenderDomain(formData: FormData) {
   const mailbox = String(formData.get("mailbox") ?? "hello").trim().toLowerCase() || "hello";
   if (!domain) throw new Error("Enter a domain");
 
+  await requirePermission("canManageWorkspace");
   const workspace = await requireWorkspace();
   const created = await createSenderDomain(domain);
 
@@ -55,6 +59,7 @@ export async function connectSenderDomain(formData: FormData) {
 }
 
 export async function checkSenderDomainVerification() {
+  await requirePermission("canManageWorkspace");
   const workspace = await requireWorkspace();
   if (!workspace.senderDomainId) return;
 
@@ -65,6 +70,7 @@ export async function checkSenderDomainVerification() {
 }
 
 export async function disconnectSenderDomain() {
+  await requirePermission("canManageWorkspace");
   const workspace = await requireWorkspace();
   if (workspace.senderDomainId) {
     try {
@@ -86,6 +92,7 @@ export async function inviteTeammate(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!email) throw new Error("Enter an email address");
 
+  await requirePermission("canManageTeam");
   const workspace = await requireWorkspace();
   const session = await auth();
 
@@ -122,6 +129,7 @@ export async function inviteTeammate(formData: FormData) {
 }
 
 export async function removeTeammate(userId: string) {
+  await requirePermission("canManageTeam");
   const workspace = await requireWorkspace();
   const session = await auth();
 
@@ -147,6 +155,7 @@ export async function uploadLogo(formData: FormData) {
   if (!file.type.startsWith("image/")) throw new Error("That's not an image file");
   if (file.size > MAX_LOGO_BYTES) throw new Error("Keep the logo under 1.5MB");
 
+  await requirePermission("canManageWorkspace");
   const workspace = await requireWorkspace();
   const bytes = Buffer.from(await file.arrayBuffer());
   const dataUrl = `data:${file.type};base64,${bytes.toString("base64")}`;
@@ -156,6 +165,7 @@ export async function uploadLogo(formData: FormData) {
 }
 
 export async function removeLogo() {
+  await requirePermission("canManageWorkspace");
   const workspace = await requireWorkspace();
   await prisma.workspace.update({ where: { id: workspace.id }, data: { logoImage: null } });
   revalidatePath("/settings");

@@ -51,6 +51,8 @@ model Workspace {
   onboardingProfile OnboardingProfile?
   auditLogs         AuditLog[]
   localCaptureTokens LocalCaptureToken[]
+  roles              Role[]
+  approvalSteps      ApprovalStep[]
 }
 
 // Answers from the pre-signup onboarding screens. Captured client-side and
@@ -78,6 +80,15 @@ model User {
   passwordHash    String? // null for accounts created via Google sign-in
   emailVerifiedAt DateTime? // set immediately for Google sign-ins (already verified); via emailed link for credentials sign-ups
   createdAt       DateTime  @default(now())
+
+  // Nullable so nothing breaks for a user created before roles existed —
+  // in practice the migration backfills every existing user onto their
+  // workspace's auto-created Owner role, so this is really only ever null
+  // in the instant between a teammate being invited and someone assigning
+  // them a role.
+  roleId String?
+  role   Role?   @relation(fields: [roleId], references: [id])
+  contractApprovalsDecided ContractApproval[]
 
   // twoFactorSecret is set as soon as setup starts (QR shown) but
   // twoFactorEnabled only flips to true once the user proves they can
@@ -245,7 +256,7 @@ model Contract {
   deal       Deal              @relation(fields: [dealId], references: [id])
   templateId String?
   template   ContractTemplate? @relation(fields: [templateId], references: [id])
-  status     String            @default("draft") // draft | sent | signed
+  status     String            @default("draft") // draft | pending_approval | changes_requested | sent | signed
   sentAt     DateTime?
   signedAt   DateTime?
   signerName String?
@@ -254,6 +265,76 @@ model Contract {
   reminderSentAt DateTime? // set once the 3-day "still unsigned" nudge has gone out
   viewedAt   DateTime? // first time the client actually opened the sign page
   createdAt  DateTime          @default(now())
+
+  approvals ContractApproval[]
+}
+
+// A workspace-defined role — e.g. "Legal", "Finance", "Manager", or
+// whatever a given company actually calls its own teams. Two jobs at once:
+// (1) gates general app permissions below, (2) can be a step in an
+// ApprovalStep chain, where "the Legal role approves" rather than one named
+// person, so it still works if that specific person is out.
+//
+// Every workspace gets exactly one isOwner role, created alongside it —
+// full permissions, can't be deleted, exists so there's always at least one
+// person who can manage the workspace even if every custom role gets
+// deleted.
+model Role {
+  id                  String    @id @default(cuid())
+  workspaceId         String
+  workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name                String
+  isOwner             Boolean   @default(false)
+  canManageWorkspace  Boolean   @default(false) // settings, sender domain, logo, workspace name
+  canManageTeam       Boolean   @default(false) // invite/remove teammates, create/edit/delete roles, assign roles
+  canManageTemplates  Boolean   @default(false) // create/edit/delete contract templates
+  canApproveContracts Boolean   @default(false) // eligible to be a step in the approval chain
+  createdAt           DateTime  @default(now())
+
+  users         User[]
+  approvalSteps ApprovalStep[]
+  approvals     ContractApproval[]
+
+  @@unique([workspaceId, name])
+}
+
+// The workspace-level approval chain "template" — an ordered list of roles
+// that must approve, in order, before a contract can be sent. Configured
+// once in Settings; applies to every contract from then on. A contract that
+// entered approval before the chain changed keeps its own ContractApproval
+// snapshot, so editing the chain never rewrites history for deals already
+// in flight.
+model ApprovalStep {
+  id          String   @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  roleId      String
+  role        Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  order       Int
+  createdAt   DateTime  @default(now())
+
+  @@unique([workspaceId, order])
+}
+
+// One row per approval step, per contract — a snapshot taken from
+// ApprovalStep the moment a contract enters pending_approval. Anyone
+// currently holding roleId can act on it (not one named person), but only
+// once every lower-order step for the same contract is already "approved".
+model ContractApproval {
+  id             String    @id @default(cuid())
+  contractId     String
+  contract       Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  roleId         String
+  role           Role      @relation(fields: [roleId], references: [id])
+  order          Int
+  status         String    @default("pending") // pending | approved | rejected
+  decidedByUserId String?
+  decidedByUser   User?     @relation(fields: [decidedByUserId], references: [id])
+  note           String?
+  decidedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@unique([contractId, order])
 }
 
 model UpgradeRequest {

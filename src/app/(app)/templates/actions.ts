@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { extractText, splitIntoClauses } from "@/lib/parse-document";
-import { requireWorkspaceId } from "@/lib/workspace";
+import { requirePermission } from "@/lib/permissions";
 
 type ClauseInput = { title: string; body: string };
 
@@ -31,7 +31,8 @@ export async function createTemplate(formData: FormData) {
   if (!name) throw new Error("Template name is required");
   if (clauses.length === 0) throw new Error("Add at least one clause");
 
-  const workspaceId = await requireWorkspaceId();
+  const user = await requirePermission("canManageTemplates");
+  const workspaceId = user.workspaceId;
 
   const template = await prisma.contractTemplate.create({
     data: {
@@ -56,7 +57,8 @@ export async function createTemplateFromDocument(formData: FormData) {
   const text = await extractText(file);
   const clauses = splitIntoClauses(text);
 
-  const workspaceId = await requireWorkspaceId();
+  const user = await requirePermission("canManageTemplates");
+  const workspaceId = user.workspaceId;
 
   const template = await prisma.contractTemplate.create({
     data: {
@@ -79,7 +81,8 @@ export async function updateTemplate(templateId: string, formData: FormData) {
   if (!name) throw new Error("Template name is required");
   if (clauses.length === 0) throw new Error("Add at least one clause");
 
-  const workspaceId = await requireWorkspaceId();
+  const user = await requirePermission("canManageTemplates");
+  const workspaceId = user.workspaceId;
 
   await prisma.contractTemplate.updateMany({
     where: { id: templateId, workspaceId },
@@ -95,7 +98,8 @@ export async function updateTemplate(templateId: string, formData: FormData) {
 }
 
 export async function deleteTemplate(templateId: string) {
-  const workspaceId = await requireWorkspaceId();
+  const user = await requirePermission("canManageTemplates");
+  const workspaceId = user.workspaceId;
   const inUse = await prisma.deal.count({ where: { templateId } });
   if (inUse > 0) {
     throw new Error("This template is used by one or more deals and can't be deleted.");
