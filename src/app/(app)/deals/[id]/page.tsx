@@ -2,9 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import DealTermsCard from "@/components/DealTermsCard";
 import ContinueCallButton from "@/components/ContinueCallButton";
+import ActionItemsCard from "@/components/ActionItemsCard";
 import { prisma } from "@/lib/db";
 import { requireWorkspaceId } from "@/lib/workspace";
-import { fillMissingFields, generateContract, retryExtraction, updateFieldValues } from "./actions";
+import { fillMissingFields, generateContract, retryExtraction, toggleActionItem, updateFieldValues } from "./actions";
 
 const CALL_SOURCE_LABEL: Record<string, string> = {
   local: "Recorded locally",
@@ -61,6 +62,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
       contract: true,
       calls: { orderBy: { startedAt: "asc" } },
       fieldChanges: { orderBy: { changedAt: "asc" } },
+      actionItems: { orderBy: { createdAt: "asc" } },
     },
   });
   if (!deal) notFound();
@@ -144,6 +146,8 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
             </div>
           </div>
         )}
+
+        <ActionItemsCard dealId={deal.id} items={deal.actionItems} toggleAction={toggleActionItem} />
       </div>
 
       <div className="flex flex-col gap-4">

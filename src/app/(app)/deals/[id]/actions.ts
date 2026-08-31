@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { applyExtractionToDeal } from "@/lib/deal-live";
@@ -159,4 +160,18 @@ export async function startRenewal(dealId: string) {
   });
 
   redirect(`/deals/${newDeal.id}/contract`);
+}
+
+export async function toggleActionItem(dealId: string, itemId: string) {
+  const workspaceId = await requireWorkspaceId();
+  const item = await prisma.actionItem.findFirst({ where: { id: itemId, dealId, deal: { workspaceId } } });
+  if (!item) throw new Error("Action item not found");
+
+  const done = item.status !== "done";
+  await prisma.actionItem.update({
+    where: { id: itemId },
+    data: { status: done ? "done" : "open", doneAt: done ? new Date() : null },
+  });
+
+  revalidatePath(`/deals/${dealId}`);
 }

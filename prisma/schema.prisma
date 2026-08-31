@@ -186,6 +186,7 @@ model Deal {
   contract     Contract?
   calls        Call[]
   fieldChanges DealFieldChange[]
+  actionItems  ActionItem[]
 }
 
 // One row per recording session attached to a deal — a deal that started
@@ -206,6 +207,30 @@ model Call {
 
   localCaptureTokens LocalCaptureToken[]
   fieldChanges       DealFieldChange[]
+  actionItems        ActionItem[]
+
+  @@index([dealId])
+}
+
+// A commitment made on a call that isn't a deal term — "I'll send the
+// proposal by Friday", "you need to sign off on the creative brief" — the
+// kind of thing that currently just evaporates once the call ends. Extracted
+// once, right when a call finishes (see extractActionItems), from that
+// call's own transcript — never re-derived on later passes, so there's no
+// risk of the same commitment reappearing as a duplicate.
+model ActionItem {
+  id          String    @id @default(cuid())
+  dealId      String
+  deal        Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  callId      String?
+  call        Call?     @relation(fields: [callId], references: [id], onDelete: SetNull)
+  description String
+  ownerType   String // team | client — who owes this, not a specific named person
+  dueDate     DateTime?
+  status      String    @default("open") // open | done
+  sourceQuote String?
+  doneAt      DateTime?
+  createdAt   DateTime  @default(now())
 
   @@index([dealId])
 }

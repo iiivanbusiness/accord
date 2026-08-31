@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { extractDealFromTranscript, buildDealFieldRows } from "@/lib/extract-deal";
+import { extractActionItems } from "@/lib/extract-action-items";
 import { extractPlaceholderKeys } from "@/lib/contract";
 import { createCallBot, detectPlatformFromUrl } from "@/lib/recall";
 import { requireWorkspace } from "@/lib/workspace";
@@ -113,12 +114,19 @@ export async function createDealFromTranscript(formData: FormData) {
       fields: { create: fieldRows },
       calls: { create: { transcript, source: "upload", endedAt: new Date() } },
     },
+    include: { calls: true },
   });
 
   await prisma.workspace.update({
     where: { id: workspaceId },
     data: { callsUsedThisMonth: { increment: 1 } },
   });
+
+  try {
+    await extractActionItems(deal.calls[0].id);
+  } catch (err) {
+    console.error(`Failed to extract action items for deal ${deal.id}`, err);
+  }
 
   redirect(`/deals/${deal.id}`);
 }

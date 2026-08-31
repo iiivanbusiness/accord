@@ -5,6 +5,7 @@ import { transcribeWav, isDeepgramConfigured } from "@/lib/deepgram";
 import { applyExtractionToDeal } from "@/lib/deal-live";
 import { extractPlaceholderKeys } from "@/lib/contract";
 import { autoGenerateAndSendContract } from "@/lib/auto-send";
+import { extractActionItems } from "@/lib/extract-action-items";
 import { sendAdminAlertEmail } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
@@ -83,6 +84,11 @@ export async function POST(req: Request) {
     const { hasMissing } = await applyExtractionToDeal(deal.id, fresh?.liveTranscript ?? "", placeholderKeys, record.callId);
 
     if (isFinal) {
+      try {
+        await extractActionItems(record.callId);
+      } catch (err) {
+        console.error(`Failed to extract action items for call ${record.callId}`, err);
+      }
       if (!hasMissing && !deal.workspace.requireApproval) {
         await autoGenerateAndSendContract(deal.id);
       }
