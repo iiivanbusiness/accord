@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { getSenderDomainStatus, type SenderDomainRecord } from "@/lib/sender-domain";
 import TwoFactorSettings from "@/components/TwoFactorSettings";
+import RolesManager from "@/components/RolesManager";
+import RoleSelect from "@/components/RoleSelect";
 import {
   checkSenderDomainVerification,
   connectSenderDomain,
@@ -15,6 +17,7 @@ import {
   updateWorkspaceName,
   uploadLogo,
 } from "./actions";
+import { assignUserRole, createRole, deleteRole, updateRole } from "./roles-actions";
 
 function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notifyOnSigned" | "autoRemind" }) {
   return (
@@ -35,15 +38,18 @@ function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notify
 
 export default async function SettingsPage() {
   const workspaceId = await requireWorkspaceId();
-  const [workspace, session] = await Promise.all([
-    prisma.workspace.findUnique({ where: { id: workspaceId }, include: { users: true } }),
+  const [workspace, session, roles] = await Promise.all([
+    prisma.workspace.findUnique({ where: { id: workspaceId }, include: { users: { include: { role: true } } } }),
     auth(),
+    prisma.role.findMany({ where: { workspaceId }, include: { _count: { select: { users: true } } }, orderBy: [{ isOwner: "desc" }, { createdAt: "asc" }] }),
   ]);
   const usagePct = workspace ? Math.round((workspace.callsUsedThisMonth / workspace.callsLimit) * 100) : 0;
   if (!workspace) return null;
   const currentUser = workspace.users.find((u) => u.email === session?.user?.email);
+  const canManageTeam = Boolean(currentUser?.role?.canManageTeam);
   const notifyEmail = workspace.users.map((u) => u.email).join(", ") || "your account email";
   const pendingUpgrade = await prisma.upgradeRequest.findFirst({ where: { workspaceId, status: "pending" } });
+  const roleOptions = roles.map((r) => ({ id: r.id, name: r.name }));
 
   let senderRecords: SenderDomainRecord[] = [];
   if (workspace.senderDomainId && workspace.senderDomainStatus !== "verified") {
@@ -146,13 +152,20 @@ export default async function SettingsPage() {
               <div className="text-[13.5px] font-medium">{u.name}</div>
               <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>{u.email}</div>
             </div>
-            {workspace.users.length > 1 && (
-              <form action={removeTeammate.bind(null, u.id)}>
-                <button type="submit" className="text-[12px] font-medium" style={{ color: "var(--ink-muted)" }}>
-                  Remove
-                </button>
-              </form>
-            )}
+            <div className="flex items-center gap-3">
+              {canManageTeam && roleOptions.length > 0 ? (
+                <RoleSelect userId={u.id} currentRoleId={u.roleId} roles={roleOptions} action={assignUserRole} />
+              ) : (
+                u.role && <span className="chip chip-neutral" style={{ fontSize: 11 }}>{u.role.name}</span>
+              )}
+              {workspace.users.length > 1 && canManageTeam && (
+                <form action={removeTeammate.bind(null, u.id)}>
+                  <button type="submit" className="text-[12px] font-medium" style={{ color: "var(--ink-muted)" }}>
+                    Remove
+                  </button>
+                </form>
+              )}
+            </div>
           </div>
         ))}
         <form action={inviteTeammate} className="flex flex-col gap-2 py-3.5 sm:flex-row sm:items-center">
@@ -171,6 +184,32 @@ export default async function SettingsPage() {
         </div>
       </div>
     </div>
+
+    {canManageTeam && (
+      <div className="card mb-4 max-w-[600px]">
+        <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
+          <h2 className="text-[15px] font-medium">Roles &amp; permissions</h2>
+          <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
+            Owner always has every permission. Custom roles control what teammates can do — and can later gate steps in a contract approval chain.
+          </div>
+        </div>
+        <RolesManager
+          roles={roles.map((r) => ({
+            id: r.id,
+            name: r.name,
+            isOwner: r.isOwner,
+            canManageWorkspace: r.canManageWorkspace,
+            canManageTeam: r.canManageTeam,
+            canManageTemplates: r.canManageTemplates,
+            canApproveContracts: r.canApproveContracts,
+            memberCount: r._count.users,
+          }))}
+          createRoleAction={createRole}
+          updateRoleAction={updateRole}
+          deleteRoleAction={deleteRole}
+        />
+      </div>
+    )}
 
     {currentUser?.passwordHash && (
       <div className="card mb-4 max-w-[600px]">
