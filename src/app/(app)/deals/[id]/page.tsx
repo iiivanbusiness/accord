@@ -56,12 +56,20 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
       template: true,
       contract: true,
       calls: { orderBy: { startedAt: "asc" } },
+      fieldChanges: { orderBy: { changedAt: "asc" } },
     },
   });
   if (!deal) notFound();
 
-  const groups = new Map<string, typeof deal.fields>();
-  for (const field of deal.fields) {
+  const historyByKey = new Map<string, typeof deal.fieldChanges>();
+  for (const change of deal.fieldChanges) {
+    if (!historyByKey.has(change.fieldKey)) historyByKey.set(change.fieldKey, []);
+    historyByKey.get(change.fieldKey)!.push(change);
+  }
+  const fieldsWithHistory = deal.fields.map((field) => ({ ...field, history: historyByKey.get(field.fieldKey) ?? [] }));
+
+  const groups = new Map<string, typeof fieldsWithHistory>();
+  for (const field of fieldsWithHistory) {
     if (!groups.has(field.groupLabel)) groups.set(field.groupLabel, []);
     groups.get(field.groupLabel)!.push(field);
   }

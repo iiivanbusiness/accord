@@ -8,7 +8,8 @@ import { extractDealFromTranscript, buildDealFieldRows } from "@/lib/extract-dea
 export async function applyExtractionToDeal(
   dealId: string,
   transcript: string,
-  placeholderKeys: string[]
+  placeholderKeys: string[],
+  callId?: string
 ): Promise<{ hasMissing: boolean }> {
   const deal = await prisma.deal.findUnique({ where: { id: dealId } });
   if (!deal) throw new Error("Deal not found");
@@ -26,6 +27,24 @@ export async function applyExtractionToDeal(
 
   for (const row of fieldRows) {
     if (locked(row.fieldKey)) continue;
+
+    // A real change — not "missing found a value" for the first time, that's
+    // not a negotiation moving, just extraction catching up.
+    const previousValue = existingByKey.get(row.fieldKey)?.value;
+    if (previousValue && row.value && previousValue !== row.value) {
+      await prisma.dealFieldChange.create({
+        data: {
+          dealId,
+          fieldKey: row.fieldKey,
+          oldValue: previousValue,
+          newValue: row.value,
+          changedBy: "extraction",
+          callId,
+          sourceQuote: row.sourceQuote,
+        },
+      });
+    }
+
     await prisma.dealField.upsert({
       where: { dealId_fieldKey: { dealId, fieldKey: row.fieldKey } },
       create: {

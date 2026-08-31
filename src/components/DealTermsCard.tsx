@@ -2,6 +2,13 @@
 
 import { useState } from "react";
 
+type FieldChange = {
+  oldValue: string | null;
+  newValue: string | null;
+  changedBy: string;
+  changedAt: Date;
+};
+
 type Field = {
   id: string;
   groupLabel: string;
@@ -9,7 +16,12 @@ type Field = {
   value: string | null;
   status: string;
   sourceQuote: string | null;
+  history?: FieldChange[];
 };
+
+function formatChangeDate(date: Date): string {
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
 export default function DealTermsCard({
   groups,
@@ -20,6 +32,7 @@ export default function DealTermsCard({
 }) {
   const [editing, setEditing] = useState(false);
   const [openQuote, setOpenQuote] = useState<string | null>(null);
+  const [openHistory, setOpenHistory] = useState<string | null>(null);
 
   return (
     <div className="card">
@@ -45,6 +58,16 @@ export default function DealTermsCard({
                     <span className="text-[13.5px]" style={{ color: "var(--ink-muted)" }}>{row.label}</span>
                     <div className="flex items-center gap-2">
                       <span className="text-[13.5px] font-medium">{row.value}</span>
+                      {!!row.history?.length && (
+                        <button
+                          onClick={() => setOpenHistory(openHistory === row.id ? null : row.id)}
+                          title="Show how this changed"
+                          className="flex h-[18px] items-center justify-center rounded-[5px] px-1 text-[10.5px] font-medium"
+                          style={{ color: "var(--accent-blue)" }}
+                        >
+                          changed
+                        </button>
+                      )}
                       {row.sourceQuote && (
                         <button
                           onClick={() => setOpenQuote(openQuote === row.id ? null : row.id)}
@@ -57,6 +80,22 @@ export default function DealTermsCard({
                       )}
                     </div>
                   </div>
+                  {!!row.history?.length && openHistory === row.id && (
+                    <div className="mb-2 flex flex-col gap-1.5 rounded-[8px] p-3 text-[12.5px]" style={{ background: "var(--surface-2)" }}>
+                      {row.history!.map((change, i) => (
+                        <div key={i} className="flex items-center justify-between gap-3" style={{ color: "var(--ink-muted)" }}>
+                          <span>
+                            <span style={{ textDecoration: "line-through" }}>{change.oldValue}</span>
+                            {" → "}
+                            <span style={{ color: "var(--ink)" }}>{change.newValue}</span>
+                          </span>
+                          <span className="flex-none text-[11px]">
+                            {change.changedBy === "manual" ? "edited" : "on call"} · {formatChangeDate(change.changedAt)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {row.sourceQuote && openQuote === row.id && (
                     <blockquote
                       className="mb-2 rounded-r-[8px] py-2 pl-3 pr-3 text-[12.5px] italic"

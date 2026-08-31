@@ -80,7 +80,7 @@ export async function POST(req: Request) {
     }
 
     const fresh = await prisma.deal.findUnique({ where: { id: deal.id } });
-    const { hasMissing } = await applyExtractionToDeal(deal.id, fresh?.liveTranscript ?? "", placeholderKeys);
+    const { hasMissing } = await applyExtractionToDeal(deal.id, fresh?.liveTranscript ?? "", placeholderKeys, record.callId);
 
     if (isFinal) {
       if (!hasMissing && !deal.workspace.requireApproval) {

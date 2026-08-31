@@ -77,6 +77,11 @@ export async function updateFieldValues(dealId: string, formData: FormData) {
   for (const field of editableFields) {
     const value = String(formData.get(field.id) ?? "").trim();
     if (value === field.value) continue;
+    if (field.value) {
+      await prisma.dealFieldChange.create({
+        data: { dealId, fieldKey: field.fieldKey, oldValue: field.value, newValue: value, changedBy: "manual" },
+      });
+    }
     await prisma.dealField.update({
       where: { id: field.id },
       data: { value, status: "user_edited" },

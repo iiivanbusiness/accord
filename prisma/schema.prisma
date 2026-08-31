@@ -171,9 +171,10 @@ model Deal {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  fields   DealField[]
-  contract Contract?
-  calls    Call[]
+  fields       DealField[]
+  contract     Contract?
+  calls        Call[]
+  fieldChanges DealFieldChange[]
 }
 
 // One row per recording session attached to a deal — a deal that started
@@ -193,8 +194,30 @@ model Call {
   endedAt    DateTime?
 
   localCaptureTokens LocalCaptureToken[]
+  fieldChanges       DealFieldChange[]
 
   @@index([dealId])
+}
+
+// One row per time a field's value actually changed after already having a
+// real value — first-time extraction (missing -> found) isn't a "change",
+// so this only fires when a later pass or a manual edit overwrites a value
+// that was already something. Powers the "Fee: €2,000 -> €2,500" trail on
+// the deal page; doesn't feed extraction itself in any way.
+model DealFieldChange {
+  id          String   @id @default(cuid())
+  dealId      String
+  deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  fieldKey    String
+  oldValue    String?
+  newValue    String?
+  changedBy   String // extraction | manual
+  callId      String?
+  call        Call?    @relation(fields: [callId], references: [id], onDelete: SetNull)
+  sourceQuote String?
+  changedAt   DateTime @default(now())
+
+  @@index([dealId, fieldKey])
 }
 
 // One row per deal-term shown in the Deal Detail screen — mirrors the
