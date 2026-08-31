@@ -11,6 +11,7 @@ const PERMISSION_FIELDS = [
   "canManageTeam",
   "canManageTemplates",
   "canApproveContracts",
+  "canApproveTemplates",
 ] as const;
 
 function readPermissions(formData: FormData) {
@@ -19,6 +20,7 @@ function readPermissions(formData: FormData) {
     canManageTeam: false,
     canManageTemplates: false,
     canApproveContracts: false,
+    canApproveTemplates: false,
   };
   for (const field of PERMISSION_FIELDS) data[field] = formData.get(field) === "on";
   return data;

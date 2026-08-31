@@ -89,6 +89,7 @@ model User {
   roleId String?
   role   Role?   @relation(fields: [roleId], references: [id])
   contractApprovalsDecided ContractApproval[]
+  lockedTemplates          ContractTemplate[]
 
   // twoFactorSecret is set as soon as setup starts (QR shown) but
   // twoFactorEnabled only flips to true once the user proves they can
@@ -151,6 +152,17 @@ model ContractTemplate {
   description        String
   requiredFieldCount Int       @default(0)
   clauses            String // JSON string: [{title, body}]
+
+  // Locking is the "legal approved this standard wording" gate — once
+  // locked, editing/deleting requires canApproveTemplates, not just
+  // canManageTemplates, so an individual rep can't quietly reword an
+  // approved clause. lockedByUser is set-null on delete rather than
+  // restricted — losing the "who locked it" attribution shouldn't block
+  // removing a departed teammate.
+  locked         Boolean   @default(false)
+  lockedByUserId String?
+  lockedByUser   User?     @relation(fields: [lockedByUserId], references: [id], onDelete: SetNull)
+  lockedAt       DateTime?
 
   deals     Deal[]
   contracts Contract[]
@@ -328,8 +340,9 @@ model Role {
   isOwner             Boolean   @default(false)
   canManageWorkspace  Boolean   @default(false) // settings, sender domain, logo, workspace name
   canManageTeam       Boolean   @default(false) // invite/remove teammates, create/edit/delete roles, assign roles
-  canManageTemplates  Boolean   @default(false) // create/edit/delete contract templates
+  canManageTemplates  Boolean   @default(false) // create/edit/delete UNLOCKED contract templates
   canApproveContracts Boolean   @default(false) // eligible to be a step in the approval chain
+  canApproveTemplates Boolean   @default(false) // lock/unlock templates, and edit/delete a locked one — the "legal approved this wording" gate
   createdAt           DateTime  @default(now())
 
   users         User[]

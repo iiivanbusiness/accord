@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import ClauseEditor from "@/components/ClauseEditor";
 import { prisma } from "@/lib/db";
 import { requireWorkspaceId } from "@/lib/workspace";
+import { currentUserWithRole } from "@/lib/permissions";
 import { updateTemplate } from "../../actions";
 
 type Clause = { title: string; body: string };
@@ -10,8 +11,13 @@ type Clause = { title: string; body: string };
 export default async function EditTemplatePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const workspaceId = await requireWorkspaceId();
-  const template = await prisma.contractTemplate.findFirst({ where: { id, workspaceId } });
+  const [template, user] = await Promise.all([
+    prisma.contractTemplate.findFirst({ where: { id, workspaceId } }),
+    currentUserWithRole(),
+  ]);
   if (!template) notFound();
+  if (!user.role?.canManageTemplates) redirect(`/templates/${id}`);
+  if (template.locked && !user.role?.canApproveTemplates) redirect(`/templates/${id}`);
 
   const clauses = JSON.parse(template.clauses) as Clause[];
 

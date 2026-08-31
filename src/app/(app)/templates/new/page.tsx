@@ -1,8 +1,13 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import ClauseEditor from "@/components/ClauseEditor";
+import { currentUserWithRole } from "@/lib/permissions";
 import { createTemplate } from "../actions";
 
-export default function NewTemplatePage() {
+export default async function NewTemplatePage() {
+  const user = await currentUserWithRole();
+  if (!user.role?.canManageTemplates) redirect("/templates");
+
   return (
     <>
     <Link href="/templates" className="mb-3.5 inline-flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "var(--ink-muted)" }}>

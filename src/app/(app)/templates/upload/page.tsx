@@ -1,7 +1,12 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { currentUserWithRole } from "@/lib/permissions";
 import { createTemplateFromDocument } from "../actions";
 
-export default function UploadTemplatePage() {
+export default async function UploadTemplatePage() {
+  const user = await currentUserWithRole();
+  if (!user.role?.canManageTemplates) redirect("/templates");
+
   return (
     <>
     <Link href="/templates" className="mb-3.5 inline-flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "var(--ink-muted)" }}>

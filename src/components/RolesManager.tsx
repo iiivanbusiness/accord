@@ -10,14 +10,16 @@ type Role = {
   canManageTeam: boolean;
   canManageTemplates: boolean;
   canApproveContracts: boolean;
+  canApproveTemplates: boolean;
   memberCount: number;
 };
 
 const PERMISSIONS: { field: keyof Role; label: string; hint: string }[] = [
   { field: "canManageWorkspace", label: "Manage workspace settings", hint: "Workspace name, logo, sending domain, integrations" },
   { field: "canManageTeam", label: "Manage team & roles", hint: "Invite/remove teammates, create/edit/delete roles, assign roles" },
-  { field: "canManageTemplates", label: "Manage contract templates", hint: "Create, edit, and delete templates" },
+  { field: "canManageTemplates", label: "Manage contract templates", hint: "Create, edit, and delete unlocked templates" },
   { field: "canApproveContracts", label: "Approve contracts", hint: "Eligible to be a step in the approval chain" },
+  { field: "canApproveTemplates", label: "Approve & lock templates", hint: "Lock templates as approved wording, and edit/delete a locked one" },
 ];
 
 function PermissionCheckboxes({ role }: { role?: Role }) {

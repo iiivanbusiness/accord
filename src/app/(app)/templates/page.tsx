@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireWorkspaceId } from "@/lib/workspace";
+import { currentUserWithRole } from "@/lib/permissions";
 
 export default async function TemplatesPage() {
   const workspaceId = await requireWorkspaceId();
-  const templates = await prisma.contractTemplate.findMany({ where: { workspaceId }, orderBy: { name: "asc" } });
+  const [templates, user] = await Promise.all([
+    prisma.contractTemplate.findMany({ where: { workspaceId }, orderBy: { name: "asc" } }),
+    currentUserWithRole(),
+  ]);
+  const canManage = Boolean(user.role?.canManageTemplates);
 
   return (
     <>
@@ -15,20 +20,25 @@ export default async function TemplatesPage() {
           The engine fills these from what your call actually covered
         </div>
       </div>
-      <div className="flex gap-2.5">
-        <Link href="/templates/upload" className="btn btn-secondary">
-          ⭱ Upload a contract
-        </Link>
-        <Link href="/templates/new" className="btn btn-primary">
-          + New template
-        </Link>
-      </div>
+      {canManage && (
+        <div className="flex gap-2.5">
+          <Link href="/templates/upload" className="btn btn-secondary">
+            ⭱ Upload a contract
+          </Link>
+          <Link href="/templates/new" className="btn btn-primary">
+            + New template
+          </Link>
+        </div>
+      )}
     </div>
 
     <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
       {templates.map((tpl) => (
         <Link key={tpl.id} href={`/templates/${tpl.id}`} className="card p-[18px]" style={{ color: "inherit" }}>
-          <h3 className="text-[15px] font-medium">{tpl.name}</h3>
+          <div className="flex items-center gap-1.5">
+            <h3 className="text-[15px] font-medium">{tpl.name}</h3>
+            {tpl.locked && <span title="Locked — approved wording">🔒</span>}
+          </div>
           <div className="mb-2.5 mt-1 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>{tpl.description}</div>
           <span className="chip chip-neutral">{tpl.requiredFieldCount} required fields</span>
         </Link>

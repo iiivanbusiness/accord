@@ -207,6 +207,7 @@ export default async function SettingsPage() {
             canManageTeam: r.canManageTeam,
             canManageTemplates: r.canManageTemplates,
             canApproveContracts: r.canApproveContracts,
+            canApproveTemplates: r.canApproveTemplates,
             memberCount: r._count.users,
           }))}
           createRoleAction={createRole}

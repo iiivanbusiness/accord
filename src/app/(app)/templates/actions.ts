@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { extractText, splitIntoClauses } from "@/lib/parse-document";
 import { requirePermission } from "@/lib/permissions";
+import { logAudit } from "@/lib/audit";
 
 type ClauseInput = { title: string; body: string };
 
@@ -84,6 +85,12 @@ export async function updateTemplate(templateId: string, formData: FormData) {
   const user = await requirePermission("canManageTemplates");
   const workspaceId = user.workspaceId;
 
+  const template = await prisma.contractTemplate.findFirst({ where: { id: templateId, workspaceId } });
+  if (!template) throw new Error("Template not found");
+  if (template.locked && !user.role?.canApproveTemplates) {
+    throw new Error("This template is locked — ask someone who can approve templates to unlock it first");
+  }
+
   await prisma.contractTemplate.updateMany({
     where: { id: templateId, workspaceId },
     data: {
@@ -100,10 +107,47 @@ export async function updateTemplate(templateId: string, formData: FormData) {
 export async function deleteTemplate(templateId: string) {
   const user = await requirePermission("canManageTemplates");
   const workspaceId = user.workspaceId;
+
+  const template = await prisma.contractTemplate.findFirst({ where: { id: templateId, workspaceId } });
+  if (!template) throw new Error("Template not found");
+  if (template.locked && !user.role?.canApproveTemplates) {
+    throw new Error("This template is locked — ask someone who can approve templates to unlock it first");
+  }
+
   const inUse = await prisma.deal.count({ where: { templateId } });
   if (inUse > 0) {
     throw new Error("This template is used by one or more deals and can't be deleted.");
   }
   await prisma.contractTemplate.deleteMany({ where: { id: templateId, workspaceId } });
   redirect("/templates");
+}
+
+export async function lockTemplate(templateId: string) {
+  const user = await requirePermission("canApproveTemplates");
+  const template = await prisma.contractTemplate.findFirst({ where: { id: templateId, workspaceId: user.workspaceId } });
+  if (!template) throw new Error("Template not found");
+
+  await prisma.contractTemplate.update({
+    where: { id: templateId },
+    data: { locked: true, lockedByUserId: user.id, lockedAt: new Date() },
+  });
+
+  await logAudit({ workspaceId: user.workspaceId, actorEmail: user.email, action: "template.locked", targetType: "ContractTemplate", targetId: templateId, metadata: { name: template.name } });
+
+  redirect(`/templates/${templateId}`);
+}
+
+export async function unlockTemplate(templateId: string) {
+  const user = await requirePermission("canApproveTemplates");
+  const template = await prisma.contractTemplate.findFirst({ where: { id: templateId, workspaceId: user.workspaceId } });
+  if (!template) throw new Error("Template not found");
+
+  await prisma.contractTemplate.update({
+    where: { id: templateId },
+    data: { locked: false, lockedByUserId: null, lockedAt: null },
+  });
+
+  await logAudit({ workspaceId: user.workspaceId, actorEmail: user.email, action: "template.unlocked", targetType: "ContractTemplate", targetId: templateId, metadata: { name: template.name } });
+
+  redirect(`/templates/${templateId}`);
 }
