@@ -168,7 +168,7 @@ model Deal {
   service    String
   feeDisplay String
   status     String   @default("processing") // processing | missing_info | ready | pending_approval | changes_requested | sent | signed
-  source     String   @default("manual") // zoom | meet | manual | upload
+  source     String   @default("manual") // zoom | meet | manual | upload | renewal
   callLength String?
   summary    String? // 2-3 sentence "what happened on this call", from the same extraction pass as the fields
   recallBotId String? @unique // set when a Recall.ai bot is capturing this call
@@ -265,6 +265,15 @@ model Contract {
   reminderSentAt DateTime? // set once the 3-day "still unsigned" nudge has gone out
   viewedAt   DateTime? // first time the client actually opened the sign page
   createdAt  DateTime          @default(now())
+
+  // Populated by a small Claude extraction pass right after signing, read
+  // from the final filled clause text (the most reliable source — it's the
+  // exact legal language, not a template placeholder). Null when the terms
+  // didn't state a fixed end date (e.g. an ongoing engagement with no term).
+  renewalDate           DateTime?
+  autoRenews            Boolean   @default(false)
+  renewalNote           String? // one short human sentence, e.g. "Renews monthly unless 30 days' notice given"
+  renewalReminderSentAt DateTime? // set once the "renews/expires soon" nudge has gone out
 
   // The email a human composed on the Send page, held here while the
   // workspace's approval chain runs — sent for real, verbatim, the moment

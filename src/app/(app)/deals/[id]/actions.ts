@@ -7,6 +7,7 @@ import { applyExtractionToDeal } from "@/lib/deal-live";
 import { extractPlaceholderKeys } from "@/lib/contract";
 import { auth } from "@/lib/auth";
 import { requestOrSendContract } from "@/lib/approval";
+import { logAudit } from "@/lib/audit";
 
 export async function retryExtraction(dealId: string) {
   const workspaceId = await requireWorkspaceId();
@@ -108,4 +109,54 @@ export async function sendContractEmail(dealId: string, formData: FormData) {
   }
 
   redirect(`/deals/${dealId}/contract`);
+}
+
+// Spins up a fresh deal for the same client, pre-filled with the current
+// terms — the "renewal proposal" starting point. Values come in already
+// "confirmed" (they're a known-good copy of what the client already signed
+// once), so the new deal is immediately reviewable/sendable instead of
+// looking like it's missing information.
+export async function startRenewal(dealId: string) {
+  const workspaceId = await requireWorkspaceId();
+  const deal = await prisma.deal.findFirst({
+    where: { id: dealId, workspaceId },
+    include: { fields: true, contract: true },
+  });
+  if (!deal) throw new Error("Deal not found");
+  if (deal.contract?.status !== "signed") throw new Error("Only a signed deal can be renewed");
+
+  const newDeal = await prisma.deal.create({
+    data: {
+      workspaceId,
+      clientId: deal.clientId,
+      templateId: deal.templateId,
+      service: deal.service,
+      feeDisplay: deal.feeDisplay,
+      status: "ready",
+      source: "renewal",
+      fields: {
+        create: deal.fields.map((f) => ({
+          groupLabel: f.groupLabel,
+          label: f.label,
+          fieldKey: f.fieldKey,
+          value: f.value,
+          status: f.value ? "confirmed" : "missing",
+          orderIndex: f.orderIndex,
+        })),
+      },
+      contract: { create: { templateId: deal.templateId, status: "draft" } },
+    },
+  });
+
+  const session = await auth();
+  await logAudit({
+    workspaceId,
+    actorEmail: session?.user?.email,
+    action: "deal.renewal_started",
+    targetType: "Deal",
+    targetId: newDeal.id,
+    metadata: { fromDealId: dealId },
+  });
+
+  redirect(`/deals/${newDeal.id}/contract`);
 }

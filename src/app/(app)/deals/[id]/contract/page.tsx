@@ -7,6 +7,11 @@ import { currentUserWithRole } from "@/lib/permissions";
 import DownloadContractButton from "@/components/DownloadContractButton";
 import ApprovalStepper from "@/components/ApprovalStepper";
 import { decideApproval } from "../approval-actions";
+import { startRenewal } from "../actions";
+
+function daysUntil(date: Date): number {
+  return Math.ceil((date.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+}
 
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -141,6 +146,34 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
         </div>
       </aside>
     </div>
+
+    {deal.contract.status === "signed" && deal.contract.renewalDate && (
+      <div className="card mt-[18px] max-w-[600px]">
+        <div className="border-b px-5 py-4" style={{ borderColor: "var(--hairline)" }}>
+          <h2 className="text-[15px] font-medium">Renewal</h2>
+        </div>
+        <div className="flex flex-col gap-3 px-5 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[13.5px] font-medium">
+                {deal.contract.autoRenews ? "Auto-renews" : "Term ends"} {deal.contract.renewalDate.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
+              </div>
+              {deal.contract.renewalNote && (
+                <div className="mt-0.5 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>{deal.contract.renewalNote}</div>
+              )}
+            </div>
+            <span className={`chip flex-none ${daysUntil(deal.contract.renewalDate) <= 30 ? "chip-warn" : "chip-neutral"}`} style={{ fontSize: 11 }}>
+              {daysUntil(deal.contract.renewalDate) > 0 ? `${daysUntil(deal.contract.renewalDate)}d left` : "Past due"}
+            </span>
+          </div>
+          <form action={startRenewal.bind(null, deal.id)}>
+            <button type="submit" className="btn btn-secondary w-full justify-center">
+              Start renewal
+            </button>
+          </form>
+        </div>
+      </div>
+    )}
 
     {showApprovalStepper && (
       <div className="mt-[18px] max-w-[600px]">

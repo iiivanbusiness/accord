@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { sendSignedNotificationEmail } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { extractRenewalTerms } from "@/lib/extract-renewal";
 
 export async function signContract(contractId: string, formData: FormData) {
   const signerName = String(formData.get("signerName") ?? "").trim();
@@ -60,6 +61,12 @@ export async function signContract(contractId: string, formData: FormData) {
     } catch (err) {
       console.error("Failed to send signed-notification email", err);
     }
+  }
+
+  try {
+    await extractRenewalTerms(contract.id);
+  } catch (err) {
+    console.error("Failed to extract renewal terms", err);
   }
 
   redirect(`/sign/${contractId}`);

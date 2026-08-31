@@ -28,6 +28,10 @@ function formatEventTime(date: Date): string {
   return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
+function daysUntil(date: Date): number {
+  return Math.ceil((date.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+}
+
 const STATUS_LABEL: Record<string, string> = {
   processing: "Analyzing call…",
   missing_info: "Missing info",
@@ -90,10 +94,16 @@ export default async function DashboardPage() {
   const [workspaceId, session] = await Promise.all([requireWorkspaceId(), auth()]);
   const firstName = session?.user?.name?.trim().split(/\s+/)[0] ?? null;
 
-  const [deals, clientCount, upcomingEvents] = await Promise.all([
+  const [deals, clientCount, upcomingEvents, upcomingRenewals] = await Promise.all([
     prisma.deal.findMany({ where: { workspaceId }, include: { client: true, contract: true }, orderBy: { updatedAt: "desc" } }),
     prisma.client.count({ where: { workspaceId } }),
     prisma.calendarEvent.findMany({ where: { workspaceId, startTime: { gte: now } }, orderBy: { startTime: "asc" }, take: 5 }),
+    prisma.contract.findMany({
+      where: { status: "signed", renewalDate: { gte: now }, deal: { workspaceId } },
+      include: { deal: { include: { client: true } } },
+      orderBy: { renewalDate: "asc" },
+      take: 5,
+    }),
   ]);
 
   const signedCount = deals.filter((d) => d.status === "signed").length;
@@ -226,6 +236,41 @@ export default async function DashboardPage() {
           </div>
         )}
       </div>
+    </div>
+
+    <div className="card card-hover mb-5 p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-[15px] font-medium">Upcoming renewals</h2>
+      </div>
+      {upcomingRenewals.length === 0 ? (
+        <div className="py-6 text-center text-[13px]" style={{ color: "var(--ink-muted)" }}>
+          No contracts renewing soon.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1">
+          {upcomingRenewals.map((contract) => (
+            <Link
+              key={contract.id}
+              href={`/deals/${contract.dealId}/contract`}
+              className="flex items-center gap-3 border-t py-2.5 first:border-t-0"
+              style={{ borderColor: "var(--hairline-soft)", color: "inherit" }}
+            >
+              <div
+                className="font-mono-tab flex w-[64px] flex-none flex-col items-start rounded-[8px] px-2 py-1 text-[11.5px] font-medium"
+                style={{ background: "var(--surface-2)" }}
+              >
+                {daysUntil(contract.renewalDate as Date)}d
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] font-medium">{contract.deal.client.name}</div>
+                <div className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
+                  {contract.autoRenews ? "Auto-renews" : "Term ends"} {(contract.renewalDate as Date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
 
     <div className="card card-hover overflow-hidden">

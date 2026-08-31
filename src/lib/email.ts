@@ -177,6 +177,29 @@ export async function sendChangesRequestedEmail(options: {
   });
 }
 
+export async function sendRenewalReminderEmail(options: {
+  to: string[];
+  clientName: string;
+  templateName: string;
+  renewalDate: Date;
+  autoRenews: boolean;
+  renewalNote?: string | null;
+  dealUrl: string;
+}): Promise<void> {
+  const dateLabel = options.renewalDate.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+  await sendSystemEmail({
+    to: options.to,
+    subject: `${options.clientName}'s contract ${options.autoRenews ? "renews" : "ends"} on ${dateLabel}`,
+    bodyHtml: `
+      <p style="margin:0 0 14px;">The ${escapeHtml(options.templateName)} with <strong>${escapeHtml(options.clientName)}</strong> ${options.autoRenews ? "auto-renews" : "ends"} on <strong>${dateLabel}</strong> — coming up in the next 30 days.</p>
+      ${options.renewalNote ? `<p style="margin:0 0 14px;font-style:italic;">${escapeHtml(options.renewalNote)}</p>` : ""}
+      <a href="${options.dealUrl}" style="display:inline-block;margin:0 0 20px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
+        Review &amp; start renewal
+      </a>
+    `,
+  });
+}
+
 export async function sendVerificationEmail(options: { to: string; verifyUrl: string }): Promise<void> {
   await sendSystemEmail({
     to: [options.to],
