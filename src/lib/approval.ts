@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { sendContractEmail, sendApprovalRequestedEmail, sendChangesRequestedEmail } from "@/lib/email";
 import { logAudit } from "@/lib/audit";
+import { getOrMintPortalToken } from "@/lib/client-portal";
 
 export type PendingEmail = { to: string; subject: string; message: string };
 
@@ -81,13 +82,19 @@ export async function performActualSend(contractId: string, pendingOverride?: Pe
   const replyTo = workspace.users[0]?.email ?? null;
   const verifiedSenderEmail = workspace.senderDomainStatus === "verified" ? workspace.senderEmail : null;
 
-  await sendContractEmail({ to, subject, message, signLink, workspaceName: workspace.name, replyTo, verifiedSenderEmail });
+  const portalToken = await getOrMintPortalToken(deal.client.id);
+  const portalUrl = `${appUrl()}/portal/${portalToken}`;
+
+  await sendContractEmail({ to, subject, message, signLink, workspaceName: workspace.name, replyTo, verifiedSenderEmail, portalUrl });
 
   await prisma.contract.update({
     where: { id: contractId },
     data: { status: "sent", sentAt: new Date(), pendingTo: null, pendingSubject: null, pendingMessage: null },
   });
   await prisma.deal.update({ where: { id: deal.id }, data: { status: "sent" } });
+  // Resending is how the workspace answers open clause-change requests —
+  // whatever they asked for is presumably reflected in this new version.
+  await prisma.clauseComment.updateMany({ where: { contractId, resolved: false }, data: { resolved: true } });
 }
 
 // Notifies whoever currently holds the given role that a contract needs

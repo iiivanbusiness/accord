@@ -35,7 +35,12 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
         client: true,
         template: true,
         fields: true,
-        contract: { include: { approvals: { include: { role: true, decidedByUser: true }, orderBy: { order: "asc" } } } },
+        contract: {
+          include: {
+            approvals: { include: { role: true, decidedByUser: true }, orderBy: { order: "asc" } },
+            clauseComments: { where: { resolved: false }, orderBy: { createdAt: "asc" } },
+          },
+        },
         workspace: true,
       },
     }),
@@ -46,6 +51,11 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
   const clauses = fillClauses(deal.template.clauses, deal.fields);
   const showApprovalStepper = deal.contract.approvals.length > 0 && (deal.contract.status === "pending_approval" || deal.contract.status === "changes_requested");
   const canResend = deal.contract.status === "draft" || deal.contract.status === "changes_requested";
+  const commentsByClause = new Map<string, typeof deal.contract.clauseComments>();
+  for (const comment of deal.contract.clauseComments) {
+    if (!commentsByClause.has(comment.clauseTitle)) commentsByClause.set(comment.clauseTitle, []);
+    commentsByClause.get(comment.clauseTitle)!.push(comment);
+  }
 
   return (
     <>
@@ -113,6 +123,11 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
               {clause.title}
             </h3>
             <p className="text-[14px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>{clause.body}</p>
+            {commentsByClause.get(clause.title)?.map((comment) => (
+              <div key={comment.id} className="mt-2 rounded-[8px] px-3 py-2.5 text-[12.5px]" style={{ background: "var(--warn-soft)", color: "var(--ink)" }}>
+                <span className="font-medium">{comment.fromName}:</span> {comment.comment}
+              </div>
+            ))}
           </div>
         ))}
       </div>

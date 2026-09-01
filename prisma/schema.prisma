@@ -138,6 +138,15 @@ model Client {
   billingAddress String?
   createdAt      DateTime  @default(now())
 
+  // A stable, bookmarkable link to this client's own portal (every
+  // agreement they have with the workspace, in one place) — minted once,
+  // lazily, the first time a contract is actually sent to them. Stored
+  // plain, not hashed, the same trust model as a Contract's own id used
+  // directly in /sign/[id]: an unguessable long-lived link, not a
+  // short-lived single-use credential like the password-reset/local-capture
+  // tokens, which is what actually needs hashing.
+  portalToken String? @unique
+
   deals Deal[]
 }
 
@@ -319,7 +328,28 @@ model Contract {
   pendingSubject String?
   pendingMessage String?
 
-  approvals ContractApproval[]
+  approvals      ContractApproval[]
+  clauseComments ClauseComment[]
+}
+
+// A client's request to change a specific clause, left on the public sign
+// page before they've signed — the "no way to negotiate, just sign-or-not"
+// gap. Reuses the existing changes_requested status (same one an internal
+// approval rejection sets) rather than adding a new one, so the contract
+// page's "Send again" flow already just works. Auto-resolved (not deleted —
+// kept as part of the record) the next time this contract is actually sent
+// again, on the assumption the new version addresses it.
+model ClauseComment {
+  id          String   @id @default(cuid())
+  contractId  String
+  contract    Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  clauseTitle String
+  comment     String
+  fromName    String // whatever name the client typed in, or "The client" if left blank
+  resolved    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([contractId])
 }
 
 // A workspace-defined role — e.g. "Legal", "Finance", "Manager", or

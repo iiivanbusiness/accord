@@ -1,13 +1,14 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { fillClauses } from "@/lib/contract";
-import { signContract } from "./actions";
+import { signContract, requestClauseChange } from "./actions";
 import BrandLogo from "@/components/BrandLogo";
 import SignaturePad from "@/components/SignaturePad";
 import DownloadContractButton from "@/components/DownloadContractButton";
 
-export default async function SignPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function SignPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ feedbackSent?: string }> }) {
   const { id } = await params;
+  const { feedbackSent } = await searchParams;
   const contract = await prisma.contract.findUnique({
     where: { id },
     include: { deal: { include: { client: true, fields: true, workspace: true } }, template: true },
@@ -46,6 +47,11 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
       </header>
 
       <main className="mx-auto max-w-[720px] px-6 py-10">
+        {feedbackSent && (
+          <div className="chip chip-success mb-6 w-full justify-start px-4 py-3 text-[13.5px]">
+            ✓ Thanks — your feedback was sent. We&apos;ll follow up.
+          </div>
+        )}
         {signed && (
           <div className="mb-6 flex flex-col gap-3">
             <div className="chip chip-success px-4 py-3 text-[13.5px]">
@@ -72,6 +78,18 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
                 {clause.title}
               </h3>
               <p className="text-[14px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>{clause.body}</p>
+              {!signed && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-[12px] font-medium" style={{ color: "var(--accent-blue)" }}>
+                    Request a change to this clause
+                  </summary>
+                  <form action={requestClauseChange.bind(null, contract.id, clause.title)} className="mt-2.5 flex flex-col gap-2 rounded-[10px] p-3.5" style={{ background: "var(--surface-2)" }}>
+                    <input name="fromName" placeholder="Your name (optional)" className="input" style={{ fontSize: "13px", padding: "8px 11px" }} />
+                    <textarea name="comment" required rows={2} placeholder="What would you like changed here?" className="input" style={{ fontSize: "13px", padding: "8px 11px" }} />
+                    <button type="submit" className="btn btn-secondary btn-sm w-fit">Send feedback</button>
+                  </form>
+                </details>
+              )}
             </div>
           ))}
         </div>

@@ -18,6 +18,7 @@ export const authConfig = {
         request.nextUrl.pathname === "/" ||
         request.nextUrl.pathname.startsWith("/login") ||
         request.nextUrl.pathname.startsWith("/sign") ||
+        request.nextUrl.pathname.startsWith("/portal") ||
         request.nextUrl.pathname.startsWith("/onboarding") ||
         request.nextUrl.pathname.startsWith("/verify-email") ||
         request.nextUrl.pathname.startsWith("/forgot-password") ||

@@ -18,6 +18,7 @@ export async function sendContractEmail(options: {
   workspaceName: string;
   replyTo?: string | null;
   verifiedSenderEmail?: string | null;
+  portalUrl?: string | null;
 }): Promise<void> {
   const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -33,9 +34,10 @@ export async function sendContractEmail(options: {
   const html = `
     <div style="font-family:-apple-system,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;color:#1d1d1f;">
       ${messageHtml}
-      <a href="${options.signLink}" style="display:inline-block;margin:12px 0 20px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
+      <a href="${options.signLink}" style="display:inline-block;margin:12px 0 8px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
         View &amp; sign the agreement
       </a>
+      ${options.portalUrl ? `<p style="margin:0 0 20px;"><a href="${options.portalUrl}" style="color:#6e6e73;font-size:12.5px;">View all your agreements with ${escapeHtml(options.workspaceName)}</a></p>` : `<div style="margin-bottom:20px;"></div>`}
       <p style="margin:0;font-size:12.5px;color:#6e6e73;">${footer}</p>
     </div>
   `;
