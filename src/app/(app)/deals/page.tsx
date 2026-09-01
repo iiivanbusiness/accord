@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireWorkspace, requireWorkspaceId } from "@/lib/workspace";
+import DealsBulkTable from "@/components/DealsBulkTable";
+import { bulkRemind, bulkSend } from "./bulk-actions";
 
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -72,10 +74,22 @@ export default async function DealsPage({
     requireWorkspace(),
     prisma.deal.findMany({
       where: { workspaceId },
-      include: { client: true },
+      include: { client: true, contract: true },
       orderBy: { updatedAt: "desc" },
     }),
   ]);
+
+  const tableRows = deals.map((deal) => ({
+    id: deal.id,
+    clientName: deal.client.name,
+    service: deal.service,
+    feeDisplay: deal.feeDisplay,
+    statusLabel: STATUS_LABEL[deal.status] ?? deal.status,
+    statusChip: STATUS_CHIP[deal.status] ?? "chip-neutral",
+    updatedAgo: timeAgo(deal.updatedAt),
+    canRemind: deal.contract?.status === "sent" && Boolean(deal.client.email),
+    canSend: deal.contract?.status === "draft" && Boolean(deal.client.email),
+  }));
 
   const byColumn = new Map<string, typeof deals>();
   for (const col of BOARD_COLUMNS) byColumn.set(col, []);
@@ -148,49 +162,7 @@ export default async function DealsPage({
         })}
       </div>
     ) : (
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr>
-                {["Client", "Value", "Status", "Updated"].map((h) => (
-                  <th
-                    key={h}
-                    className="border-b px-5 py-3.5 text-left text-[12px] font-medium uppercase tracking-wide"
-                    style={{ color: "var(--ink-muted)", borderColor: "var(--hairline)" }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {deals.map((deal) => (
-                <tr key={deal.id} className="row-hover transition-colors">
-                  <td className="border-b px-5 py-4" style={{ borderColor: "var(--hairline-soft)" }}>
-                    <Link href={`/deals/${deal.id}`} className="flex flex-col gap-0.5" style={{ color: "inherit" }}>
-                      <span className="font-medium" style={{ color: "var(--ink)" }}>{deal.client.name}</span>
-                      <span className="text-[13px]" style={{ color: "var(--ink-muted)" }}>{deal.service}</span>
-                    </Link>
-                  </td>
-                  <td className="font-mono-tab border-b px-5 py-4 font-medium" style={{ borderColor: "var(--hairline-soft)", color: "var(--ink)" }}>
-                    {deal.feeDisplay}
-                  </td>
-                  <td className="border-b px-5 py-4" style={{ borderColor: "var(--hairline-soft)" }}>
-                    <span className={`chip ${STATUS_CHIP[deal.status] ?? "chip-neutral"}`}>
-                      <span className="chip-dot" />
-                      {STATUS_LABEL[deal.status] ?? deal.status}
-                    </span>
-                  </td>
-                  <td className="border-b px-5 py-4 text-[13px]" style={{ color: "var(--ink-muted)", borderColor: "var(--hairline-soft)" }}>
-                    {timeAgo(deal.updatedAt)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DealsBulkTable rows={tableRows} remindAction={bulkRemind} sendAction={bulkSend} />
     )}
     </>
   );
