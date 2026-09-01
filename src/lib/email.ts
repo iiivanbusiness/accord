@@ -139,6 +139,30 @@ export async function sendTeammateInviteEmail(options: {
   });
 }
 
+export async function sendStaleDealsEmail(options: {
+  to: string[];
+  deals: { clientName: string; service: string; daysSinceUpdate: number; dealUrl: string }[];
+}): Promise<void> {
+  if (options.deals.length === 0) return;
+  const rows = options.deals
+    .map(
+      (d) => `
+      <p style="margin:0 0 10px;">
+        <a href="${d.dealUrl}" style="color:#1d1d1f;font-weight:600;text-decoration:none;">${escapeHtml(d.clientName)}</a>
+        — ${escapeHtml(d.service)} <span style="color:#6e6e73;">(untouched ${d.daysSinceUpdate} days)</span>
+      </p>`
+    )
+    .join("");
+  await sendSystemEmail({
+    to: options.to,
+    subject: `${options.deals.length} deal${options.deals.length === 1 ? "" : "s"} sitting untouched`,
+    bodyHtml: `
+      <p style="margin:0 0 14px;">These deals have been waiting on a review or a send for a while — worth a quick look before they go cold:</p>
+      ${rows}
+    `,
+  });
+}
+
 export async function sendApprovalRequestedEmail(options: {
   to: string[];
   clientName: string;

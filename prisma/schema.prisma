@@ -202,6 +202,11 @@ model Deal {
   lastExtractedTranscript String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  // Set when a "this deal has been sitting untouched" nudge goes out —
+  // cleared (via being older than updatedAt) the moment the deal is
+  // actually touched again, so a resolved-then-stale-again deal can nudge
+  // a second time instead of going quiet forever after one email.
+  staleReminderSentAt DateTime?
 
   fields       DealField[]
   contract     Contract?

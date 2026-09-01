@@ -94,17 +94,27 @@ export default async function DashboardPage() {
   const [workspaceId, session] = await Promise.all([requireWorkspaceId(), auth()]);
   const firstName = session?.user?.name?.trim().split(/\s+/)[0] ?? null;
 
-  const [deals, clientCount, upcomingEvents, upcomingRenewals] = await Promise.all([
+  const in90Days = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+  const staleCutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const [deals, clientCount, upcomingEvents, renewalsAtRisk, staleDeals] = await Promise.all([
     prisma.deal.findMany({ where: { workspaceId }, include: { client: true, contract: true }, orderBy: { updatedAt: "desc" } }),
     prisma.client.count({ where: { workspaceId } }),
     prisma.calendarEvent.findMany({ where: { workspaceId, startTime: { gte: now } }, orderBy: { startTime: "asc" }, take: 5 }),
     prisma.contract.findMany({
-      where: { status: "signed", renewalDate: { gte: now }, deal: { workspaceId } },
+      where: { status: "signed", renewalDate: { gte: now, lte: in90Days }, deal: { workspaceId } },
       include: { deal: { include: { client: true } } },
       orderBy: { renewalDate: "asc" },
-      take: 5,
+    }),
+    prisma.deal.findMany({
+      where: { workspaceId, status: { in: ["ready", "missing_info"] }, updatedAt: { lte: staleCutoff } },
+      include: { client: true },
+      orderBy: { updatedAt: "asc" },
     }),
   ]);
+
+  const revenueAtRisk = renewalsAtRisk.reduce((sum, c) => sum + parseFee(c.deal.feeDisplay), 0);
+  const upcomingRenewals = renewalsAtRisk.slice(0, 5);
 
   const signedCount = deals.filter((d) => d.status === "signed").length;
   const combinedValue = deals.reduce((sum, d) => sum + parseFee(d.feeDisplay), 0);
@@ -238,39 +248,96 @@ export default async function DashboardPage() {
       </div>
     </div>
 
-    <div className="card card-hover mb-5 p-5">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-[15px] font-medium">Upcoming renewals</h2>
-      </div>
-      {upcomingRenewals.length === 0 ? (
-        <div className="py-6 text-center text-[13px]" style={{ color: "var(--ink-muted)" }}>
-          No contracts renewing soon.
+    <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="card card-hover p-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-[15px] font-medium">Upcoming renewals</h2>
+          {renewalsAtRisk.length > 0 && (
+            <span className="chip chip-warn flex-none" style={{ fontSize: 11 }}>
+              €{revenueAtRisk.toLocaleString()} in 90 days
+            </span>
+          )}
         </div>
-      ) : (
-        <div className="flex flex-col gap-1">
-          {upcomingRenewals.map((contract) => (
-            <Link
-              key={contract.id}
-              href={`/deals/${contract.dealId}/contract`}
-              className="flex items-center gap-3 border-t py-2.5 first:border-t-0"
-              style={{ borderColor: "var(--hairline-soft)", color: "inherit" }}
-            >
-              <div
-                className="font-mono-tab flex w-[64px] flex-none flex-col items-start rounded-[8px] px-2 py-1 text-[11.5px] font-medium"
-                style={{ background: "var(--surface-2)" }}
+        {upcomingRenewals.length === 0 ? (
+          <div className="py-6 text-center text-[13px]" style={{ color: "var(--ink-muted)" }}>
+            No contracts renewing soon.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {upcomingRenewals.map((contract) => (
+              <Link
+                key={contract.id}
+                href={`/deals/${contract.dealId}/contract`}
+                className="flex items-center gap-3 border-t py-2.5 first:border-t-0"
+                style={{ borderColor: "var(--hairline-soft)", color: "inherit" }}
               >
-                {daysUntil(contract.renewalDate as Date)}d
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-medium">{contract.deal.client.name}</div>
-                <div className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
-                  {contract.autoRenews ? "Auto-renews" : "Term ends"} {(contract.renewalDate as Date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                <div
+                  className="font-mono-tab flex w-[64px] flex-none flex-col items-start rounded-[8px] px-2 py-1 text-[11.5px] font-medium"
+                  style={{ background: "var(--surface-2)" }}
+                >
+                  {daysUntil(contract.renewalDate as Date)}d
                 </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-medium">{contract.deal.client.name}</div>
+                  <div className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
+                    {contract.autoRenews ? "Auto-renews" : "Term ends"} {(contract.renewalDate as Date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                  </div>
+                </div>
+              </Link>
+            ))}
+            {renewalsAtRisk.length > upcomingRenewals.length && (
+              <div className="pt-2 text-center text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
+                +{renewalsAtRisk.length - upcomingRenewals.length} more in the next 90 days
               </div>
-            </Link>
-          ))}
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="card card-hover p-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-[15px] font-medium">Stuck deals</h2>
+          {staleDeals.length > 0 && (
+            <span className="chip chip-warn flex-none" style={{ fontSize: 11 }}>
+              {staleDeals.length} untouched 7+ days
+            </span>
+          )}
         </div>
-      )}
+        {staleDeals.length === 0 ? (
+          <div className="py-6 text-center text-[13px]" style={{ color: "var(--ink-muted)" }}>
+            Nothing sitting idle — nice.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {staleDeals.slice(0, 5).map((deal) => (
+              <Link
+                key={deal.id}
+                href={`/deals/${deal.id}`}
+                className="flex items-center gap-3 border-t py-2.5 first:border-t-0"
+                style={{ borderColor: "var(--hairline-soft)", color: "inherit" }}
+              >
+                <div
+                  className="font-mono-tab flex w-[64px] flex-none flex-col items-start rounded-[8px] px-2 py-1 text-[11.5px] font-medium"
+                  style={{ background: "var(--surface-2)" }}
+                >
+                  {timeAgo(deal.updatedAt)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px] font-medium">{deal.client.name}</div>
+                  <div className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
+                    {STATUS_LABEL[deal.status] ?? deal.status}
+                  </div>
+                </div>
+              </Link>
+            ))}
+            {staleDeals.length > 5 && (
+              <div className="pt-2 text-center text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
+                +{staleDeals.length - 5} more
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
 
     <div className="card card-hover overflow-hidden">
