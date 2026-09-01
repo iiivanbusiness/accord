@@ -3,13 +3,15 @@
 import { useState } from "react";
 
 type Clause = { title: string; body: string };
+type LibraryItem = { id: string; title: string; body: string };
 
-export default function ClauseEditor({ initialClauses }: { initialClauses?: Clause[] }) {
+export default function ClauseEditor({ initialClauses, libraryClauses }: { initialClauses?: Clause[]; libraryClauses?: LibraryItem[] }) {
   const [clauses, setClauses] = useState<Clause[]>(
     initialClauses && initialClauses.length > 0
       ? initialClauses
       : [{ title: "Services", body: "Agency will provide {service} for {clientName}." }]
   );
+  const [libraryPick, setLibraryPick] = useState("");
 
   function update(i: number, key: keyof Clause, value: string) {
     setClauses((prev) => prev.map((c, idx) => (idx === i ? { ...c, [key]: value } : c)));
@@ -19,6 +21,14 @@ export default function ClauseEditor({ initialClauses }: { initialClauses?: Clau
   }
   function removeClause(i: number) {
     setClauses((prev) => prev.filter((_, idx) => idx !== i));
+  }
+  function insertFromLibrary() {
+    const item = libraryClauses?.find((l) => l.id === libraryPick);
+    if (!item) return;
+    // A plain copy, not a reference — editing this clause afterward, or
+    // updating the library item later, never touches the other.
+    setClauses((prev) => [...prev, { title: item.title, body: item.body }]);
+    setLibraryPick("");
   }
 
   return (
@@ -54,9 +64,29 @@ export default function ClauseEditor({ initialClauses }: { initialClauses?: Clau
           </div>
         ))}
       </div>
-      <button type="button" onClick={addClause} className="btn btn-secondary btn-sm mt-3">
-        + Add clause
-      </button>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={addClause} className="btn btn-secondary btn-sm">
+          + Add clause
+        </button>
+        {libraryClauses && libraryClauses.length > 0 && (
+          <>
+            <select
+              value={libraryPick}
+              onChange={(e) => setLibraryPick(e.target.value)}
+              className="input"
+              style={{ fontSize: "12.5px", padding: "6px 9px", width: "auto" }}
+            >
+              <option value="">Insert from library…</option>
+              {libraryClauses.map((item) => (
+                <option key={item.id} value={item.id}>{item.title}</option>
+              ))}
+            </select>
+            <button type="button" onClick={insertFromLibrary} disabled={!libraryPick} className="btn btn-secondary btn-sm">
+              Insert
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

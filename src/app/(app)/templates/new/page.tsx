@@ -2,11 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import ClauseEditor from "@/components/ClauseEditor";
 import { currentUserWithRole } from "@/lib/permissions";
+import { prisma } from "@/lib/db";
 import { createTemplate } from "../actions";
 
 export default async function NewTemplatePage() {
   const user = await currentUserWithRole();
   if (!user.role?.canManageTemplates) redirect("/templates");
+  const libraryClauses = await prisma.clauseLibraryItem.findMany({ where: { workspaceId: user.workspaceId }, orderBy: { title: "asc" } });
 
   return (
     <>
@@ -31,7 +33,7 @@ export default async function NewTemplatePage() {
         <input name="description" placeholder="One line describing when to use this template" className="input" />
       </label>
 
-      <ClauseEditor />
+      <ClauseEditor libraryClauses={libraryClauses} />
 
       <button type="submit" className="btn btn-primary mt-2 w-full justify-center">
         Create template

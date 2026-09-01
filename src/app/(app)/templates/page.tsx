@@ -22,6 +22,11 @@ export default async function TemplatesPage() {
       </div>
       {canManage && (
         <div className="flex gap-2.5">
+          {Boolean(user.role?.canApproveTemplates) && (
+            <Link href="/templates/library" className="btn btn-secondary">
+              Clause library
+            </Link>
+          )}
           <Link href="/templates/upload" className="btn btn-secondary">
             ⭱ Upload a contract
           </Link>

@@ -53,6 +53,26 @@ model Workspace {
   localCaptureTokens LocalCaptureToken[]
   roles              Role[]
   approvalSteps      ApprovalStep[]
+  clauseLibraryItems ClauseLibraryItem[]
+}
+
+// A canonical, reusable clause — "insert from library" into any template
+// instead of retyping the same Confidentiality/Governing Law wording in
+// every one. Copy-on-insert, not a live reference: inserting drops a plain
+// copy into the template's own clauses JSON, so editing the library later
+// doesn't silently rewrite contracts already generated from it. The point
+// is giving legal one canonical place to maintain the wording and quickly
+// re-insert it wherever it's used, not automatic template-wide sync.
+model ClauseLibraryItem {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title       String
+  body        String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId])
 }
 
 // Answers from the pre-signup onboarding screens. Captured client-side and

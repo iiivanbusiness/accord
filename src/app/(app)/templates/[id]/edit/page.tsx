@@ -11,9 +11,10 @@ type Clause = { title: string; body: string };
 export default async function EditTemplatePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const workspaceId = await requireWorkspaceId();
-  const [template, user] = await Promise.all([
+  const [template, user, libraryClauses] = await Promise.all([
     prisma.contractTemplate.findFirst({ where: { id, workspaceId } }),
     currentUserWithRole(),
+    prisma.clauseLibraryItem.findMany({ where: { workspaceId }, orderBy: { title: "asc" } }),
   ]);
   if (!template) notFound();
   if (!user.role?.canManageTemplates) redirect(`/templates/${id}`);
@@ -44,7 +45,7 @@ export default async function EditTemplatePage({ params }: { params: Promise<{ i
         <input name="description" defaultValue={template.description} className="input" />
       </label>
 
-      <ClauseEditor initialClauses={clauses} />
+      <ClauseEditor initialClauses={clauses} libraryClauses={libraryClauses} />
 
       <button type="submit" className="btn btn-primary mt-2 w-full justify-center">
         Save changes
