@@ -1,0 +1,144 @@
+import { renderToBuffer } from "@react-pdf/renderer";
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { currentUserWithRole } from "@/lib/permissions";
+import { AuditTrailPdfDocument, type AuditEvent } from "@/lib/audit-trail-pdf";
+
+const CALL_SOURCE_LABEL: Record<string, string> = {
+  local: "Recorded locally",
+  upload: "Pasted transcript",
+};
+
+// Compliance-sensitive (approval decisions, signer IPs) — gated on
+// canManageWorkspace, the same admin tier that configures the approval
+// chain itself, not the general canManageTemplates/canApproveContracts
+// permissions a regular teammate might hold.
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+
+  let user;
+  try {
+    user = await currentUserWithRole();
+  } catch {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
+  if (!user.role?.canManageWorkspace) {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
+
+  const deal = await prisma.deal.findFirst({
+    where: { id, workspaceId: user.workspaceId },
+    include: {
+      client: true,
+      workspace: true,
+      calls: { orderBy: { startedAt: "asc" } },
+      fieldChanges: { orderBy: { changedAt: "asc" } },
+      contract: {
+        include: {
+          template: true,
+          approvals: { include: { role: true, decidedByUser: true }, orderBy: { order: "asc" } },
+        },
+      },
+    },
+  });
+  if (!deal) return new NextResponse("Not found", { status: 404 });
+
+  const auditLogs = deal.contract
+    ? await prisma.auditLog.findMany({
+        where: { workspaceId: user.workspaceId, OR: [{ targetId: deal.id }, { targetId: deal.contract.id }] },
+        orderBy: { createdAt: "asc" },
+      })
+    : await prisma.auditLog.findMany({
+        where: { workspaceId: user.workspaceId, targetId: deal.id },
+        orderBy: { createdAt: "asc" },
+      });
+
+  const events: AuditEvent[] = [];
+
+  events.push({ when: deal.createdAt, label: "Deal created", detail: `${deal.client.name} — ${deal.service}` });
+
+  for (const call of deal.calls) {
+    events.push({
+      when: call.startedAt,
+      label: `Call recorded (${CALL_SOURCE_LABEL[call.source] ?? call.source})`,
+      detail: call.endedAt ? `Ended ${call.endedAt.toLocaleString()}` : "In progress",
+    });
+  }
+
+  for (const change of deal.fieldChanges) {
+    events.push({
+      when: change.changedAt,
+      label: `Field changed: ${change.fieldKey}`,
+      // "->" not "→" — the PDF's base Helvetica font (WinAnsiEncoding) has
+      // no glyph for the Unicode arrow and silently substitutes garbage.
+      detail: `"${change.oldValue ?? "—"}" -> "${change.newValue ?? "—"}" (${change.changedBy === "manual" ? "edited manually" : "from a call"})`,
+    });
+  }
+
+  if (deal.contract) {
+    for (const approval of deal.contract.approvals) {
+      if (approval.status === "pending") continue;
+      events.push({
+        when: approval.decidedAt ?? deal.contract.createdAt,
+        label: `Approval ${approval.status} — ${approval.role.name}`,
+        detail: [approval.decidedByUser ? `by ${approval.decidedByUser.name} (${approval.decidedByUser.email})` : null, approval.note ? `"${approval.note}"` : null]
+          .filter(Boolean)
+          .join(" — "),
+      });
+    }
+    if (deal.contract.sentAt) {
+      events.push({ when: deal.contract.sentAt, label: "Contract sent to client" });
+    }
+    if (deal.contract.viewedAt) {
+      events.push({ when: deal.contract.viewedAt, label: "Client viewed the sign page" });
+    }
+    if (deal.contract.signedAt) {
+      events.push({
+        when: deal.contract.signedAt,
+        label: "Contract signed",
+        detail: [deal.contract.signerName ? `by ${deal.contract.signerName}` : null, deal.contract.signerIp ? `from IP ${deal.contract.signerIp}` : null]
+          .filter(Boolean)
+          .join(" "),
+      });
+    }
+  }
+
+  for (const entry of auditLogs) {
+    let detail: string | null = null;
+    if (entry.metadata) {
+      try {
+        const parsed = JSON.parse(entry.metadata) as Record<string, unknown>;
+        detail = Object.entries(parsed)
+          .filter(([, v]) => v !== null && v !== undefined && v !== "")
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(", ") || null;
+      } catch {
+        // ignore malformed metadata
+      }
+    }
+    events.push({
+      when: entry.createdAt,
+      label: `System log: ${entry.action}`,
+      detail: [entry.actorEmail, detail, entry.ip ? `IP ${entry.ip}` : null].filter(Boolean).join(" — ") || null,
+    });
+  }
+
+  events.sort((a, b) => a.when.getTime() - b.when.getTime());
+
+  const buffer = await renderToBuffer(
+    <AuditTrailPdfDocument
+      clientName={deal.client.name}
+      templateName={deal.contract?.template?.name ?? deal.service}
+      workspaceName={deal.workspace.name}
+      generatedAt={new Date()}
+      events={events}
+    />
+  );
+
+  return new NextResponse(new Uint8Array(buffer), {
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="Audit-Trail-${deal.client.name.replace(/\s+/g, "-")}.pdf"`,
+    },
+  });
+}

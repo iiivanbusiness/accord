@@ -5,6 +5,7 @@ import { fillClauses } from "@/lib/contract";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { currentUserWithRole } from "@/lib/permissions";
 import DownloadContractButton from "@/components/DownloadContractButton";
+import AuditTrailButton from "@/components/AuditTrailButton";
 import ApprovalStepper from "@/components/ApprovalStepper";
 import { decideApproval } from "../approval-actions";
 import { startRenewal } from "../actions";
@@ -143,6 +144,9 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
             </>
           )}
           <DownloadContractButton contractId={deal.contract.id} className="btn btn-secondary w-full justify-center" />
+          {Boolean(currentUser.role?.canManageWorkspace) && (
+            <AuditTrailButton dealId={deal.id} className="btn btn-secondary w-full justify-center" />
+          )}
         </div>
       </aside>
     </div>
