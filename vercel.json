@@ -7,10 +7,6 @@
     {
       "path": "/api/cron/renewals",
       "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/cron/stale-deals",
-      "schedule": "0 9 * * *"
     }
   ]
 }

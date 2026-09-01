@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendAdminAlertEmail, sendRenewalReminderEmail } from "@/lib/email";
+import { runStaleDealsDigest } from "@/lib/stale-deals";
 
 const WINDOW_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -10,6 +11,12 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // per-workspace opt-in toggle, unlike the signature reminder: this is
 // informational to the team, not client-facing, so there's no reason to
 // gate it.
+//
+// Also runs the stale-deals digest (see src/lib/stale-deals.ts) in the same
+// request — Vercel's Hobby plan caps a project at 2 cron jobs, and this
+// project already has 2 without it (remind, renewals), so a 3rd daily job
+// gets piggybacked here instead of registered separately in vercel.json.
+// Each check is independent — a failure in one doesn't stop the other.
 export async function GET(req: Request) {
   const authHeader = req.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -50,7 +57,22 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ checked: dueContracts.length, sent });
+    let staleResult = { checked: 0, sent: 0 };
+    try {
+      staleResult = await runStaleDealsDigest();
+    } catch (err) {
+      console.error("Stale-deals digest (piggybacked on renewals cron) crashed", err);
+      try {
+        await sendAdminAlertEmail({
+          subject: "Stale-deals digest crashed",
+          details: err instanceof Error ? (err.stack ?? err.message) : String(err),
+        });
+      } catch (alertErr) {
+        console.error("Failed to send admin alert email", alertErr);
+      }
+    }
+
+    return NextResponse.json({ renewals: { checked: dueContracts.length, sent }, staleDeals: staleResult });
   } catch (err) {
     console.error("Renewal reminder cron crashed", err);
     try {
