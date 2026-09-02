@@ -50,6 +50,18 @@ model Workspace {
   allowedEmailDomain String?
   scimTokenHash      String? @unique
 
+  // OIDC single sign-on — one identity provider per workspace (Okta, Azure
+  // AD/Entra, Google Workspace, or any standard OIDC issuer). Resolved by
+  // matching the email domain the person types on the SSO sign-in screen
+  // against allowedEmailDomain, since there's no per-workspace vanity
+  // login URL. ssoClientSecret is stored plain — consistent with every
+  // other field in this schema (no field-level encryption exists anywhere
+  // else here); Postgres/Neon encrypts the whole database at rest.
+  ssoEnabled      Boolean @default(false)
+  ssoIssuer       String? // e.g. https://mycompany.okta.com
+  ssoClientId     String?
+  ssoClientSecret String?
+
   createdAt          DateTime @default(now())
 
   users             User[]

@@ -7,6 +7,7 @@ import RolesManager from "@/components/RolesManager";
 import RoleSelect from "@/components/RoleSelect";
 import ApprovalChainManager from "@/components/ApprovalChainManager";
 import ScimSettingsPanel from "@/components/ScimSettingsPanel";
+import SsoSettingsPanel from "@/components/SsoSettingsPanel";
 import {
   checkSenderDomainVerification,
   connectSenderDomain,
@@ -17,8 +18,10 @@ import {
   removeTeammate,
   requestUpgrade,
   revokeScimToken,
+  toggleSso,
   toggleWorkspaceFlag,
   updateAllowedDomain,
+  updateSsoConfig,
   updateWorkspaceName,
   uploadLogo,
 } from "./actions";
@@ -255,6 +258,30 @@ export default async function SettingsPage() {
           updateDomainAction={updateAllowedDomain}
           generateTokenAction={generateScimToken}
           revokeTokenAction={revokeScimToken}
+        />
+      </div>
+    )}
+
+    {canManageWorkspacePerm && (
+      <div className="card mb-4 max-w-[600px]">
+        <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
+          <h2 className="text-[15px] font-medium">Single sign-on</h2>
+          <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
+            {workspace.ssoEnabled ? (
+              <span className="chip chip-success" style={{ padding: "1px 8px" }}>Enabled</span>
+            ) : (
+              "Requires an allowed email domain above, plus an OIDC app registered with your identity provider."
+            )}
+          </div>
+        </div>
+        <SsoSettingsPanel
+          ssoEnabled={workspace.ssoEnabled}
+          currentIssuer={workspace.ssoIssuer}
+          currentClientId={workspace.ssoClientId}
+          hasClientSecret={Boolean(workspace.ssoClientSecret)}
+          redirectUri={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/sso/callback`}
+          updateConfigAction={updateSsoConfig}
+          toggleAction={toggleSso}
         />
       </div>
     )}

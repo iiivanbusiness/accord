@@ -256,3 +256,53 @@ export async function revokeScimToken(): Promise<void> {
 
   revalidatePath("/settings");
 }
+
+export async function updateSsoConfig(formData: FormData) {
+  const issuer = String(formData.get("issuer") ?? "").trim().replace(/\/+$/, "");
+  const clientId = String(formData.get("clientId") ?? "").trim();
+  const clientSecret = String(formData.get("clientSecret") ?? "").trim();
+  if (issuer && !/^https:\/\//.test(issuer)) {
+    throw new Error("Issuer must be an https:// URL, e.g. https://mycompany.okta.com");
+  }
+
+  const user = await requirePermission("canManageWorkspace");
+  await prisma.workspace.update({
+    where: { id: user.workspaceId },
+    data: {
+      ssoIssuer: issuer || null,
+      ssoClientId: clientId || null,
+      // Blank means "leave the existing secret alone" — the field is
+      // never pre-filled with the real value, so an empty submit isn't
+      // distinguishable from "didn't mean to change it".
+      ...(clientSecret ? { ssoClientSecret: clientSecret } : {}),
+    },
+  });
+
+  const session = await auth();
+  await logAudit({ workspaceId: user.workspaceId, actorEmail: session?.user?.email, action: "workspace.sso_config_updated" });
+  revalidatePath("/settings");
+}
+
+export async function toggleSso(): Promise<void> {
+  const user = await requirePermission("canManageWorkspace");
+  const workspace = await prisma.workspace.findUniqueOrThrow({ where: { id: user.workspaceId } });
+
+  if (!workspace.ssoEnabled) {
+    if (!workspace.ssoIssuer || !workspace.ssoClientId || !workspace.ssoClientSecret) {
+      throw new Error("Set an issuer, client ID, and client secret before enabling SSO");
+    }
+    if (!workspace.allowedEmailDomain) {
+      throw new Error("Set an allowed email domain above first — it's how sign-ins get matched to this workspace");
+    }
+  }
+
+  await prisma.workspace.update({ where: { id: user.workspaceId }, data: { ssoEnabled: !workspace.ssoEnabled } });
+
+  const session = await auth();
+  await logAudit({
+    workspaceId: user.workspaceId,
+    actorEmail: session?.user?.email,
+    action: workspace.ssoEnabled ? "workspace.sso_disabled" : "workspace.sso_enabled",
+  });
+  revalidatePath("/settings");
+}

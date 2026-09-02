@@ -58,7 +58,7 @@ export default async function LoginPage({
 
         {error && (
           <div className="chip chip-warn mb-4 w-full justify-center py-2.5 text-[12.5px]">
-            {ERROR_MESSAGE[error] ?? "Something went wrong — try again."}
+            {ERROR_MESSAGE[error] ?? error}
           </div>
         )}
         {reset && (
@@ -101,6 +101,22 @@ export default async function LoginPage({
             </label>
             <button type="submit" className="btn btn-primary mt-2 w-full justify-center">
               Sign in
+            </button>
+          </form>
+
+          <div className="my-1 flex items-center gap-3">
+            <div className="h-px flex-1" style={{ background: "var(--hairline)" }} />
+            <span className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>or</span>
+            <div className="h-px flex-1" style={{ background: "var(--hairline)" }} />
+          </div>
+
+          <form action="/api/sso/start" method="get" className="flex flex-col gap-3">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[13px] font-medium">Company SSO</span>
+              <input name="email" type="email" required placeholder="you@company.com" className="input" />
+            </label>
+            <button type="submit" className="btn btn-secondary w-full justify-center">
+              Continue with SSO
             </button>
           </form>
         </div>
