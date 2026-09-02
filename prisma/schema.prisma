@@ -19,6 +19,13 @@ model Workspace {
   requireApproval    Boolean  @default(true)
   notifyOnSigned     Boolean  @default(true)
   autoRemind         Boolean  @default(false)
+  // How many days an unsigned contract waits before the "still unsigned"
+  // nudge goes out — used to be hardcoded to 3. reminderIntervalDays only
+  // matters when autoRemind is on; signingExpiryDays is independent (null
+  // = never expires, matching the original no-expiry behavior) and applies
+  // regardless of autoRemind.
+  reminderIntervalDays Int  @default(3)
+  signingExpiryDays    Int?
   zoomConnected      Boolean  @default(true)
   meetConnected      Boolean  @default(false)
 
@@ -449,15 +456,32 @@ model Contract {
   deal       Deal              @relation(fields: [dealId], references: [id])
   templateId String?
   template   ContractTemplate? @relation(fields: [templateId], references: [id])
-  status     String            @default("draft") // draft | pending_approval | changes_requested | sent | signed
+  status     String            @default("draft") // draft | pending_approval | changes_requested | sent | partially_signed | signed | expired
   sentAt     DateTime?
   signedAt   DateTime?
+  // signerName/signerIp/signatureImage are always the CLIENT's own
+  // signature specifically (the original, single-signer fields — kept
+  // exactly as-is so every existing piece built around them, audit trail,
+  // dashboard, webhooks, HubSpot sync, keeps working unchanged). Additional
+  // signers (a counter-signer on our own side, the client's legal/manager)
+  // are ContractSigner rows below — most contracts have zero of those and
+  // are functionally identical to before this existed.
   signerName String?
   signerIp   String?
   signatureImage String? // base64 PNG data URL, drawn on the sign page
-  reminderSentAt DateTime? // set once the 3-day "still unsigned" nudge has gone out
+  reminderSentAt DateTime? // set once the "still unsigned" nudge has gone out — cadence is workspace.reminderIntervalDays
   viewedAt   DateTime? // first time the client actually opened the sign page
+  // Computed at send time from workspace.signingExpiryDays (sentAt + that
+  // many days) — null when the workspace has no expiry configured, same
+  // as the original never-expires behavior.
+  expiresAt  DateTime?
   createdAt  DateTime          @default(now())
+
+  // Comma-separated emails that get a copy of the contract email (sent AND
+  // resent) but never sign anything — DocuSign calls these "CC recipients".
+  ccEmails String?
+
+  signers ContractSigner[]
 
   // Populated by a small Claude extraction pass right after signing, read
   // from the final filled clause text (the most reliable source — it's the
@@ -477,6 +501,34 @@ model Contract {
 
   approvals      ContractApproval[]
   clauseComments ClauseComment[]
+}
+
+// An ADDITIONAL signer beyond the client (order 0, implicit — that's still
+// Contract.signerName/signatureImage above). Added at send time when a
+// deal needs more than one signature — our own counter-signer, the
+// client's legal/manager. Signs in `order` after the client, each notified
+// only once it's their turn (DocuSign calls this routing order). A
+// contract with zero of these behaves exactly like before this model
+// existed.
+model ContractSigner {
+  id         String    @id @default(cuid())
+  contractId String
+  contract   Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  name       String
+  email      String
+  role       String // countersigner | cc-signer (free text label shown next to their name, e.g. "Legal")
+  order      Int // 1, 2, 3... — 0 is implicitly the client, handled by the existing single-signer fields
+  status     String    @default("pending") // pending | signed | declined
+  token      String    @unique // this signer's own unguessable link credential — /sign/[contractId]/countersign/[token]
+  signatureImage String?
+  signerIp   String?
+  declinedReason String?
+  signedAt   DateTime?
+  notifiedAt DateTime? // when it became their turn and we emailed their link
+  createdAt  DateTime  @default(now())
+
+  @@unique([contractId, order])
+  @@index([contractId])
 }
 
 // A client's request to change a specific clause, left on the public sign

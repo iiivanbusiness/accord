@@ -11,6 +11,7 @@ import { requestOrSendContract } from "@/lib/approval";
 import { logAudit } from "@/lib/audit";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import { currentUserWithRole } from "@/lib/permissions";
+import { randomBytes } from "crypto";
 
 export async function retryExtraction(dealId: string) {
   const { where } = await dealVisibilityFilter();
@@ -104,10 +105,43 @@ export async function sendContractEmail(dealId: string, formData: FormData) {
   const message = String(formData.get("message") ?? "").trim();
   if (!to || !subject || !message) throw new Error("To, subject, and message are all required");
 
+  const ccRaw = String(formData.get("cc") ?? "").trim();
+  const ccList = ccRaw
+    ? ccRaw.split(",").map((e) => e.trim()).filter(Boolean)
+    : [];
+
+  const signerNames = formData.getAll("signerName").map((v) => String(v).trim());
+  const signerEmails = formData.getAll("signerEmail").map((v) => String(v).trim());
+  const signerRoles = formData.getAll("signerRole").map((v) => String(v).trim());
+  const countersigners = signerNames
+    .map((name, i) => ({ name, email: signerEmails[i] ?? "", role: signerRoles[i]?.trim() || "Counter-signer" }))
+    .filter((s) => s.name && s.email);
+
   const { where } = await dealVisibilityFilter();
   const workspaceId = await requireWorkspaceId();
   const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId, ...where }, include: { contract: true } });
   if (!deal || !deal.contract) throw new Error("Deal not found");
+
+  // CC list and counter-signers are contract setup, not part of the
+  // approval-gated email content — stored immediately regardless of
+  // whether an approval chain holds the actual send.
+  await prisma.contract.update({
+    where: { id: deal.contract.id },
+    data: { ccEmails: ccList.length > 0 ? JSON.stringify(ccList) : null },
+  });
+  if (countersigners.length > 0) {
+    await prisma.contractSigner.deleteMany({ where: { contractId: deal.contract.id, status: "pending" } });
+    await prisma.contractSigner.createMany({
+      data: countersigners.map((s, i) => ({
+        contractId: deal.contract!.id,
+        name: s.name,
+        email: s.email,
+        role: s.role,
+        order: i + 1,
+        token: randomBytes(24).toString("hex"),
+      })),
+    });
+  }
 
   const session = await auth();
   try {

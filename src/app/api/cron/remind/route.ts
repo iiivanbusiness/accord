@@ -1,34 +1,39 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendAdminAlertEmail, sendReminderEmail } from "@/lib/email";
+import { logAudit } from "@/lib/audit";
 
-const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
-
-// Runs daily (see vercel.json). Sends exactly one "still unsigned" nudge per
-// contract, 3 days after it was sent, only for workspaces that opted in via
-// the "Auto-remind clients after 3 days" setting.
+// Runs daily (see vercel.json). Two independent sweeps over "sent"
+// contracts, sharing this one cron slot (Hobby plan caps at 2 total —
+// see stale-deals.ts for the other consolidation): the "still unsigned"
+// nudge, and marking contracts past their configured expiry.
 export async function GET(req: Request) {
   const authHeader = req.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  try {
-    const cutoff = new Date(Date.now() - THREE_DAYS_MS);
+  let reminded = 0;
+  let expired = 0;
 
-    const dueContracts = await prisma.contract.findMany({
+  try {
+    // Reminder cadence is per-workspace (reminderIntervalDays) since it
+    // moved off a hardcoded 3 days — can't push that into the query
+    // itself, so pull every still-eligible candidate and check each one.
+    const reminderCandidates = await prisma.contract.findMany({
       where: {
         status: "sent",
-        sentAt: { lte: cutoff },
         reminderSentAt: null,
         deal: { workspace: { autoRemind: true } },
       },
       include: { deal: { include: { client: true, workspace: true } } },
     });
 
-    let sent = 0;
-    for (const contract of dueContracts) {
-      if (!contract.deal.client.email) continue;
+    for (const contract of reminderCandidates) {
+      if (!contract.sentAt || !contract.deal.client.email) continue;
+      const dueAt = contract.sentAt.getTime() + contract.deal.workspace.reminderIntervalDays * 24 * 60 * 60 * 1000;
+      if (dueAt > Date.now()) continue;
+
       try {
         const verifiedSenderEmail = contract.deal.workspace.senderDomainStatus === "verified" ? contract.deal.workspace.senderEmail : null;
         await sendReminderEmail({
@@ -39,23 +44,33 @@ export async function GET(req: Request) {
           verifiedSenderEmail,
         });
         await prisma.contract.update({ where: { id: contract.id }, data: { reminderSentAt: new Date() } });
-        sent++;
+        reminded++;
       } catch (err) {
         console.error(`Failed to send reminder for contract ${contract.id}`, err);
       }
     }
-
-    return NextResponse.json({ checked: dueContracts.length, sent });
   } catch (err) {
-    console.error("Reminder cron crashed", err);
+    console.error("Reminder sweep crashed", err);
     try {
-      await sendAdminAlertEmail({
-        subject: "Reminder cron crashed",
-        details: err instanceof Error ? (err.stack ?? err.message) : String(err),
-      });
+      await sendAdminAlertEmail({ subject: "Reminder cron crashed", details: err instanceof Error ? (err.stack ?? err.message) : String(err) });
     } catch (alertErr) {
       console.error("Failed to send admin alert email", alertErr);
     }
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
+
+  try {
+    const expiredResult = await prisma.contract.findMany({
+      where: { status: "sent", expiresAt: { lte: new Date() } },
+      include: { deal: { select: { id: true, workspaceId: true } } },
+    });
+    for (const contract of expiredResult) {
+      await prisma.contract.update({ where: { id: contract.id }, data: { status: "expired" } });
+      await logAudit({ workspaceId: contract.deal.workspaceId, action: "contract.expired", targetType: "Contract", targetId: contract.id });
+      expired++;
+    }
+  } catch (err) {
+    console.error("Expiry sweep crashed", err);
+  }
+
+  return NextResponse.json({ reminded, expired });
 }

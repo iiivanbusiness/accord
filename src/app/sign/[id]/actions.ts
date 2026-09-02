@@ -3,14 +3,10 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { sendSignedNotificationEmail } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
-import { extractRenewalTerms } from "@/lib/extract-renewal";
 import { notifyChangesRequested } from "@/lib/approval";
-import { dispatchWebhookEvent } from "@/lib/webhooks";
-import { notifySlack } from "@/lib/slack";
-import { syncDealToHubspot } from "@/lib/hubspot";
+import { advanceSigningOrFinalize } from "@/lib/signing";
 
 export async function signContract(contractId: string, formData: FormData) {
   const signerName = String(formData.get("signerName") ?? "").trim();
@@ -27,26 +23,24 @@ export async function signContract(contractId: string, formData: FormData) {
   ]);
   if (!contractOk || !ipOk) throw new Error("Too many attempts — try again later.");
 
-  // updateMany with status filter makes this atomic: a contract that's
-  // already signed (or a concurrent double-submit) can't overwrite the
-  // existing signerName/signatureImage/signedAt — that's the legally
-  // significant record, it shouldn't be replaceable after the fact.
+  // updateMany with a status filter makes this atomic: a contract that's
+  // already been signed, or has moved on to waiting for a counter-signer,
+  // or a concurrent double-submit, can't overwrite the existing
+  // signerName/signatureImage/signedAt — that's the legally significant
+  // record, it shouldn't be replaceable after the fact. Only a contract
+  // still sitting at "sent" (the client hasn't acted yet) can be signed.
   const result = await prisma.contract.updateMany({
-    where: { id: contractId, status: { not: "signed" } },
-    data: { status: "signed", signedAt: new Date(), signerName, signerIp: ip, signatureImage },
+    where: { id: contractId, status: "sent" },
+    data: { signedAt: new Date(), signerName, signerIp: ip, signatureImage },
   });
   if (result.count === 0) {
     redirect(`/sign/${contractId}`);
   }
 
-  const contract = await prisma.contract.findUniqueOrThrow({
-    where: { id: contractId },
-    include: { deal: { include: { client: true, workspace: { include: { users: true } } } }, template: true },
-  });
+  const contract = await prisma.contract.findUniqueOrThrow({ where: { id: contractId } });
 
-  await prisma.deal.update({ where: { id: contract.dealId }, data: { status: "signed" } });
   await logAudit({
-    workspaceId: contract.deal.workspaceId,
+    workspaceId: (await prisma.deal.findUniqueOrThrow({ where: { id: contract.dealId }, select: { workspaceId: true } })).workspaceId,
     actorEmail: signerName,
     action: "contract.signed",
     targetType: "Contract",
@@ -54,34 +48,10 @@ export async function signContract(contractId: string, formData: FormData) {
     ip,
   });
 
-  if (contract.deal.workspace.notifyOnSigned) {
-    try {
-      await sendSignedNotificationEmail({
-        to: contract.deal.workspace.users.map((u) => u.email),
-        clientName: signerName,
-        templateName: contract.template?.name ?? "contract",
-        contractUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/deals/${contract.dealId}/contract`,
-      });
-    } catch (err) {
-      console.error("Failed to send signed-notification email", err);
-    }
-  }
-
-  try {
-    await extractRenewalTerms(contract.id);
-  } catch (err) {
-    console.error("Failed to extract renewal terms", err);
-  }
-
-  await dispatchWebhookEvent(contract.deal.workspaceId, "contract.signed", {
-    dealId: contract.dealId,
-    contractId: contract.id,
-    clientName: contract.deal.client.name,
-    signerName,
-    signedAt: new Date().toISOString(),
-  });
-  await notifySlack(contract.deal.workspaceId, { type: "contract.signed", dealId: contract.dealId, clientName: contract.deal.client.name, signerName });
-  await syncDealToHubspot(contract.deal.workspaceId, contract.dealId);
+  // finalizeContractSigned (when nobody else needs to sign) or
+  // notifying the next counter-signer (when someone does) both happen
+  // here — the client's own signing action doesn't need to know which.
+  await advanceSigningOrFinalize(contractId);
 
   redirect(`/sign/${contractId}`);
 }
@@ -102,7 +72,9 @@ export async function requestClauseChange(contractId: string, clauseTitle: strin
 
   const contract = await prisma.contract.findUnique({ where: { id: contractId }, include: { deal: true } });
   if (!contract) throw new Error("Not found");
-  if (contract.status === "signed") throw new Error("This agreement is already signed");
+  if (contract.status === "signed" || contract.status === "partially_signed" || contract.status === "expired") {
+    throw new Error("This agreement can no longer be changed");
+  }
 
   await prisma.clauseComment.create({ data: { contractId, clauseTitle, comment, fromName } });
   await prisma.contract.update({ where: { id: contractId }, data: { status: "changes_requested" } });

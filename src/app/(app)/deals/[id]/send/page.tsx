@@ -5,6 +5,7 @@ import { isEmailConfigured } from "@/lib/email";
 import { requireWorkspace, requireWorkspaceId } from "@/lib/workspace";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import { sendContractEmail } from "../actions";
+import CountersignerFields from "@/components/CountersignerFields";
 
 export default async function SendContractPage({
   params,
@@ -63,6 +64,10 @@ export default async function SendContractPage({
         <input name="to" type="email" required defaultValue={deal.client.email ?? ""} placeholder="client@company.com" className="input" />
       </label>
       <label className="flex flex-col gap-1.5">
+        <span className="text-[13px] font-medium">CC <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>(optional — comma-separated, gets a copy but doesn&apos;t sign)</span></span>
+        <input name="cc" placeholder="assistant@client.com, ops@yourcompany.com" className="input" />
+      </label>
+      <label className="flex flex-col gap-1.5">
         <span className="text-[13px] font-medium">Subject</span>
         <input name="subject" required defaultValue={defaultSubject} className="input" />
       </label>
@@ -73,6 +78,7 @@ export default async function SendContractPage({
           The sign link is appended below your message automatically.
         </span>
       </label>
+      <CountersignerFields clientName={deal.client.name} />
       <button type="submit" disabled={!configured} className="btn btn-primary mt-2 w-full justify-center">
         Send email
       </button>

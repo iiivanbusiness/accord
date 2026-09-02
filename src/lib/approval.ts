@@ -110,11 +110,21 @@ export async function performActualSend(contractId: string, pendingOverride?: Pe
   const portalToken = await getOrMintPortalToken(deal.client.id);
   const portalUrl = `${appUrl()}/portal/${portalToken}`;
 
-  await sendContractEmail({ to, subject, message, signLink, workspaceName: workspace.name, replyTo, verifiedSenderEmail, portalUrl });
+  let cc: string[] | undefined;
+  try {
+    cc = contract.ccEmails ? (JSON.parse(contract.ccEmails) as string[]) : undefined;
+  } catch {
+    cc = undefined;
+  }
+
+  await sendContractEmail({ to, cc, subject, message, signLink, workspaceName: workspace.name, replyTo, verifiedSenderEmail, portalUrl });
+
+  const sentAt = new Date();
+  const expiresAt = workspace.signingExpiryDays ? new Date(sentAt.getTime() + workspace.signingExpiryDays * 24 * 60 * 60 * 1000) : null;
 
   await prisma.contract.update({
     where: { id: contractId },
-    data: { status: "sent", sentAt: new Date(), pendingTo: null, pendingSubject: null, pendingMessage: null },
+    data: { status: "sent", sentAt, expiresAt, pendingTo: null, pendingSubject: null, pendingMessage: null },
   });
   await prisma.deal.update({ where: { id: deal.id }, data: { status: "sent" } });
   // Resending is how the workspace answers open clause-change requests —

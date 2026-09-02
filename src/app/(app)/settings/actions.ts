@@ -25,6 +25,26 @@ export async function toggleWorkspaceFlag(field: ToggleField) {
   revalidatePath("/settings");
 }
 
+export async function updateSigningTiming(formData: FormData) {
+  const rawInterval = String(formData.get("reminderIntervalDays") ?? "").trim();
+  const reminderIntervalDays = rawInterval ? Number(rawInterval) : 3;
+  if (!Number.isInteger(reminderIntervalDays) || reminderIntervalDays < 1 || reminderIntervalDays > 90) {
+    throw new Error("Reminder days must be a whole number between 1 and 90");
+  }
+
+  const rawExpiry = String(formData.get("signingExpiryDays") ?? "").trim();
+  const signingExpiryDays = rawExpiry ? Number(rawExpiry) : null;
+  if (signingExpiryDays != null && (!Number.isInteger(signingExpiryDays) || signingExpiryDays < 1 || signingExpiryDays > 365)) {
+    throw new Error("Expiry days must be a whole number between 1 and 365, or left blank for no expiry");
+  }
+
+  await requirePermission("canManageWorkspace");
+  const workspace = await requireWorkspace();
+  await prisma.workspace.update({ where: { id: workspace.id }, data: { reminderIntervalDays, signingExpiryDays } });
+
+  revalidatePath("/settings");
+}
+
 export async function updateWorkspaceName(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return;

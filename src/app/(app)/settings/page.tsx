@@ -29,6 +29,7 @@ import {
   toggleSso,
   toggleWorkspaceFlag,
   updateAllowedDomain,
+  updateSigningTiming,
   updateSsoConfig,
   updateWorkspaceName,
   uploadLogo,
@@ -613,10 +614,27 @@ export default async function SettingsPage({
       </div>
       <div className="flex items-center justify-between gap-4 py-[15px]">
         <div>
-          <div className="text-[13.5px] font-medium">Auto-remind clients after 3 days</div>
+          <div className="text-[13.5px] font-medium">Auto-remind clients after {workspace.reminderIntervalDays} day{workspace.reminderIntervalDays === 1 ? "" : "s"}</div>
           <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>One polite nudge if a contract is left unsigned</div>
         </div>
         <Toggle on={workspace.autoRemind} field="autoRemind" />
+      </div>
+      <div className="flex flex-col gap-2.5 border-t py-[15px]" style={{ borderColor: "var(--hairline-soft)" }}>
+        <div>
+          <div className="text-[13.5px] font-medium">Signing timing</div>
+          <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>How many days before a reminder, and (optionally) before an unsigned link expires</div>
+        </div>
+        <form action={updateSigningTiming} className="flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>Remind after (days)</span>
+            <input name="reminderIntervalDays" type="number" min="1" max="90" defaultValue={workspace.reminderIntervalDays} className="input" style={{ fontSize: "13px", padding: "7px 10px", width: 90 }} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>Expire after (days, blank = never)</span>
+            <input name="signingExpiryDays" type="number" min="1" max="365" defaultValue={workspace.signingExpiryDays ?? ""} placeholder="—" className="input" style={{ fontSize: "13px", padding: "7px 10px", width: 90 }} />
+          </label>
+          <button type="submit" className="btn btn-secondary btn-sm">Save</button>
+        </form>
       </div>
     </div>
     </>

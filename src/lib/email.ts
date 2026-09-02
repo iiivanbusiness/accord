@@ -12,6 +12,7 @@ function fromAddress(workspaceName: string, verifiedSenderEmail?: string | null)
 
 export async function sendContractEmail(options: {
   to: string;
+  cc?: string[];
   subject: string;
   message: string;
   signLink: string;
@@ -45,7 +46,52 @@ export async function sendContractEmail(options: {
   const { error } = await resend.emails.send({
     from: fromAddress(options.workspaceName, options.verifiedSenderEmail),
     to: options.to,
+    ...(options.cc && options.cc.length > 0 ? { cc: options.cc } : {}),
     subject: options.subject,
+    html,
+    ...(!options.verifiedSenderEmail && options.replyTo ? { replyTo: options.replyTo } : {}),
+  });
+
+  if (error) throw new Error(error.message);
+}
+
+// Sent to a counter-signer once it's their turn in the routing order — the
+// client (and any earlier counter-signer) already signed, this person is
+// next. Deliberately its own function rather than reusing
+// sendContractEmail: there's no human-composed message here, just a
+// standard notice, and no CC (each signer gets their own turn-specific
+// email, not the original send's CC list).
+export async function sendCountersignRequestEmail(options: {
+  to: string;
+  signerName: string;
+  clientName: string;
+  templateName: string;
+  signLink: string;
+  workspaceName: string;
+  replyTo?: string | null;
+  verifiedSenderEmail?: string | null;
+}): Promise<void> {
+  const resend = new Resend(process.env.RESEND_API_KEY);
+
+  const footer = options.verifiedSenderEmail
+    ? `Sent by ${escapeHtml(options.workspaceName)}`
+    : `Sent by ${escapeHtml(options.workspaceName)} via SealMe`;
+
+  const html = `
+    <div style="font-family:-apple-system,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;color:#1d1d1f;">
+      <p style="margin:0 0 14px;">Hi ${escapeHtml(options.signerName)},</p>
+      <p style="margin:0 0 14px;">The agreement between ${escapeHtml(options.workspaceName)} and ${escapeHtml(options.clientName)} (${escapeHtml(options.templateName)}) is ready for your signature.</p>
+      <a href="${options.signLink}" style="display:inline-block;margin:12px 0 20px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
+        Review &amp; sign
+      </a>
+      <p style="margin:0;font-size:12.5px;color:#6e6e73;">${footer}</p>
+    </div>
+  `;
+
+  const { error } = await resend.emails.send({
+    from: fromAddress(options.workspaceName, options.verifiedSenderEmail),
+    to: options.to,
+    subject: `Your signature is needed: ${options.clientName} — ${options.templateName}`,
     html,
     ...(!options.verifiedSenderEmail && options.replyTo ? { replyTo: options.replyTo } : {}),
   });
