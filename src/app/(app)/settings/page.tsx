@@ -13,6 +13,10 @@ import ApprovalDelegatesPanel from "@/components/ApprovalDelegatesPanel";
 import ScimSettingsPanel from "@/components/ScimSettingsPanel";
 import SsoSettingsPanel from "@/components/SsoSettingsPanel";
 import DeveloperSettingsLink from "@/components/DeveloperSettingsLink";
+import SlackSettingsPanel from "@/components/SlackSettingsPanel";
+import HubspotSettingsPanel from "@/components/HubspotSettingsPanel";
+import { listSlackChannels, isSlackConfigured } from "@/lib/slack";
+import { isHubspotConfigured } from "@/lib/hubspot";
 import {
   checkSenderDomainVerification,
   connectSenderDomain,
@@ -34,6 +38,8 @@ import { assignUserRole, createRole, deleteRole, updateRole } from "./roles-acti
 import { createTeam, deleteTeam, assignUserTeam } from "./team-actions";
 import { createApprovalChain, deleteApprovalChain, moveApprovalChain, addApprovalStep, moveApprovalStep, removeApprovalStep } from "./approval-actions";
 import { createDelegation, revokeDelegation } from "./delegation-actions";
+import { setSlackChannel, toggleSlack, disconnectSlack } from "./slack-actions";
+import { toggleHubspot, disconnectHubspot } from "./hubspot-actions";
 
 function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notifyOnSigned" | "autoRemind" }) {
   return (
@@ -52,7 +58,12 @@ function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notify
   );
 }
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; slack_connected?: string; hubspot_connected?: string }>;
+}) {
+  const { error: connectError, slack_connected, hubspot_connected } = await searchParams;
   const workspaceId = await requireWorkspaceId();
   const [workspace, session, roles, teams, approvalChains] = await Promise.all([
     prisma.workspace.findUnique({ where: { id: workspaceId }, include: { users: { include: { role: true, team: true } } } }),
@@ -90,6 +101,16 @@ export default async function SettingsPage() {
     endsAt: d.endsAt ? d.endsAt.toISOString() : null,
   }));
 
+  let slackChannels: { id: string; name: string }[] = [];
+  let slackChannelsError: string | null = null;
+  if (workspace.slackAccessToken) {
+    try {
+      slackChannels = await listSlackChannels(workspace.slackAccessToken);
+    } catch (err) {
+      slackChannelsError = err instanceof Error ? err.message : "Unknown error";
+    }
+  }
+
   let senderRecords: SenderDomainRecord[] = [];
   if (workspace.senderDomainId && workspace.senderDomainStatus !== "verified") {
     try {
@@ -108,6 +129,22 @@ export default async function SettingsPage() {
         Workspace preferences for {workspace.name}
       </div>
     </div>
+
+    {connectError && (
+      <div className="chip chip-warn mb-4 max-w-[600px] justify-start px-3.5 py-2.5 text-[12.5px]">
+        {connectError.replace(/_/g, " ")}
+      </div>
+    )}
+    {slack_connected && (
+      <div className="chip chip-success mb-4 max-w-[600px] justify-start px-3.5 py-2.5 text-[12.5px]">
+        Slack connected — pick a channel below.
+      </div>
+    )}
+    {hubspot_connected && (
+      <div className="chip chip-success mb-4 max-w-[600px] justify-start px-3.5 py-2.5 text-[12.5px]">
+        HubSpot connected.
+      </div>
+    )}
 
     <div className="card mb-4 max-w-[600px]">
       <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
@@ -361,6 +398,49 @@ export default async function SettingsPage() {
           redirectUri={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/sso/callback`}
           updateConfigAction={updateSsoConfig}
           toggleAction={toggleSso}
+        />
+      </div>
+    )}
+
+    {canManageWorkspacePerm && (
+      <div className="card mb-4 max-w-[600px]">
+        <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
+          <h2 className="text-[15px] font-medium">Slack</h2>
+          <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
+            Post to a channel when a deal starts, a contract goes out or gets signed, or an approval is waiting on someone.
+          </div>
+        </div>
+        <SlackSettingsPanel
+          configured={isSlackConfigured()}
+          connected={Boolean(workspace.slackAccessToken)}
+          teamName={workspace.slackTeamName}
+          currentChannelId={workspace.slackChannelId}
+          currentChannelName={workspace.slackChannelName}
+          channels={slackChannels}
+          channelsError={slackChannelsError}
+          enabled={workspace.slackEnabled}
+          setChannelAction={setSlackChannel}
+          toggleAction={toggleSlack}
+          disconnectAction={disconnectSlack}
+        />
+      </div>
+    )}
+
+    {canManageWorkspacePerm && (
+      <div className="card mb-4 max-w-[600px]">
+        <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
+          <h2 className="text-[15px] font-medium">HubSpot</h2>
+          <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
+            Push clients and deals to HubSpot automatically as Contacts and Deals — one-directional, SealMe stays the source of truth.
+          </div>
+        </div>
+        <HubspotSettingsPanel
+          configured={isHubspotConfigured()}
+          connected={Boolean(workspace.hubspotRefreshToken)}
+          portalId={workspace.hubspotPortalId}
+          enabled={workspace.hubspotEnabled}
+          toggleAction={toggleHubspot}
+          disconnectAction={disconnectHubspot}
         />
       </div>
     )}

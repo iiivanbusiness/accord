@@ -62,6 +62,29 @@ model Workspace {
   ssoClientId     String?
   ssoClientSecret String?
 
+  // Slack — one SealMe-owned Slack app (SLACK_CLIENT_ID/SECRET env vars,
+  // shared across every workspace), installed per-workspace via OAuth.
+  // slackAccessToken is the bot token (xoxb-...) that install grants;
+  // there's no refresh token in Slack's model, it doesn't expire.
+  // slackChannelId is picked afterward in Settings from the bot's own
+  // channel list.
+  slackEnabled     Boolean @default(false)
+  slackTeamId      String?
+  slackTeamName    String?
+  slackAccessToken String?
+  slackChannelId   String?
+  slackChannelName String?
+
+  // HubSpot — same shared-app-per-workspace-install model as Slack, but
+  // HubSpot access tokens expire (~30 min) and need the refresh token to
+  // renew — same pattern as googleAccessToken/googleRefreshToken above.
+  // One-directional (SealMe -> HubSpot) push sync only; see src/lib/hubspot.ts.
+  hubspotEnabled        Boolean   @default(false)
+  hubspotPortalId       String?
+  hubspotAccessToken    String?
+  hubspotRefreshToken   String?
+  hubspotTokenExpiresAt DateTime?
+
   createdAt          DateTime @default(now())
 
   users             User[]
@@ -239,6 +262,10 @@ model Client {
   // tokens, which is what actually needs hashing.
   portalToken String? @unique
 
+  // Set once this client has been pushed to HubSpot as a Contact — lets
+  // later syncs update that same record instead of creating a duplicate.
+  hubspotContactId String?
+
   deals Deal[]
 }
 
@@ -315,6 +342,10 @@ model Deal {
   // actually touched again, so a resolved-then-stale-again deal can nudge
   // a second time instead of going quiet forever after one email.
   staleReminderSentAt DateTime?
+
+  // Set once this deal has been pushed to HubSpot as a Deal object — lets
+  // a later status change (sent, signed) update that same record.
+  hubspotDealId String?
 
   fields       DealField[]
   contract     Contract?

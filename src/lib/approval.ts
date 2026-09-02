@@ -4,6 +4,8 @@ import { logAudit } from "@/lib/audit";
 import { getOrMintPortalToken } from "@/lib/client-portal";
 import { parseFee } from "@/lib/money";
 import { dispatchWebhookEvent } from "@/lib/webhooks";
+import { notifySlack } from "@/lib/slack";
+import { syncDealToHubspot } from "@/lib/hubspot";
 
 export type PendingEmail = { to: string; subject: string; message: string };
 
@@ -125,6 +127,8 @@ export async function performActualSend(contractId: string, pendingOverride?: Pe
     clientName: deal.client.name,
     signLink,
   });
+  await notifySlack(workspace.id, { type: "contract.sent", dealId: deal.id, clientName: deal.client.name });
+  await syncDealToHubspot(workspace.id, deal.id);
 }
 
 // Notifies whoever currently holds the given role that a contract needs
@@ -149,6 +153,8 @@ export async function notifyStepApprovers(dealId: string, roleId: string): Promi
   } catch (err) {
     console.error("Failed to send approval-requested email", err);
   }
+
+  await notifySlack(deal.workspaceId, { type: "approval.requested", dealId, clientName: deal.client.name, roleName: role.name });
 }
 
 // No per-deal owner is tracked, so a rejection notifies the whole team —

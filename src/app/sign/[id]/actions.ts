@@ -9,6 +9,8 @@ import { logAudit } from "@/lib/audit";
 import { extractRenewalTerms } from "@/lib/extract-renewal";
 import { notifyChangesRequested } from "@/lib/approval";
 import { dispatchWebhookEvent } from "@/lib/webhooks";
+import { notifySlack } from "@/lib/slack";
+import { syncDealToHubspot } from "@/lib/hubspot";
 
 export async function signContract(contractId: string, formData: FormData) {
   const signerName = String(formData.get("signerName") ?? "").trim();
@@ -78,6 +80,8 @@ export async function signContract(contractId: string, formData: FormData) {
     signerName,
     signedAt: new Date().toISOString(),
   });
+  await notifySlack(contract.deal.workspaceId, { type: "contract.signed", dealId: contract.dealId, clientName: contract.deal.client.name, signerName });
+  await syncDealToHubspot(contract.deal.workspaceId, contract.dealId);
 
   redirect(`/sign/${contractId}`);
 }
