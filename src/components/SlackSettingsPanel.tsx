@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import ExternalConnectLink from "./ExternalConnectLink";
 
 type Channel = { id: string; name: string };
 
@@ -54,7 +55,7 @@ export default function SlackSettingsPanel({
   if (!connected) {
     return (
       <div className="px-[22px] py-[18px]">
-        <a href="/api/slack/connect" className="btn btn-secondary btn-sm inline-flex">Connect Slack</a>
+        <ExternalConnectLink href="/api/slack/connect" className="btn btn-secondary btn-sm inline-flex">Connect Slack</ExternalConnectLink>
       </div>
     );
   }

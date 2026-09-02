@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { isGoogleCalendarConfigured } from "@/lib/google-calendar";
 import { requireWorkspace, requireWorkspaceId } from "@/lib/workspace";
 import { deleteEvent, disconnectGoogleCalendar, syncGoogleCalendarNow } from "./actions";
+import ExternalConnectLink from "@/components/ExternalConnectLink";
 
 function formatDay(date: Date): string {
   const today = new Date();
@@ -99,9 +100,9 @@ export default async function CalendarPage({
             </form>
           </>
         ) : (
-          <a href="/api/google-calendar/connect" className="btn btn-primary btn-sm" style={!configured ? { pointerEvents: "none", opacity: 0.5 } : undefined}>
+          <ExternalConnectLink href="/api/google-calendar/connect" className="btn btn-primary btn-sm" style={!configured ? { pointerEvents: "none", opacity: 0.5 } : undefined}>
             Connect Google Calendar
-          </a>
+          </ExternalConnectLink>
         )}
       </div>
     </div>

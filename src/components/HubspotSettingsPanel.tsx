@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import ExternalConnectLink from "./ExternalConnectLink";
 
 export default function HubspotSettingsPanel({
   configured,
@@ -42,7 +43,7 @@ export default function HubspotSettingsPanel({
   if (!connected) {
     return (
       <div className="px-[22px] py-[18px]">
-        <a href="/api/hubspot/connect" className="btn btn-secondary btn-sm inline-flex">Connect HubSpot</a>
+        <ExternalConnectLink href="/api/hubspot/connect" className="btn btn-secondary btn-sm inline-flex">Connect HubSpot</ExternalConnectLink>
       </div>
     );
   }
