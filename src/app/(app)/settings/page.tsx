@@ -208,6 +208,7 @@ export default async function SettingsPage() {
             canManageTemplates: r.canManageTemplates,
             canApproveContracts: r.canApproveContracts,
             canApproveTemplates: r.canApproveTemplates,
+            canViewAllDeals: r.canViewAllDeals,
             memberCount: r._count.users,
           }))}
           createRoleAction={createRole}

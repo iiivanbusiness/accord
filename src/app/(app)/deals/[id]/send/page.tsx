@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { isEmailConfigured } from "@/lib/email";
 import { requireWorkspace, requireWorkspaceId } from "@/lib/workspace";
+import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import { sendContractEmail } from "../actions";
 
 export default async function SendContractPage({
@@ -15,9 +16,10 @@ export default async function SendContractPage({
   const { id } = await params;
   const { error } = await searchParams;
   const workspaceId = await requireWorkspaceId();
+  const { where: visibility } = await dealVisibilityFilter();
   const [deal, workspace] = await Promise.all([
     prisma.deal.findFirst({
-      where: { id, workspaceId },
+      where: { id, workspaceId, ...visibility },
       include: { client: true, template: true, contract: true },
     }),
     requireWorkspace(),

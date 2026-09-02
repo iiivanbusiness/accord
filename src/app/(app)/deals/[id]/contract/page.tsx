@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { fillClauses } from "@/lib/contract";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { currentUserWithRole } from "@/lib/permissions";
+import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import DownloadContractButton from "@/components/DownloadContractButton";
 import AuditTrailButton from "@/components/AuditTrailButton";
 import ApprovalStepper from "@/components/ApprovalStepper";
@@ -28,24 +29,23 @@ function timeAgo(date: Date): string {
 export default async function ContractPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const workspaceId = await requireWorkspaceId();
-  const [deal, currentUser] = await Promise.all([
-    prisma.deal.findFirst({
-      where: { id, workspaceId },
-      include: {
-        client: true,
-        template: true,
-        fields: true,
-        contract: {
-          include: {
-            approvals: { include: { role: true, decidedByUser: true }, orderBy: { order: "asc" } },
-            clauseComments: { where: { resolved: false }, orderBy: { createdAt: "asc" } },
-          },
+  const currentUser = await currentUserWithRole();
+  const { where: visibility } = await dealVisibilityFilter(currentUser);
+  const deal = await prisma.deal.findFirst({
+    where: { id, workspaceId, ...visibility },
+    include: {
+      client: true,
+      template: true,
+      fields: true,
+      contract: {
+        include: {
+          approvals: { include: { role: true, decidedByUser: true }, orderBy: { order: "asc" } },
+          clauseComments: { where: { resolved: false }, orderBy: { createdAt: "asc" } },
         },
-        workspace: true,
       },
-    }),
-    currentUserWithRole(),
-  ]);
+      workspace: true,
+    },
+  });
   if (!deal || !deal.contract || !deal.template) notFound();
 
   const clauses = fillClauses(deal.template.clauses, deal.fields);

@@ -7,15 +7,17 @@ import { sendReminderEmail } from "@/lib/email";
 import { requestOrSendContract } from "@/lib/approval";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
+import { dealVisibilityFilter } from "@/lib/deal-visibility";
 
 // An explicit manual nudge, not the automated 3-day cron — bypasses that
 // cron's cutoff and its per-workspace autoRemind opt-in (someone actively
 // chose to remind these clients right now), but still sets reminderSentAt
 // so the cron doesn't also send a duplicate later.
 export async function bulkRemind(dealIds: string[]): Promise<{ sent: number; skipped: number }> {
+  const { where } = await dealVisibilityFilter();
   const workspaceId = await requireWorkspaceId();
   const deals = await prisma.deal.findMany({
-    where: { id: { in: dealIds }, workspaceId },
+    where: { id: { in: dealIds }, workspaceId, ...where },
     include: { client: true, workspace: true, contract: true },
   });
 
@@ -54,10 +56,11 @@ export async function bulkRemind(dealIds: string[]): Promise<{ sent: number; ski
 // the individual Send page would pre-fill — only for deals that already
 // have a reviewed contract sitting in draft with somewhere to send it.
 export async function bulkSend(dealIds: string[]): Promise<{ sent: number; skipped: number }> {
+  const { where } = await dealVisibilityFilter();
   const workspaceId = await requireWorkspaceId();
   const workspace = await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } });
   const deals = await prisma.deal.findMany({
-    where: { id: { in: dealIds }, workspaceId },
+    where: { id: { in: dealIds }, workspaceId, ...where },
     include: { client: true, template: true, contract: true },
   });
 

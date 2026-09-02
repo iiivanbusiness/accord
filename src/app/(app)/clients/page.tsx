@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { computeClientRisk } from "@/lib/client-risk";
+import { dealVisibilityFilter } from "@/lib/deal-visibility";
 
 function initials(name: string): string {
   return name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
@@ -11,10 +12,12 @@ const RISK_CHIP: Record<string, string> = { high: "chip-warn", watch: "chip-neut
 
 export default async function ClientsPage() {
   const workspaceId = await requireWorkspaceId();
+  const { where: visibility, canViewAll } = await dealVisibilityFilter();
   const clients = await prisma.client.findMany({
     where: { workspaceId },
     include: {
       deals: {
+        where: visibility,
         include: {
           actionItems: true,
           contract: { include: { clauseComments: true } },
@@ -24,14 +27,18 @@ export default async function ClientsPage() {
     orderBy: { name: "asc" },
   });
 
-  const withRisk = clients.map((client) => ({ client, risk: computeClientRisk(client) }));
+  // A restricted role only sees clients it actually has a visible deal
+  // with — otherwise the client list itself would leak who else the
+  // workspace talks to.
+  const visibleClients = canViewAll ? clients : clients.filter((c) => c.deals.length > 0);
+  const withRisk = visibleClients.map((client) => ({ client, risk: computeClientRisk(client) }));
 
   return (
     <>
     <div className="mb-6">
       <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Clients</h1>
       <div className="mt-1 text-[14px]" style={{ color: "var(--ink-muted)" }}>
-        {clients.length} clients across active and past deals
+        {visibleClients.length} clients across active and past deals
       </div>
     </div>
 

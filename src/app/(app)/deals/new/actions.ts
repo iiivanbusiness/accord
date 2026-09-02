@@ -8,6 +8,7 @@ import { extractActionItems } from "@/lib/extract-action-items";
 import { extractPlaceholderKeys } from "@/lib/contract";
 import { createCallBot, detectPlatformFromUrl } from "@/lib/recall";
 import { requireWorkspace } from "@/lib/workspace";
+import { currentUserWithRole } from "@/lib/permissions";
 
 // Every path here costs real money one way or another (Anthropic tokens for
 // extraction, a live Recall bot-minute for calls) — callsLimit was tracked
@@ -32,7 +33,7 @@ export async function createDeal(formData: FormData) {
     throw new Error("Client, service, and fee are required");
   }
 
-  const workspace = await requireWorkspace();
+  const [workspace, user] = await Promise.all([requireWorkspace(), currentUserWithRole()]);
   assertUnderCallLimit(workspace);
   const workspaceId = workspace.id;
 
@@ -45,6 +46,7 @@ export async function createDeal(formData: FormData) {
       workspaceId,
       clientId: client.id,
       templateId,
+      ownerId: user.id,
       service,
       feeDisplay,
       status: "ready",
@@ -74,7 +76,7 @@ export async function createDealFromTranscript(formData: FormData) {
   if (!transcript) throw new Error("Paste a call transcript first");
   if (!templateId) throw new Error("Choose a template");
 
-  const workspace = await requireWorkspace();
+  const [workspace, user] = await Promise.all([requireWorkspace(), currentUserWithRole()]);
   assertUnderCallLimit(workspace);
   const workspaceId = workspace.id;
 
@@ -106,6 +108,7 @@ export async function createDealFromTranscript(formData: FormData) {
       workspaceId,
       clientId: client.id,
       templateId,
+      ownerId: user.id,
       service,
       feeDisplay: fee,
       status: hasMissing ? "missing_info" : "ready",
@@ -138,7 +141,7 @@ export async function startCallFromEvent(formData: FormData) {
   if (!eventId) throw new Error("Choose a calendar event");
   if (!templateId) throw new Error("Choose a template");
 
-  const workspace = await requireWorkspace();
+  const [workspace, user] = await Promise.all([requireWorkspace(), currentUserWithRole()]);
   assertUnderCallLimit(workspace);
   const workspaceId = workspace.id;
 
@@ -168,6 +171,7 @@ export async function startCallFromEvent(formData: FormData) {
       workspaceId,
       clientId: client.id,
       templateId,
+      ownerId: user.id,
       service: "",
       feeDisplay: "",
       status: "processing",
@@ -199,7 +203,7 @@ export async function startLocalCapture(formData: FormData): Promise<{ dealId: s
   if (!clientName) return { error: "Enter who you're meeting with" };
   if (!templateId) return { error: "Choose a template" };
 
-  const workspace = await requireWorkspace();
+  const [workspace, user] = await Promise.all([requireWorkspace(), currentUserWithRole()]);
   if (workspace.callsUsedThisMonth >= workspace.callsLimit) {
     return { error: "You've used all your calls for this billing period — upgrade your plan to start more." };
   }
@@ -214,6 +218,7 @@ export async function startLocalCapture(formData: FormData): Promise<{ dealId: s
       workspaceId,
       clientId: client.id,
       templateId,
+      ownerId: user.id,
       service: "",
       feeDisplay: "",
       status: "processing",
@@ -284,7 +289,7 @@ export async function startCallBot(formData: FormData) {
   if (!clientName) throw new Error("Enter who you're meeting with");
   if (!templateId) throw new Error("Choose a template");
 
-  const workspace = await requireWorkspace();
+  const [workspace, user] = await Promise.all([requireWorkspace(), currentUserWithRole()]);
   assertUnderCallLimit(workspace);
   const workspaceId = workspace.id;
 
@@ -305,6 +310,7 @@ export async function startCallBot(formData: FormData) {
       workspaceId,
       clientId: client.id,
       templateId,
+      ownerId: user.id,
       service: "",
       feeDisplay: "",
       status: "processing",

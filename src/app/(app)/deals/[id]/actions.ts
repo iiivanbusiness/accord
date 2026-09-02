@@ -9,10 +9,12 @@ import { extractPlaceholderKeys } from "@/lib/contract";
 import { auth } from "@/lib/auth";
 import { requestOrSendContract } from "@/lib/approval";
 import { logAudit } from "@/lib/audit";
+import { dealVisibilityFilter } from "@/lib/deal-visibility";
 
 export async function retryExtraction(dealId: string) {
+  const { where } = await dealVisibilityFilter();
   const workspaceId = await requireWorkspaceId();
-  const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId }, include: { template: true } });
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId, ...where }, include: { template: true } });
   if (!deal || !deal.template) throw new Error("Deal not found");
 
   try {
@@ -26,8 +28,9 @@ export async function retryExtraction(dealId: string) {
 }
 
 export async function generateContract(dealId: string) {
+  const { where } = await dealVisibilityFilter();
   const workspaceId = await requireWorkspaceId();
-  const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId }, include: { fields: true } });
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId, ...where }, include: { fields: true } });
   if (!deal) throw new Error("Deal not found");
 
   const missing = deal.fields.some((f) => f.status === "missing");
@@ -47,8 +50,9 @@ export async function generateContract(dealId: string) {
 }
 
 export async function fillMissingFields(dealId: string, formData: FormData) {
+  const { where } = await dealVisibilityFilter();
   const workspaceId = await requireWorkspaceId();
-  const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId }, include: { fields: true } });
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId, ...where }, include: { fields: true } });
   if (!deal) throw new Error("Deal not found");
 
   const missingFields = deal.fields.filter((f) => f.status === "missing");
@@ -70,8 +74,9 @@ export async function fillMissingFields(dealId: string, formData: FormData) {
 }
 
 export async function updateFieldValues(dealId: string, formData: FormData) {
+  const { where } = await dealVisibilityFilter();
   const workspaceId = await requireWorkspaceId();
-  const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId }, include: { fields: true } });
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId, ...where }, include: { fields: true } });
   if (!deal) throw new Error("Deal not found");
 
   const editableFields = deal.fields.filter((f) => f.status !== "missing");
@@ -98,8 +103,9 @@ export async function sendContractEmail(dealId: string, formData: FormData) {
   const message = String(formData.get("message") ?? "").trim();
   if (!to || !subject || !message) throw new Error("To, subject, and message are all required");
 
+  const { where } = await dealVisibilityFilter();
   const workspaceId = await requireWorkspaceId();
-  const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId }, include: { contract: true } });
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId, ...where }, include: { contract: true } });
   if (!deal || !deal.contract) throw new Error("Deal not found");
 
   const session = await auth();
@@ -116,11 +122,13 @@ export async function sendContractEmail(dealId: string, formData: FormData) {
 // terms — the "renewal proposal" starting point. Values come in already
 // "confirmed" (they're a known-good copy of what the client already signed
 // once), so the new deal is immediately reviewable/sendable instead of
-// looking like it's missing information.
+// looking like it's missing information. Owned by whoever starts the
+// renewal, not carried over from the original deal's owner.
 export async function startRenewal(dealId: string) {
+  const { where, userId } = await dealVisibilityFilter();
   const workspaceId = await requireWorkspaceId();
   const deal = await prisma.deal.findFirst({
-    where: { id: dealId, workspaceId },
+    where: { id: dealId, workspaceId, ...where },
     include: { fields: true, contract: true },
   });
   if (!deal) throw new Error("Deal not found");
@@ -131,6 +139,7 @@ export async function startRenewal(dealId: string) {
       workspaceId,
       clientId: deal.clientId,
       templateId: deal.templateId,
+      ownerId: userId,
       service: deal.service,
       feeDisplay: deal.feeDisplay,
       status: "ready",
@@ -163,8 +172,9 @@ export async function startRenewal(dealId: string) {
 }
 
 export async function toggleActionItem(dealId: string, itemId: string) {
+  const { where } = await dealVisibilityFilter();
   const workspaceId = await requireWorkspaceId();
-  const item = await prisma.actionItem.findFirst({ where: { id: itemId, dealId, deal: { workspaceId } } });
+  const item = await prisma.actionItem.findFirst({ where: { id: itemId, dealId, deal: { workspaceId, ...where } } });
   if (!item) throw new Error("Action item not found");
 
   const done = item.status !== "done";

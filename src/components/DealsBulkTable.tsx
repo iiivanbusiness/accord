@@ -11,6 +11,7 @@ type Row = {
   statusLabel: string;
   statusChip: string;
   updatedAgo: string;
+  ownerName: string | null;
   canRemind: boolean;
   canSend: boolean;
 };
@@ -19,10 +20,12 @@ export default function DealsBulkTable({
   rows,
   remindAction,
   sendAction,
+  showOwnerColumn = false,
 }: {
   rows: Row[];
   remindAction: (dealIds: string[]) => Promise<{ sent: number; skipped: number }>;
   sendAction: (dealIds: string[]) => Promise<{ sent: number; skipped: number }>;
+  showOwnerColumn?: boolean;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
@@ -100,7 +103,7 @@ export default function DealsBulkTable({
               <th className="border-b px-5 py-3.5" style={{ borderColor: "var(--hairline)", width: 36 }}>
                 <input type="checkbox" checked={rows.length > 0 && selected.size === rows.length} onChange={toggleAll} />
               </th>
-              {["Client", "Value", "Status", "Updated"].map((h) => (
+              {["Client", "Value", "Status", "Updated", ...(showOwnerColumn ? ["Owner"] : [])].map((h) => (
                 <th
                   key={h}
                   className="border-b px-5 py-3.5 text-left text-[12px] font-medium uppercase tracking-wide"
@@ -135,6 +138,11 @@ export default function DealsBulkTable({
                 <td className="border-b px-5 py-4 text-[13px]" style={{ color: "var(--ink-muted)", borderColor: "var(--hairline-soft)" }}>
                   {row.updatedAgo}
                 </td>
+                {showOwnerColumn && (
+                  <td className="border-b px-5 py-4 text-[13px]" style={{ color: "var(--ink-muted)", borderColor: "var(--hairline-soft)" }}>
+                    {row.ownerName ?? "—"}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

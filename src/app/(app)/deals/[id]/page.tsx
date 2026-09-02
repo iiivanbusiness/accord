@@ -5,6 +5,7 @@ import ContinueCallButton from "@/components/ContinueCallButton";
 import ActionItemsCard from "@/components/ActionItemsCard";
 import { prisma } from "@/lib/db";
 import { requireWorkspaceId } from "@/lib/workspace";
+import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import { fillMissingFields, generateContract, retryExtraction, toggleActionItem, updateFieldValues } from "./actions";
 
 const CALL_SOURCE_LABEL: Record<string, string> = {
@@ -53,8 +54,9 @@ const STATUS_CHIP: Record<string, string> = {
 export default async function DealDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const workspaceId = await requireWorkspaceId();
+  const { where: visibility } = await dealVisibilityFilter();
   const deal = await prisma.deal.findFirst({
-    where: { id, workspaceId },
+    where: { id, workspaceId, ...visibility },
     include: {
       client: true,
       fields: { orderBy: { orderIndex: "asc" } },

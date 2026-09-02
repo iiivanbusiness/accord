@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { parseFee } from "@/lib/money";
 import { requireWorkspaceId } from "@/lib/workspace";
+import { dealVisibilityFilter } from "@/lib/deal-visibility";
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -44,7 +45,8 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default async function AnalyticsPage() {
   const workspaceId = await requireWorkspaceId();
-  const deals = await prisma.deal.findMany({ where: { workspaceId }, include: { template: true, contract: true } });
+  const { where: visibility, canViewAll } = await dealVisibilityFilter();
+  const deals = await prisma.deal.findMany({ where: { workspaceId, ...visibility }, include: { template: true, contract: true } });
 
   const total = deals.length;
   const signed = deals.filter((d) => d.status === "signed").length;
@@ -73,7 +75,7 @@ export default async function AnalyticsPage() {
     <div className="mb-6">
       <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Analytics</h1>
       <div className="mt-1 text-[14px]" style={{ color: "var(--ink-muted)" }}>
-        How your deals are moving from call to signature
+        How your deals are moving from call to signature{!canViewAll && " — your own deals only"}
       </div>
     </div>
 

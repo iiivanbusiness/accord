@@ -110,6 +110,7 @@ model User {
   role   Role?   @relation(fields: [roleId], references: [id])
   contractApprovalsDecided ContractApproval[]
   lockedTemplates          ContractTemplate[]
+  ownedDeals               Deal[]
 
   // twoFactorSecret is set as soon as setup starts (QR shown) but
   // twoFactorEnabled only flips to true once the user proves they can
@@ -205,6 +206,15 @@ model Deal {
   client      Client            @relation(fields: [clientId], references: [id])
   templateId  String?
   template    ContractTemplate? @relation(fields: [templateId], references: [id])
+
+  // Whoever started this deal — the visibility boundary for a role without
+  // canViewAllDeals. Nullable, and null-owner deals stay visible to
+  // everyone: every deal that existed before this field did is null, and
+  // there's no correct historical owner to backfill onto it. onDelete:
+  // SetNull rather than Cascade — removing a teammate should never delete
+  // their deals, just orphan the ownership.
+  ownerId String?
+  owner   User?   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
 
   service    String
   feeDisplay String
@@ -398,6 +408,7 @@ model Role {
   canManageTemplates  Boolean   @default(false) // create/edit/delete UNLOCKED contract templates
   canApproveContracts Boolean   @default(false) // eligible to be a step in the approval chain
   canApproveTemplates Boolean   @default(false) // lock/unlock templates, and edit/delete a locked one — the "legal approved this wording" gate
+  canViewAllDeals     Boolean   @default(false) // see every deal/client in the workspace, not just ones this user started — a rep without it only sees their own (plus any deal with no owner)
   createdAt           DateTime  @default(now())
 
   users         User[]

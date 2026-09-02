@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { parseFee } from "@/lib/money";
 import { requireWorkspaceId } from "@/lib/workspace";
+import { dealVisibilityFilter } from "@/lib/deal-visibility";
 
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -93,21 +94,22 @@ export default async function DashboardPage() {
   const now = new Date();
   const [workspaceId, session] = await Promise.all([requireWorkspaceId(), auth()]);
   const firstName = session?.user?.name?.trim().split(/\s+/)[0] ?? null;
+  const { where: visibility } = await dealVisibilityFilter();
 
   const in90Days = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
   const staleCutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   const [deals, clientCount, upcomingEvents, renewalsAtRisk, staleDeals] = await Promise.all([
-    prisma.deal.findMany({ where: { workspaceId }, include: { client: true, contract: true }, orderBy: { updatedAt: "desc" } }),
+    prisma.deal.findMany({ where: { workspaceId, ...visibility }, include: { client: true, contract: true }, orderBy: { updatedAt: "desc" } }),
     prisma.client.count({ where: { workspaceId } }),
     prisma.calendarEvent.findMany({ where: { workspaceId, startTime: { gte: now } }, orderBy: { startTime: "asc" }, take: 5 }),
     prisma.contract.findMany({
-      where: { status: "signed", renewalDate: { gte: now, lte: in90Days }, deal: { workspaceId } },
+      where: { status: "signed", renewalDate: { gte: now, lte: in90Days }, deal: { workspaceId, ...visibility } },
       include: { deal: { include: { client: true } } },
       orderBy: { renewalDate: "asc" },
     }),
     prisma.deal.findMany({
-      where: { workspaceId, status: { in: ["ready", "missing_info"] }, updatedAt: { lte: staleCutoff } },
+      where: { workspaceId, status: { in: ["ready", "missing_info"] }, updatedAt: { lte: staleCutoff }, ...visibility },
       include: { client: true },
       orderBy: { updatedAt: "asc" },
     }),

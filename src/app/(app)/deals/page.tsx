@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireWorkspace, requireWorkspaceId } from "@/lib/workspace";
 import DealsBulkTable from "@/components/DealsBulkTable";
 import { bulkRemind, bulkSend } from "./bulk-actions";
+import { dealVisibilityFilter } from "@/lib/deal-visibility";
 
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -70,11 +71,12 @@ export default async function DealsPage({
   const { view } = await searchParams;
   const isBoard = view === "board";
   const workspaceId = await requireWorkspaceId();
+  const { where: visibility, canViewAll } = await dealVisibilityFilter();
   const [workspace, deals] = await Promise.all([
     requireWorkspace(),
     prisma.deal.findMany({
-      where: { workspaceId },
-      include: { client: true, contract: true },
+      where: { workspaceId, ...visibility },
+      include: { client: true, contract: true, owner: true },
       orderBy: { updatedAt: "desc" },
     }),
   ]);
@@ -87,6 +89,7 @@ export default async function DealsPage({
     statusLabel: STATUS_LABEL[deal.status] ?? deal.status,
     statusChip: STATUS_CHIP[deal.status] ?? "chip-neutral",
     updatedAgo: timeAgo(deal.updatedAt),
+    ownerName: deal.owner?.name ?? null,
     canRemind: deal.contract?.status === "sent" && Boolean(deal.client.email),
     canSend: deal.contract?.status === "draft" && Boolean(deal.client.email),
   }));
@@ -162,7 +165,7 @@ export default async function DealsPage({
         })}
       </div>
     ) : (
-      <DealsBulkTable rows={tableRows} remindAction={bulkRemind} sendAction={bulkSend} />
+      <DealsBulkTable rows={tableRows} remindAction={bulkRemind} sendAction={bulkSend} showOwnerColumn={canViewAll} />
     )}
     </>
   );
