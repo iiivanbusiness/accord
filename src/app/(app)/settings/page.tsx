@@ -6,15 +6,19 @@ import TwoFactorSettings from "@/components/TwoFactorSettings";
 import RolesManager from "@/components/RolesManager";
 import RoleSelect from "@/components/RoleSelect";
 import ApprovalChainManager from "@/components/ApprovalChainManager";
+import ScimSettingsPanel from "@/components/ScimSettingsPanel";
 import {
   checkSenderDomainVerification,
   connectSenderDomain,
   disconnectSenderDomain,
+  generateScimToken,
   inviteTeammate,
   removeLogo,
   removeTeammate,
   requestUpgrade,
+  revokeScimToken,
   toggleWorkspaceFlag,
+  updateAllowedDomain,
   updateWorkspaceName,
   uploadLogo,
 } from "./actions";
@@ -232,6 +236,25 @@ export default async function SettingsPage() {
           addStepAction={addApprovalStep}
           removeStepAction={removeApprovalStep}
           moveStepAction={moveApprovalStep}
+        />
+      </div>
+    )}
+
+    {canManageWorkspacePerm && (
+      <div className="card mb-4 max-w-[600px]">
+        <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
+          <h2 className="text-[15px] font-medium">Access &amp; provisioning</h2>
+          <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
+            Control who can join, and let your IT team manage teammates automatically.
+          </div>
+        </div>
+        <ScimSettingsPanel
+          currentDomain={workspace.allowedEmailDomain}
+          hasScimToken={Boolean(workspace.scimTokenHash)}
+          scimBaseUrl={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/scim/v2`}
+          updateDomainAction={updateAllowedDomain}
+          generateTokenAction={generateScimToken}
+          revokeTokenAction={revokeScimToken}
         />
       </div>
     )}

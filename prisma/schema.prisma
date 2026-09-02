@@ -40,6 +40,16 @@ model Workspace {
   // Contract.signatureImage.
   logoImage String?
 
+  // Enterprise access control. allowedEmailDomain, when set, is checked
+  // against every invite and every SCIM-provisioned user — a workspace
+  // locked to "acme.com" can't accidentally invite someone outside it.
+  // scimTokenHash is the bearer credential an IdP's SCIM connector
+  // (Okta, Azure AD/Entra) authenticates with — hashed like every other
+  // long-lived credential token in this schema; the raw value is only
+  // ever shown once, at generation time, in Settings.
+  allowedEmailDomain String?
+  scimTokenHash      String? @unique
+
   createdAt          DateTime @default(now())
 
   users             User[]
@@ -100,6 +110,16 @@ model User {
   passwordHash    String? // null for accounts created via Google sign-in
   emailVerifiedAt DateTime? // set immediately for Google sign-ins (already verified); via emailed link for credentials sign-ups
   createdAt       DateTime  @default(now())
+
+  // SCIM provisioning (Okta/Azure AD/Entra pushing user lifecycle events).
+  // scimExternalId is the IdP's own id for this person, kept so a later
+  // SCIM call can look them up by an id the IdP already knows rather than
+  // by email. deactivatedAt is SCIM's "active: false" — a soft block on
+  // login, not a delete: whoever's HR system fired this can just as
+  // easily reverse it, and their deal/audit history shouldn't disappear
+  // just because they left.
+  scimExternalId String?
+  deactivatedAt  DateTime?
 
   // Nullable so nothing breaks for a user created before roles existed —
   // in practice the migration backfills every existing user onto their

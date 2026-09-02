@@ -96,6 +96,10 @@ export async function inviteTeammate(formData: FormData) {
   const workspace = await requireWorkspace();
   const session = await auth();
 
+  if (workspace.allowedEmailDomain && !email.endsWith(`@${workspace.allowedEmailDomain}`)) {
+    throw new Error(`This workspace only accepts @${workspace.allowedEmailDomain} email addresses`);
+  }
+
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     if (existing.workspaceId === workspace.id) {
@@ -206,6 +210,49 @@ export async function requestUpgrade(formData: FormData) {
   if (!existing) {
     await prisma.upgradeRequest.create({ data: { workspaceId: workspace.id, note } });
   }
+
+  revalidatePath("/settings");
+}
+
+export async function updateAllowedDomain(formData: FormData) {
+  const raw = String(formData.get("domain") ?? "").trim().toLowerCase();
+  const domain = raw.replace(/^@/, "") || null;
+  if (domain && !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) {
+    throw new Error("That doesn't look like a domain, e.g. acme.com");
+  }
+
+  const user = await requirePermission("canManageWorkspace");
+  await prisma.workspace.update({ where: { id: user.workspaceId }, data: { allowedEmailDomain: domain } });
+
+  const session = await auth();
+  await logAudit({ workspaceId: user.workspaceId, actorEmail: session?.user?.email, action: "workspace.domain_restriction_updated", metadata: { domain } });
+
+  revalidatePath("/settings");
+}
+
+// Returns the raw token exactly once — only the hash is ever stored, same
+// pattern as every other long-lived credential in this app. Generating a
+// new one immediately invalidates whatever the IdP was using before, so
+// this is also how a leaked token gets revoked: generate a fresh one.
+export async function generateScimToken(): Promise<string> {
+  const user = await requirePermission("canManageWorkspace");
+  const rawToken = randomBytes(32).toString("hex");
+  const tokenHash = createHash("sha256").update(rawToken).digest("hex");
+  await prisma.workspace.update({ where: { id: user.workspaceId }, data: { scimTokenHash: tokenHash } });
+
+  const session = await auth();
+  await logAudit({ workspaceId: user.workspaceId, actorEmail: session?.user?.email, action: "workspace.scim_token_generated" });
+
+  revalidatePath("/settings");
+  return rawToken;
+}
+
+export async function revokeScimToken(): Promise<void> {
+  const user = await requirePermission("canManageWorkspace");
+  await prisma.workspace.update({ where: { id: user.workspaceId }, data: { scimTokenHash: null } });
+
+  const session = await auth();
+  await logAudit({ workspaceId: user.workspaceId, actorEmail: session?.user?.email, action: "workspace.scim_token_revoked" });
 
   revalidatePath("/settings");
 }

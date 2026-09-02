@@ -36,6 +36,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           await logAudit({ actorEmail: email, action: "login.failure", metadata: { reason: "no_such_account" } });
           return null;
         }
+        if (user.deactivatedAt) {
+          await logAudit({ workspaceId: user.workspaceId, actorEmail: email, action: "login.failure", metadata: { reason: "deactivated" } });
+          return null;
+        }
 
         const valid = verifyPassword(password, user.passwordHash);
         if (!valid) {
@@ -104,6 +108,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           // in — every sign-in already re-confirms the address with Google,
           // so there's no separate "click a link" step for them to do.
           user = await prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: new Date() } });
+        }
+
+        // Deactivated via SCIM (or manually) — leave workspaceId unset rather
+        // than throwing: every protected page already redirects to /login
+        // when it's missing, the same "please sign in again" shape as a
+        // stale session, not a hard error page.
+        if (user.deactivatedAt) {
+          await logAudit({ workspaceId: user.workspaceId, actorEmail: email, action: "login.failure", metadata: { reason: "deactivated", provider: "google" } });
+          return token;
         }
 
         await logAudit({ workspaceId: user.workspaceId, actorEmail: email, action: "login.success", metadata: { provider: "google" } });
