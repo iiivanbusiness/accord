@@ -74,8 +74,33 @@ model Workspace {
   auditLogs         AuditLog[]
   localCaptureTokens LocalCaptureToken[]
   roles              Role[]
-  approvalSteps      ApprovalStep[]
+  approvalChains     ApprovalChain[]
   clauseLibraryItems ClauseLibraryItem[]
+  teams              Team[]
+  approvalDelegates  ApprovalDelegate[]
+  apiKeys            ApiKey[]
+  webhookEndpoints   WebhookEndpoint[]
+}
+
+// A workspace-defined organizational unit — "Sales EMEA", "Sales US" — kept
+// deliberately separate from Role: Role gates what someone can DO
+// (permissions, who can approve), Team is who they're ON, and an
+// ApprovalChain can be scoped to one so different teams get different
+// approval rules without needing different roles. Optional everywhere it's
+// referenced — a workspace that never creates a Team behaves exactly as
+// before this existed.
+model Team {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  createdAt   DateTime  @default(now())
+
+  users          User[]
+  deals          Deal[]
+  approvalChains ApprovalChain[]
+
+  @@unique([workspaceId, name])
 }
 
 // A canonical, reusable clause — "insert from library" into any template
@@ -140,9 +165,23 @@ model User {
   // them a role.
   roleId String?
   role   Role?   @relation(fields: [roleId], references: [id])
+
+  // Which Team this person is on — see the Team model doc comment. Nullable
+  // for the same reason roleId is: nothing backfills it, a workspace that
+  // never sets up teams just never has anyone on one.
+  teamId String?
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
   contractApprovalsDecided ContractApproval[]
+  approvalsDecidedOnBehalfOf ContractApproval[] @relation("ApprovalDecidedOnBehalfOf")
   lockedTemplates          ContractTemplate[]
   ownedDeals               Deal[]
+
+  // "While I'm out, X can approve on my behalf" — see ApprovalDelegate.
+  // Both directions named since a person can appear as either delegator or
+  // delegate across different rows, sometimes both at once.
+  delegationsGiven    ApprovalDelegate[] @relation("DelegationFrom")
+  delegationsReceived ApprovalDelegate[] @relation("DelegationTo")
 
   // twoFactorSecret is set as soon as setup starts (QR shown) but
   // twoFactorEnabled only flips to true once the user proves they can
@@ -247,6 +286,13 @@ model Deal {
   // their deals, just orphan the ownership.
   ownerId String?
   owner   User?   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  // Defaults to the owner's team at creation time (see createDeal etc.),
+  // editable afterward — this is what an ApprovalChain's teamId is matched
+  // against. A deal with no team only matches chains that also have no
+  // teamId set (or none at all — see resolveApprovalChain).
+  teamId String?
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
   service    String
   feeDisplay String
@@ -438,7 +484,7 @@ model Role {
   canManageWorkspace  Boolean   @default(false) // settings, sender domain, logo, workspace name
   canManageTeam       Boolean   @default(false) // invite/remove teammates, create/edit/delete roles, assign roles
   canManageTemplates  Boolean   @default(false) // create/edit/delete UNLOCKED contract templates
-  canApproveContracts Boolean   @default(false) // eligible to be a step in the approval chain
+  canApproveContracts Boolean   @default(false) // eligible to be a step in an approval chain
   canApproveTemplates Boolean   @default(false) // lock/unlock templates, and edit/delete a locked one — the "legal approved this wording" gate
   canViewAllDeals     Boolean   @default(false) // see every deal/client in the workspace, not just ones this user started — a rep without it only sees their own (plus any deal with no owner)
   createdAt           DateTime  @default(now())
@@ -450,28 +496,51 @@ model Role {
   @@unique([workspaceId, name])
 }
 
-// The workspace-level approval chain "template" — an ordered list of roles
-// that must approve, in order, before a contract can be sent. Configured
-// once in Settings; applies to every contract from then on. A contract that
-// entered approval before the chain changed keeps its own ContractApproval
-// snapshot, so editing the chain never rewrites history for deals already
-// in flight.
-model ApprovalStep {
-  id          String   @id @default(cuid())
+// One workspace can have several of these — "Default", "EMEA >€50k",
+// "US Standard" — instead of a single global chain. teamId/minDealValue are
+// match conditions: null means "matches anything" on that axis. When a
+// contract needs approval, every chain in the workspace is checked in
+// `order`, and the FIRST one whose conditions both match wins — see
+// resolveApprovalChain. Put more specific chains (a team, a value floor,
+// or both) before a catch-all, or a catch-all will shadow them. A contract
+// already mid-approval keeps its own ContractApproval snapshot, so editing
+// chains never rewrites history for deals already in flight.
+model ApprovalChain {
+  id          String    @id @default(cuid())
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  roleId      String
-  role        Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  order       Int
-  createdAt   DateTime  @default(now())
+  name        String
+
+  teamId       String? // null = matches deals on any team (or no team)
+  team         Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  minDealValue Float? // null = no floor — matches any deal value
+
+  order     Int // evaluation priority: lower is checked first
+  createdAt DateTime @default(now())
+
+  steps ApprovalStep[]
 
   @@unique([workspaceId, order])
 }
 
-// One row per approval step, per contract — a snapshot taken from
-// ApprovalStep the moment a contract enters pending_approval. Anyone
-// currently holding roleId can act on it (not one named person), but only
-// once every lower-order step for the same contract is already "approved".
+model ApprovalStep {
+  id        String        @id @default(cuid())
+  chainId   String
+  chain     ApprovalChain @relation(fields: [chainId], references: [id], onDelete: Cascade)
+  roleId    String
+  role      Role          @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  order     Int
+  createdAt DateTime      @default(now())
+
+  @@unique([chainId, order])
+}
+
+// One row per approval step, per contract — a snapshot taken from whichever
+// ApprovalChain resolved for this deal the moment it entered
+// pending_approval. Anyone currently holding roleId can act on it (not one
+// named person, and see ApprovalDelegate for "act on X's behalf while
+// they're out"), but only once every lower-order step for the same
+// contract is already "approved".
 model ContractApproval {
   id             String    @id @default(cuid())
   contractId     String
@@ -482,11 +551,40 @@ model ContractApproval {
   status         String    @default("pending") // pending | approved | rejected
   decidedByUserId String?
   decidedByUser   User?     @relation(fields: [decidedByUserId], references: [id])
+  // Set only when decidedByUserId acted as a delegate rather than a direct
+  // holder of `role` — who they were standing in for, for the audit trail.
+  decidedOnBehalfOfUserId String?
+  decidedOnBehalfOfUser   User?   @relation("ApprovalDecidedOnBehalfOf", fields: [decidedOnBehalfOfUserId], references: [id])
   note           String?
   decidedAt      DateTime?
   createdAt      DateTime  @default(now())
 
   @@unique([contractId, order])
+}
+
+// "While I'm on leave, X can approve on my behalf." Self-service: anyone
+// can hand their own approval authority to a colleague (fromUserId is
+// always the acting session user when created that way); canManageWorkspace
+// admins can also set one up for someone else (HR covering an unplanned
+// absence) or revoke any delegation. endsAt null means "until manually
+// revoked" rather than a fixed trip length. Decision eligibility in
+// decideApproval checks: does the current user hold the step's role
+// directly, OR is there a delegation, active right now, from someone who
+// does?
+model ApprovalDelegate {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fromUserId  String
+  fromUser    User      @relation("DelegationFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUserId    String
+  toUser      User      @relation("DelegationTo", fields: [toUserId], references: [id], onDelete: Cascade)
+  startsAt    DateTime  @default(now())
+  endsAt      DateTime? // null = open-ended, until revoked
+  createdAt   DateTime  @default(now())
+
+  @@index([fromUserId])
+  @@index([toUserId])
 }
 
 model UpgradeRequest {
@@ -598,4 +696,65 @@ model AuditLog {
 
   @@index([workspaceId, createdAt])
   @@index([action, createdAt])
+}
+
+// A credential for the public REST API (/api/v1/*) — a customer's own IT/
+// integration team authenticates their own systems with this, the same way
+// scimTokenHash lets an IdP authenticate. Hashed the same way (SHA-256, raw
+// value shown exactly once at generation). keyPrefix is the first few
+// characters of the raw key, kept in plaintext purely so the list in
+// Settings can show "sk_live_a1b2••••" instead of nothing at all — it's not
+// sensitive on its own (a prefix can't authenticate anything).
+model ApiKey {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String // whatever the admin called it, e.g. "Salesforce sync"
+  keyPrefix   String
+  keyHash     String    @unique
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
+
+  @@index([workspaceId])
+}
+
+// A customer-configured HTTP endpoint that gets POSTed a JSON payload when
+// one of `events` happens in this workspace — see src/lib/webhooks.ts for
+// the event list and delivery/signing. secret is stored plain (consistent
+// with every other long-lived credential in this schema that the customer
+// needs to keep re-reading, like ssoClientSecret — not a one-time reveal
+// like keyHash/scimTokenHash above, since they need it forever to verify
+// each delivery's signature). events is a JSON string array, same pattern
+// as ContractTemplate.clauses.
+model WebhookEndpoint {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  url         String
+  secret      String
+  events      String // JSON string[], e.g. ["deal.created","contract.signed"]
+  enabled     Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  deliveries WebhookDelivery[]
+
+  @@index([workspaceId])
+}
+
+// A log line per delivery attempt, purely for the admin to debug "why
+// didn't my webhook fire" from Settings — not itself retried automatically.
+// responseStatus null means the request itself failed (DNS, timeout,
+// connection refused) rather than the endpoint responding with an error
+// code.
+model WebhookDelivery {
+  id             String          @id @default(cuid())
+  endpointId     String
+  endpoint       WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  event          String
+  responseStatus Int?
+  error          String?
+  createdAt      DateTime        @default(now())
+
+  @@index([endpointId, createdAt])
 }

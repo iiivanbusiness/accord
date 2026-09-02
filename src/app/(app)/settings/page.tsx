@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { requireWorkspaceId } from "@/lib/workspace";
@@ -5,9 +6,13 @@ import { getSenderDomainStatus, type SenderDomainRecord } from "@/lib/sender-dom
 import TwoFactorSettings from "@/components/TwoFactorSettings";
 import RolesManager from "@/components/RolesManager";
 import RoleSelect from "@/components/RoleSelect";
+import TeamSelect from "@/components/TeamSelect";
+import TeamsManager from "@/components/TeamsManager";
 import ApprovalChainManager from "@/components/ApprovalChainManager";
+import ApprovalDelegatesPanel from "@/components/ApprovalDelegatesPanel";
 import ScimSettingsPanel from "@/components/ScimSettingsPanel";
 import SsoSettingsPanel from "@/components/SsoSettingsPanel";
+import DeveloperSettingsLink from "@/components/DeveloperSettingsLink";
 import {
   checkSenderDomainVerification,
   connectSenderDomain,
@@ -26,7 +31,9 @@ import {
   uploadLogo,
 } from "./actions";
 import { assignUserRole, createRole, deleteRole, updateRole } from "./roles-actions";
-import { addApprovalStep, moveApprovalStep, removeApprovalStep } from "./approval-actions";
+import { createTeam, deleteTeam, assignUserTeam } from "./team-actions";
+import { createApprovalChain, deleteApprovalChain, moveApprovalChain, addApprovalStep, moveApprovalStep, removeApprovalStep } from "./approval-actions";
+import { createDelegation, revokeDelegation } from "./delegation-actions";
 
 function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notifyOnSigned" | "autoRemind" }) {
   return (
@@ -47,11 +54,16 @@ function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notify
 
 export default async function SettingsPage() {
   const workspaceId = await requireWorkspaceId();
-  const [workspace, session, roles, approvalSteps] = await Promise.all([
-    prisma.workspace.findUnique({ where: { id: workspaceId }, include: { users: { include: { role: true } } } }),
+  const [workspace, session, roles, teams, approvalChains] = await Promise.all([
+    prisma.workspace.findUnique({ where: { id: workspaceId }, include: { users: { include: { role: true, team: true } } } }),
     auth(),
     prisma.role.findMany({ where: { workspaceId }, include: { _count: { select: { users: true } } }, orderBy: [{ isOwner: "desc" }, { createdAt: "asc" }] }),
-    prisma.approvalStep.findMany({ where: { workspaceId }, include: { role: true }, orderBy: { order: "asc" } }),
+    prisma.team.findMany({ where: { workspaceId }, include: { _count: { select: { users: true } } }, orderBy: { createdAt: "asc" } }),
+    prisma.approvalChain.findMany({
+      where: { workspaceId },
+      include: { team: true, steps: { include: { role: true }, orderBy: { order: "asc" } } },
+      orderBy: { order: "asc" },
+    }),
   ]);
   const usagePct = workspace ? Math.round((workspace.callsUsedThisMonth / workspace.callsLimit) * 100) : 0;
   if (!workspace) return null;
@@ -62,6 +74,21 @@ export default async function SettingsPage() {
   const pendingUpgrade = await prisma.upgradeRequest.findFirst({ where: { workspaceId, status: "pending" } });
   const roleOptions = roles.map((r) => ({ id: r.id, name: r.name }));
   const eligibleApproverRoles = roles.filter((r) => r.canApproveContracts).map((r) => ({ id: r.id, name: r.name }));
+  const teamOptions = teams.map((t) => ({ id: t.id, name: t.name }));
+
+  const delegationsRaw = await prisma.approvalDelegate.findMany({
+    where: canManageWorkspacePerm ? { workspaceId } : { workspaceId, OR: [{ fromUserId: currentUser?.id }, { toUserId: currentUser?.id }] },
+    include: { fromUser: { select: { name: true } }, toUser: { select: { name: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+  const delegations = delegationsRaw.map((d) => ({
+    id: d.id,
+    fromUserId: d.fromUserId,
+    fromName: d.fromUser.name,
+    toUserId: d.toUserId,
+    toName: d.toUser.name,
+    endsAt: d.endsAt ? d.endsAt.toISOString() : null,
+  }));
 
   let senderRecords: SenderDomainRecord[] = [];
   if (workspace.senderDomainId && workspace.senderDomainStatus !== "verified") {
@@ -165,6 +192,11 @@ export default async function SettingsPage() {
               <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>{u.email}</div>
             </div>
             <div className="flex items-center gap-3">
+              {canManageTeam && teamOptions.length > 0 ? (
+                <TeamSelect userId={u.id} currentTeamId={u.teamId} teams={teamOptions} action={assignUserTeam} />
+              ) : (
+                u.team && <span className="chip chip-neutral" style={{ fontSize: 11 }}>{u.team.name}</span>
+              )}
               {canManageTeam && roleOptions.length > 0 ? (
                 <RoleSelect userId={u.id} currentRoleId={u.roleId} roles={roleOptions} action={assignUserRole} />
               ) : (
@@ -225,20 +257,67 @@ export default async function SettingsPage() {
       </div>
     )}
 
+    {canManageTeam && (
+      <div className="card mb-4 max-w-[600px]">
+        <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
+          <h2 className="text-[15px] font-medium">Teams</h2>
+          <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
+            Organizational segments (e.g. &ldquo;Sales EMEA&rdquo;, &ldquo;Sales US&rdquo;) — assign teammates to one above, then give a team its own approval chain below.
+          </div>
+        </div>
+        <TeamsManager
+          teams={teams.map((t) => ({ id: t.id, name: t.name, memberCount: t._count.users }))}
+          createTeamAction={createTeam}
+          deleteTeamAction={deleteTeam}
+        />
+      </div>
+    )}
+
     {canManageWorkspacePerm && (
       <div className="card mb-4 max-w-[600px]">
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
-          <h2 className="text-[15px] font-medium">Approval chain</h2>
+          <h2 className="text-[15px] font-medium">Approval chains</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            Contracts wait for every role below to approve, in order, before they go out to the client.
+            Contracts wait for every role in the matching chain to approve, in order, before they go out to the client. Small deals can move fast, while big or team-specific ones pick up extra steps.
           </div>
         </div>
         <ApprovalChainManager
-          steps={approvalSteps.map((s) => ({ id: s.id, order: s.order, roleId: s.roleId, roleName: s.role.name }))}
+          chains={approvalChains.map((c) => ({
+            id: c.id,
+            name: c.name,
+            order: c.order,
+            teamId: c.teamId,
+            teamName: c.team?.name ?? null,
+            minDealValue: c.minDealValue,
+            steps: c.steps.map((s) => ({ id: s.id, order: s.order, roleId: s.roleId, roleName: s.role.name })),
+          }))}
           eligibleRoles={eligibleApproverRoles}
+          teams={teamOptions}
+          createChainAction={createApprovalChain}
+          deleteChainAction={deleteApprovalChain}
+          moveChainAction={moveApprovalChain}
           addStepAction={addApprovalStep}
           removeStepAction={removeApprovalStep}
           moveStepAction={moveApprovalStep}
+        />
+      </div>
+    )}
+
+    {currentUser && (
+      <div className="card mb-4 max-w-[600px]">
+        <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
+          <h2 className="text-[15px] font-medium">Approval backups</h2>
+          <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
+            Going on leave? Hand your approval authority to a teammate so a chain never gets stuck waiting on one person.
+          </div>
+        </div>
+        <ApprovalDelegatesPanel
+          currentUserId={currentUser.id}
+          teammates={workspace.users.map((u) => ({ id: u.id, name: u.name }))}
+          delegations={delegations}
+          isAdmin={canManageWorkspacePerm}
+          createDelegationAction={createDelegation}
+          revokeDelegationAction={revokeDelegation}
         />
       </div>
     )}
@@ -285,6 +364,22 @@ export default async function SettingsPage() {
         />
       </div>
     )}
+
+    {canManageWorkspacePerm && (
+      <div className="card mb-4 max-w-[600px]">
+        <Link href="/settings/import" className="flex items-center justify-between gap-3 px-[22px] py-4">
+          <div>
+            <h2 className="text-[15px] font-medium">Bulk import</h2>
+            <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
+              Bring clients and deals over from a previous system via CSV.
+            </div>
+          </div>
+          <span style={{ color: "var(--ink-muted)" }}>→</span>
+        </Link>
+      </div>
+    )}
+
+    {canManageWorkspacePerm && <DeveloperSettingsLink />}
 
     {currentUser?.passwordHash && (
       <div className="card mb-4 max-w-[600px]">

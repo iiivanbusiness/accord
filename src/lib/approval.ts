@@ -2,6 +2,8 @@ import { prisma } from "@/lib/db";
 import { sendContractEmail, sendApprovalRequestedEmail, sendChangesRequestedEmail } from "@/lib/email";
 import { logAudit } from "@/lib/audit";
 import { getOrMintPortalToken } from "@/lib/client-portal";
+import { parseFee } from "@/lib/money";
+import { dispatchWebhookEvent } from "@/lib/webhooks";
 
 export type PendingEmail = { to: string; subject: string; message: string };
 
@@ -9,12 +11,35 @@ function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? "";
 }
 
+// Picks which of the workspace's ApprovalChains applies to this deal.
+// Chains are checked in `order` (lower first); the first one whose
+// teamId/minDealValue conditions both match wins. A chain with no
+// conditions at all matches everything, so it's meant to sit last as a
+// catch-all — see the doc comment on the ApprovalChain model. Returns null
+// when the workspace has no chains configured (send immediately, same as
+// before per-chain conditions existed).
+async function resolveApprovalChain(deal: { workspaceId: string; teamId: string | null; feeDisplay: string }) {
+  const chains = await prisma.approvalChain.findMany({
+    where: { workspaceId: deal.workspaceId },
+    orderBy: { order: "asc" },
+    include: { steps: { orderBy: { order: "asc" } } },
+  });
+  if (chains.length === 0) return null;
+
+  const dealValue = parseFee(deal.feeDisplay);
+  return chains.find((chain) => {
+    const teamMatches = !chain.teamId || chain.teamId === deal.teamId;
+    const valueMatches = chain.minDealValue == null || dealValue >= chain.minDealValue;
+    return teamMatches && valueMatches;
+  }) ?? null;
+}
+
 // Called anywhere a contract is about to leave the workspace's control —
 // the manual Send page and the "no approval needed" auto-send path both
-// go through here. If the workspace has an approval chain configured, the
-// contract is held in "pending_approval" and the composed email is stored
-// verbatim until the chain finishes; otherwise it's sent immediately,
-// exactly like before this feature existed.
+// go through here. If a chain resolves for this deal, the contract is held
+// in "pending_approval" and the composed email is stored verbatim until
+// the chain finishes; otherwise it's sent immediately, exactly like before
+// this feature existed.
 export async function requestOrSendContract(
   dealId: string,
   pending: PendingEmail,
@@ -24,23 +49,21 @@ export async function requestOrSendContract(
   if (!deal || !deal.contract) throw new Error("Deal not found");
   const contractId = deal.contract.id;
 
-  const steps = await prisma.approvalStep.findMany({
-    where: { workspaceId: deal.workspaceId },
-    orderBy: { order: "asc" },
-  });
+  const chain = await resolveApprovalChain(deal);
 
-  if (steps.length === 0) {
+  if (!chain || chain.steps.length === 0) {
     await performActualSend(contractId, pending);
     await logAudit({ workspaceId: deal.workspaceId, actorEmail, action: "contract.sent", targetType: "Deal", targetId: dealId, metadata: { to: pending.to } });
     return "sent";
   }
 
   // A contract re-entering approval after a rejection gets a fresh
-  // snapshot — always mirrors the chain as currently configured, never a
-  // stale one left over from a previous round.
+  // snapshot — always mirrors the chain as currently configured (and
+  // re-resolved against the deal's current team/value), never a stale one
+  // left over from a previous round.
   await prisma.contractApproval.deleteMany({ where: { contractId } });
   await prisma.contractApproval.createMany({
-    data: steps.map((s) => ({ contractId, roleId: s.roleId, order: s.order, status: "pending" })),
+    data: chain.steps.map((s) => ({ contractId, roleId: s.roleId, order: s.order, status: "pending" })),
   });
   await prisma.contract.update({
     where: { id: contractId },
@@ -53,9 +76,9 @@ export async function requestOrSendContract(
   });
   await prisma.deal.update({ where: { id: dealId }, data: { status: "pending_approval" } });
 
-  await logAudit({ workspaceId: deal.workspaceId, actorEmail, action: "contract.approval_requested", targetType: "Deal", targetId: dealId });
+  await logAudit({ workspaceId: deal.workspaceId, actorEmail, action: "contract.approval_requested", targetType: "Deal", targetId: dealId, metadata: { chain: chain.name } });
 
-  await notifyStepApprovers(dealId, steps[0].roleId);
+  await notifyStepApprovers(dealId, chain.steps[0].roleId);
 
   return "pending_approval";
 }
@@ -95,6 +118,13 @@ export async function performActualSend(contractId: string, pendingOverride?: Pe
   // Resending is how the workspace answers open clause-change requests —
   // whatever they asked for is presumably reflected in this new version.
   await prisma.clauseComment.updateMany({ where: { contractId, resolved: false }, data: { resolved: true } });
+
+  await dispatchWebhookEvent(workspace.id, "contract.sent", {
+    dealId: deal.id,
+    contractId: contract.id,
+    clientName: deal.client.name,
+    signLink,
+  });
 }
 
 // Notifies whoever currently holds the given role that a contract needs

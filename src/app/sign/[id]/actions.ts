@@ -8,6 +8,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
 import { extractRenewalTerms } from "@/lib/extract-renewal";
 import { notifyChangesRequested } from "@/lib/approval";
+import { dispatchWebhookEvent } from "@/lib/webhooks";
 
 export async function signContract(contractId: string, formData: FormData) {
   const signerName = String(formData.get("signerName") ?? "").trim();
@@ -38,7 +39,7 @@ export async function signContract(contractId: string, formData: FormData) {
 
   const contract = await prisma.contract.findUniqueOrThrow({
     where: { id: contractId },
-    include: { deal: { include: { workspace: { include: { users: true } } } }, template: true },
+    include: { deal: { include: { client: true, workspace: { include: { users: true } } } }, template: true },
   });
 
   await prisma.deal.update({ where: { id: contract.dealId }, data: { status: "signed" } });
@@ -69,6 +70,14 @@ export async function signContract(contractId: string, formData: FormData) {
   } catch (err) {
     console.error("Failed to extract renewal terms", err);
   }
+
+  await dispatchWebhookEvent(contract.deal.workspaceId, "contract.signed", {
+    dealId: contract.dealId,
+    contractId: contract.id,
+    clientName: contract.deal.client.name,
+    signerName,
+    signedAt: new Date().toISOString(),
+  });
 
   redirect(`/sign/${contractId}`);
 }

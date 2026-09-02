@@ -31,14 +31,30 @@ export async function decideApproval(dealId: string, approvalId: string, decisio
   if (earlierUnresolved > 0) throw new Error("An earlier step hasn't been approved yet");
 
   const user = await currentUserWithRole();
-  if (!user.role?.canApproveContracts || user.roleId !== approval.roleId) {
-    throw new Error("You're not eligible to decide this approval step");
+  const directMatch = Boolean(user.role?.canApproveContracts) && user.roleId === approval.roleId;
+
+  // Not a direct holder of the role — check whether someone who IS has
+  // actively delegated their approval authority to this person (see
+  // ApprovalDelegate: "while I'm out, X can approve on my behalf").
+  let onBehalfOfUserId: string | null = null;
+  if (!directMatch) {
+    const now = new Date();
+    const delegation = await prisma.approvalDelegate.findFirst({
+      where: {
+        toUserId: user.id,
+        startsAt: { lte: now },
+        OR: [{ endsAt: null }, { endsAt: { gt: now } }],
+        fromUser: { roleId: approval.roleId, role: { canApproveContracts: true } },
+      },
+    });
+    if (!delegation) throw new Error("You're not eligible to decide this approval step");
+    onBehalfOfUserId = delegation.fromUserId;
   }
 
   if (decision === "reject") {
     await prisma.contractApproval.update({
       where: { id: approvalId },
-      data: { status: "rejected", decidedByUserId: user.id, decidedAt: new Date(), note },
+      data: { status: "rejected", decidedByUserId: user.id, decidedOnBehalfOfUserId: onBehalfOfUserId, decidedAt: new Date(), note },
     });
     await prisma.contract.update({ where: { id: deal.contract.id }, data: { status: "changes_requested" } });
     await prisma.deal.update({ where: { id: dealId }, data: { status: "changes_requested" } });
@@ -67,7 +83,7 @@ export async function decideApproval(dealId: string, approvalId: string, decisio
 
   await prisma.contractApproval.update({
     where: { id: approvalId },
-    data: { status: "approved", decidedByUserId: user.id, decidedAt: new Date(), note },
+    data: { status: "approved", decidedByUserId: user.id, decidedOnBehalfOfUserId: onBehalfOfUserId, decidedAt: new Date(), note },
   });
   await logAudit({ workspaceId, actorEmail: user.email, action: "contract.approval_approved", targetType: "Deal", targetId: dealId, metadata: { note } });
 

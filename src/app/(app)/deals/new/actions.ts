@@ -9,6 +9,7 @@ import { extractPlaceholderKeys } from "@/lib/contract";
 import { createCallBot, detectPlatformFromUrl } from "@/lib/recall";
 import { requireWorkspace } from "@/lib/workspace";
 import { currentUserWithRole } from "@/lib/permissions";
+import { dispatchWebhookEvent } from "@/lib/webhooks";
 
 // Every path here costs real money one way or another (Anthropic tokens for
 // extraction, a live Recall bot-minute for calls) — callsLimit was tracked
@@ -47,6 +48,7 @@ export async function createDeal(formData: FormData) {
       clientId: client.id,
       templateId,
       ownerId: user.id,
+      teamId: user.teamId,
       service,
       feeDisplay,
       status: "ready",
@@ -65,6 +67,8 @@ export async function createDeal(formData: FormData) {
     where: { id: workspaceId },
     data: { callsUsedThisMonth: { increment: 1 } },
   });
+
+  await dispatchWebhookEvent(workspaceId, "deal.created", { dealId: deal.id, clientName, company, service, feeDisplay, status: deal.status });
 
   redirect(`/deals/${deal.id}`);
 }
@@ -109,6 +113,7 @@ export async function createDealFromTranscript(formData: FormData) {
       clientId: client.id,
       templateId,
       ownerId: user.id,
+      teamId: user.teamId,
       service,
       feeDisplay: fee,
       status: hasMissing ? "missing_info" : "ready",
@@ -130,6 +135,8 @@ export async function createDealFromTranscript(formData: FormData) {
   } catch (err) {
     console.error(`Failed to extract action items for deal ${deal.id}`, err);
   }
+
+  await dispatchWebhookEvent(workspaceId, "deal.created", { dealId: deal.id, clientName: extracted.clientName, service, feeDisplay: fee, status: deal.status });
 
   redirect(`/deals/${deal.id}`);
 }
@@ -172,6 +179,7 @@ export async function startCallFromEvent(formData: FormData) {
       clientId: client.id,
       templateId,
       ownerId: user.id,
+      teamId: user.teamId,
       service: "",
       feeDisplay: "",
       status: "processing",
@@ -186,6 +194,8 @@ export async function startCallFromEvent(formData: FormData) {
     where: { id: workspaceId },
     data: { callsUsedThisMonth: { increment: 1 } },
   });
+
+  await dispatchWebhookEvent(workspaceId, "deal.created", { dealId: deal.id, clientName, status: deal.status });
 
   redirect(`/deals/${deal.id}`);
 }
@@ -219,6 +229,7 @@ export async function startLocalCapture(formData: FormData): Promise<{ dealId: s
       clientId: client.id,
       templateId,
       ownerId: user.id,
+      teamId: user.teamId,
       service: "",
       feeDisplay: "",
       status: "processing",
@@ -233,6 +244,8 @@ export async function startLocalCapture(formData: FormData): Promise<{ dealId: s
     where: { id: workspaceId },
     data: { callsUsedThisMonth: { increment: 1 } },
   });
+
+  await dispatchWebhookEvent(workspaceId, "deal.created", { dealId: deal.id, clientName, status: deal.status });
 
   return { dealId: deal.id, token: rawToken };
 }
@@ -311,6 +324,7 @@ export async function startCallBot(formData: FormData) {
       clientId: client.id,
       templateId,
       ownerId: user.id,
+      teamId: user.teamId,
       service: "",
       feeDisplay: "",
       status: "processing",
@@ -323,6 +337,8 @@ export async function startCallBot(formData: FormData) {
     where: { id: workspaceId },
     data: { callsUsedThisMonth: { increment: 1 } },
   });
+
+  await dispatchWebhookEvent(workspaceId, "deal.created", { dealId: deal.id, clientName, status: deal.status });
 
   redirect(`/deals/${deal.id}`);
 }

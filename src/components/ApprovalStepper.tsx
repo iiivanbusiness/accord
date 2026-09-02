@@ -9,6 +9,7 @@ type ApprovalItem = {
   roleId: string;
   roleName: string;
   decidedByName: string | null;
+  decidedOnBehalfOfName: string | null;
   decidedAt: Date | null;
   note: string | null;
 };
@@ -22,12 +23,14 @@ export default function ApprovalStepper({
   approvals,
   currentUserRoleId,
   currentUserCanApprove,
+  delegatedRoleIds,
   decideAction,
 }: {
   dealId: string;
   approvals: ApprovalItem[];
   currentUserRoleId: string | null;
   currentUserCanApprove: boolean;
+  delegatedRoleIds: string[];
   decideAction: (dealId: string, approvalId: string, decision: "approve" | "reject", formData: FormData) => Promise<void>;
 }) {
   const [note, setNote] = useState("");
@@ -35,7 +38,10 @@ export default function ApprovalStepper({
   const [isPending, startTransition] = useTransition();
 
   const currentStep = approvals.find((a) => a.status === "pending");
-  const canDecideCurrent = Boolean(currentStep && currentUserCanApprove && currentUserRoleId === currentStep.roleId);
+  const actingAsDelegate = Boolean(currentStep && delegatedRoleIds.includes(currentStep.roleId));
+  const canDecideCurrent = Boolean(
+    currentStep && ((currentUserCanApprove && currentUserRoleId === currentStep.roleId) || actingAsDelegate)
+  );
 
   function decide(decision: "approve" | "reject") {
     if (!currentStep) return;
@@ -80,6 +86,7 @@ export default function ApprovalStepper({
                 {a.decidedByName && (
                   <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
                     {a.status === "approved" ? "Approved" : "Rejected"} by {a.decidedByName}
+                    {a.decidedOnBehalfOfName ? ` (on behalf of ${a.decidedOnBehalfOfName})` : ""}
                     {a.decidedAt ? ` · ${formatDate(a.decidedAt)}` : ""}
                   </div>
                 )}
@@ -94,6 +101,11 @@ export default function ApprovalStepper({
 
         {canDecideCurrent && (
           <div className="py-3.5">
+            {actingAsDelegate && (
+              <div className="mb-2 text-[12px]" style={{ color: "var(--ink-muted)" }}>
+                You&apos;re deciding this as an approval backup, not directly in {currentStep?.roleName}.
+              </div>
+            )}
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}

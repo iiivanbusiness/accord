@@ -31,22 +31,30 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
   const workspaceId = await requireWorkspaceId();
   const currentUser = await currentUserWithRole();
   const { where: visibility } = await dealVisibilityFilter(currentUser);
-  const deal = await prisma.deal.findFirst({
-    where: { id, workspaceId, ...visibility },
-    include: {
-      client: true,
-      template: true,
-      fields: true,
-      contract: {
-        include: {
-          approvals: { include: { role: true, decidedByUser: true }, orderBy: { order: "asc" } },
-          clauseComments: { where: { resolved: false }, orderBy: { createdAt: "asc" } },
+  const [deal, activeDelegationsToMe] = await Promise.all([
+    prisma.deal.findFirst({
+      where: { id, workspaceId, ...visibility },
+      include: {
+        client: true,
+        template: true,
+        fields: true,
+        contract: {
+          include: {
+            approvals: { include: { role: true, decidedByUser: true, decidedOnBehalfOfUser: true }, orderBy: { order: "asc" } },
+            clauseComments: { where: { resolved: false }, orderBy: { createdAt: "asc" } },
+          },
         },
+        workspace: true,
       },
-      workspace: true,
-    },
-  });
+    }),
+    prisma.approvalDelegate.findMany({
+      where: { toUserId: currentUser.id, startsAt: { lte: new Date() }, OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }] },
+      include: { fromUser: { select: { roleId: true } } },
+    }),
+  ]);
   if (!deal || !deal.contract || !deal.template) notFound();
+
+  const delegatedRoleIds = [...new Set(activeDelegationsToMe.map((d) => d.fromUser.roleId).filter((id): id is string => Boolean(id)))];
 
   const clauses = fillClauses(deal.template.clauses, deal.fields);
   const showApprovalStepper = deal.contract.approvals.length > 0 && (deal.contract.status === "pending_approval" || deal.contract.status === "changes_requested");
@@ -205,11 +213,13 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
             roleId: a.roleId,
             roleName: a.role.name,
             decidedByName: a.decidedByUser?.name ?? null,
+            decidedOnBehalfOfName: a.decidedOnBehalfOfUser?.name ?? null,
             decidedAt: a.decidedAt,
             note: a.note,
           }))}
           currentUserRoleId={currentUser.roleId}
           currentUserCanApprove={Boolean(currentUser.role?.canApproveContracts)}
+          delegatedRoleIds={delegatedRoleIds}
           decideAction={decideApproval}
         />
       </div>

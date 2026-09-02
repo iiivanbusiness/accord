@@ -10,6 +10,7 @@ import { auth } from "@/lib/auth";
 import { requestOrSendContract } from "@/lib/approval";
 import { logAudit } from "@/lib/audit";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
+import { currentUserWithRole } from "@/lib/permissions";
 
 export async function retryExtraction(dealId: string) {
   const { where } = await dealVisibilityFilter();
@@ -125,7 +126,8 @@ export async function sendContractEmail(dealId: string, formData: FormData) {
 // looking like it's missing information. Owned by whoever starts the
 // renewal, not carried over from the original deal's owner.
 export async function startRenewal(dealId: string) {
-  const { where, userId } = await dealVisibilityFilter();
+  const currentUser = await currentUserWithRole();
+  const { where, userId } = await dealVisibilityFilter(currentUser);
   const workspaceId = await requireWorkspaceId();
   const deal = await prisma.deal.findFirst({
     where: { id: dealId, workspaceId, ...where },
@@ -140,6 +142,7 @@ export async function startRenewal(dealId: string) {
       clientId: deal.clientId,
       templateId: deal.templateId,
       ownerId: userId,
+      teamId: currentUser.teamId,
       service: deal.service,
       feeDisplay: deal.feeDisplay,
       status: "ready",
