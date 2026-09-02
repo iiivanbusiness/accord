@@ -16,7 +16,6 @@ import DeveloperSettingsLink from "@/components/DeveloperSettingsLink";
 import SlackSettingsPanel from "@/components/SlackSettingsPanel";
 import HubspotSettingsPanel from "@/components/HubspotSettingsPanel";
 import { listSlackChannels, isSlackConfigured } from "@/lib/slack";
-import { isHubspotConfigured } from "@/lib/hubspot";
 import {
   checkSenderDomainVerification,
   connectSenderDomain,
@@ -39,7 +38,7 @@ import { createTeam, deleteTeam, assignUserTeam } from "./team-actions";
 import { createApprovalChain, deleteApprovalChain, moveApprovalChain, addApprovalStep, moveApprovalStep, removeApprovalStep } from "./approval-actions";
 import { createDelegation, revokeDelegation } from "./delegation-actions";
 import { setSlackChannel, toggleSlack, disconnectSlack } from "./slack-actions";
-import { toggleHubspot, disconnectHubspot } from "./hubspot-actions";
+import { connectHubspot, toggleHubspot, disconnectHubspot } from "./hubspot-actions";
 
 function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notifyOnSigned" | "autoRemind" }) {
   return (
@@ -61,9 +60,9 @@ function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notify
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; slack_connected?: string; hubspot_connected?: string }>;
+  searchParams: Promise<{ error?: string; slack_connected?: string }>;
 }) {
-  const { error: connectError, slack_connected, hubspot_connected } = await searchParams;
+  const { error: connectError, slack_connected } = await searchParams;
   const workspaceId = await requireWorkspaceId();
   const [workspace, session, roles, teams, approvalChains] = await Promise.all([
     prisma.workspace.findUnique({ where: { id: workspaceId }, include: { users: { include: { role: true, team: true } } } }),
@@ -138,11 +137,6 @@ export default async function SettingsPage({
     {slack_connected && (
       <div className="chip chip-success mb-4 max-w-[600px] justify-start px-3.5 py-2.5 text-[12.5px]">
         Slack connected — pick a channel below.
-      </div>
-    )}
-    {hubspot_connected && (
-      <div className="chip chip-success mb-4 max-w-[600px] justify-start px-3.5 py-2.5 text-[12.5px]">
-        HubSpot connected.
       </div>
     )}
 
@@ -435,10 +429,10 @@ export default async function SettingsPage({
           </div>
         </div>
         <HubspotSettingsPanel
-          configured={isHubspotConfigured()}
-          connected={Boolean(workspace.hubspotRefreshToken)}
+          connected={Boolean(workspace.hubspotAccessToken)}
           portalId={workspace.hubspotPortalId}
           enabled={workspace.hubspotEnabled}
+          connectAction={connectHubspot}
           toggleAction={toggleHubspot}
           disconnectAction={disconnectHubspot}
         />

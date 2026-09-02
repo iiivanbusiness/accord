@@ -1,90 +1,14 @@
 import { prisma } from "@/lib/db";
 import { parseFee } from "@/lib/money";
 
-// One SealMe-owned HubSpot app, installed per-workspace via OAuth — same
-// shared-app model as Slack. Deliberately one-directional (SealMe pushes
-// TO HubSpot, never reads from it): a real two-way sync needs HubSpot's
-// own webhook subscriptions and conflict resolution on top of this, which
-// is its own separate decision if a customer actually needs it — this
-// covers the "keep my CRM automatically up to date" case, which is most
-// of the value.
-const SCOPES = "crm.objects.contacts.write crm.objects.contacts.read crm.objects.deals.write crm.objects.deals.read oauth";
-
-export function isHubspotConfigured(): boolean {
-  return Boolean(process.env.HUBSPOT_CLIENT_ID && process.env.HUBSPOT_CLIENT_SECRET);
-}
-
-function redirectUri(): string {
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  return `${base}/api/hubspot/callback`;
-}
-
-export function buildHubspotAuthorizeUrl(): string {
-  const params = new URLSearchParams({
-    client_id: process.env.HUBSPOT_CLIENT_ID ?? "",
-    redirect_uri: redirectUri(),
-    scope: SCOPES,
-  });
-  return `https://app.hubspot.com/oauth/authorize?${params.toString()}`;
-}
-
-type HubspotTokenResponse = { access_token: string; refresh_token: string; expires_in: number };
-
-async function requestToken(body: URLSearchParams): Promise<HubspotTokenResponse> {
-  const res = await fetch("https://api.hubapi.com/oauth/v1/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-  if (!res.ok) throw new Error(`HubSpot token request failed: ${res.status} ${await res.text()}`);
-  return res.json() as Promise<HubspotTokenResponse>;
-}
-
-export async function exchangeHubspotCode(code: string): Promise<HubspotTokenResponse & { portalId: string }> {
-  const tokens = await requestToken(
-    new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: process.env.HUBSPOT_CLIENT_ID ?? "",
-      client_secret: process.env.HUBSPOT_CLIENT_SECRET ?? "",
-      redirect_uri: redirectUri(),
-      code,
-    })
-  );
-
-  const infoRes = await fetch(`https://api.hubapi.com/oauth/v1/access-tokens/${tokens.access_token}`);
-  if (!infoRes.ok) throw new Error(`Couldn't read HubSpot token info: ${infoRes.status}`);
-  const info = (await infoRes.json()) as { hub_id: number };
-
-  return { ...tokens, portalId: String(info.hub_id) };
-}
-
-async function refreshToken(refreshTokenValue: string): Promise<HubspotTokenResponse> {
-  return requestToken(
-    new URLSearchParams({
-      grant_type: "refresh_token",
-      client_id: process.env.HUBSPOT_CLIENT_ID ?? "",
-      client_secret: process.env.HUBSPOT_CLIENT_SECRET ?? "",
-      refresh_token: refreshTokenValue,
-    })
-  );
-}
-
-// Returns a live access token, refreshing first if it's missing/expired —
-// same shape as google-calendar.ts's own token handling.
-async function getValidAccessToken(workspaceId: string): Promise<string> {
-  const workspace = await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } });
-  if (!workspace.hubspotRefreshToken) throw new Error("HubSpot isn't connected for this workspace");
-
-  const expired = !workspace.hubspotTokenExpiresAt || workspace.hubspotTokenExpiresAt < new Date();
-  if (workspace.hubspotAccessToken && !expired) return workspace.hubspotAccessToken;
-
-  const refreshed = await refreshToken(workspace.hubspotRefreshToken);
-  await prisma.workspace.update({
-    where: { id: workspaceId },
-    data: { hubspotAccessToken: refreshed.access_token, hubspotTokenExpiresAt: new Date(Date.now() + refreshed.expires_in * 1000) },
-  });
-  return refreshed.access_token;
-}
+// A per-workspace HubSpot Private App token, pasted in Settings — not
+// OAuth. HubSpot disabled creating new "public" OAuth apps outside their
+// CLI/Projects flow, so each workspace makes its own Private App in its
+// own HubSpot account (Settings -> Integrations -> Private Apps, with the
+// crm.objects.contacts/deals read+write scopes) and pastes the resulting
+// token here. Deliberately one-directional (SealMe -> HubSpot push only) —
+// a real two-way sync needs HubSpot's own webhook subscriptions and
+// conflict resolution, a separate decision if a customer needs it.
 
 type HubspotObject = { id: string; properties: Record<string, string> };
 
@@ -95,6 +19,20 @@ async function hubspotFetch(accessToken: string, path: string, init?: RequestIni
   });
   if (!res.ok) throw new Error(`HubSpot API ${path} failed: ${res.status} ${await res.text()}`);
   return res.json() as Promise<HubspotObject>;
+}
+
+// Called once, when a token is pasted into Settings — proves the token is
+// actually valid and returns the portal it belongs to, so Settings can
+// show "connected to portal 12345" instead of just trusting the paste.
+// Throws with HubSpot's own message on an invalid/revoked token.
+export async function validateHubspotToken(accessToken: string): Promise<{ portalId: string }> {
+  const res = await fetch("https://api.hubapi.com/account-info/v3/details", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`That token isn't valid: ${res.status} ${await res.text()}`);
+  const data = (await res.json()) as { portalId?: number };
+  if (!data.portalId) throw new Error("HubSpot didn't return a portal id for that token");
+  return { portalId: String(data.portalId) };
 }
 
 // Creates the Contact on first sync, updates it on every later one —
@@ -148,15 +86,14 @@ async function upsertDeal(
 // caller; failures are logged only, same contract as the other two.
 export async function syncDealToHubspot(workspaceId: string, dealId: string): Promise<void> {
   const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
-  if (!workspace || !workspace.hubspotEnabled || !workspace.hubspotRefreshToken) return;
+  if (!workspace || !workspace.hubspotEnabled || !workspace.hubspotAccessToken) return;
 
   try {
     const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { client: true } });
     if (!deal) return;
 
-    const accessToken = await getValidAccessToken(workspaceId);
-    const contactId = await upsertContact(accessToken, deal.client);
-    await upsertDeal(accessToken, deal, contactId);
+    const contactId = await upsertContact(workspace.hubspotAccessToken, deal.client);
+    await upsertDeal(workspace.hubspotAccessToken, deal, contactId);
   } catch (err) {
     console.error(`HubSpot sync failed for deal ${dealId}`, err);
   }

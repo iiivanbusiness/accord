@@ -75,15 +75,18 @@ model Workspace {
   slackChannelId   String?
   slackChannelName String?
 
-  // HubSpot — same shared-app-per-workspace-install model as Slack, but
-  // HubSpot access tokens expire (~30 min) and need the refresh token to
-  // renew — same pattern as googleAccessToken/googleRefreshToken above.
-  // One-directional (SealMe -> HubSpot) push sync only; see src/lib/hubspot.ts.
-  hubspotEnabled        Boolean   @default(false)
-  hubspotPortalId       String?
-  hubspotAccessToken    String?
-  hubspotRefreshToken   String?
-  hubspotTokenExpiresAt DateTime?
+  // HubSpot — a per-workspace Private App token, pasted in Settings, not
+  // OAuth: HubSpot disabled creating new OAuth ("public") apps outside
+  // their CLI/Projects flow, so each workspace makes its own Private App
+  // in its own HubSpot account (Settings -> Integrations -> Private Apps)
+  // and pastes the resulting token here — same "customer supplies their
+  // own long-lived credential" shape as ssoClientSecret/scimTokenHash
+  // above. Private App tokens don't expire, so there's no refresh token to
+  // track. One-directional (SealMe -> HubSpot) push sync only; see
+  // src/lib/hubspot.ts.
+  hubspotEnabled     Boolean @default(false)
+  hubspotPortalId    String?
+  hubspotAccessToken String?
 
   createdAt          DateTime @default(now())
 
