@@ -3,10 +3,11 @@ import { notFound } from "next/navigation";
 import DealTermsCard from "@/components/DealTermsCard";
 import ContinueCallButton from "@/components/ContinueCallButton";
 import ActionItemsCard from "@/components/ActionItemsCard";
+import SendToDocusignButton from "@/components/SendToDocusignButton";
 import { prisma } from "@/lib/db";
-import { requireWorkspaceId } from "@/lib/workspace";
+import { requireWorkspaceId, requireWorkspace } from "@/lib/workspace";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
-import { fillMissingFields, generateContract, retryExtraction, toggleActionItem, updateFieldValues } from "./actions";
+import { fillMissingFields, generateContract, retryExtraction, sendViaDocusignNow, toggleActionItem, updateFieldValues } from "./actions";
 
 const CALL_SOURCE_LABEL: Record<string, string> = {
   local: "Recorded locally",
@@ -55,19 +56,25 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const workspaceId = await requireWorkspaceId();
   const { where: visibility } = await dealVisibilityFilter();
-  const deal = await prisma.deal.findFirst({
-    where: { id, workspaceId, ...visibility },
-    include: {
-      client: true,
-      fields: { orderBy: { orderIndex: "asc" } },
-      template: true,
-      contract: true,
-      calls: { orderBy: { startedAt: "asc" } },
-      fieldChanges: { orderBy: { changedAt: "asc" } },
-      actionItems: { orderBy: { createdAt: "asc" } },
-    },
-  });
+  const [deal, workspace] = await Promise.all([
+    prisma.deal.findFirst({
+      where: { id, workspaceId, ...visibility },
+      include: {
+        client: true,
+        fields: { orderBy: { orderIndex: "asc" } },
+        template: true,
+        contract: true,
+        calls: { orderBy: { startedAt: "asc" } },
+        fieldChanges: { orderBy: { changedAt: "asc" } },
+        actionItems: { orderBy: { createdAt: "asc" } },
+      },
+    }),
+    requireWorkspace(),
+  ]);
   if (!deal) notFound();
+
+  const canSendToDocusignNow =
+    Boolean(workspace?.docusignEnabled) && deal.status === "ready" && deal.contract?.status === "draft" && Boolean(deal.client.email);
 
   const historyByKey = new Map<string, typeof deal.fieldChanges>();
   for (const change of deal.fieldChanges) {
@@ -216,6 +223,8 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
             Uses the {deal.template?.name ?? "default"} template
           </span>
         </div>
+
+        {canSendToDocusignNow && <SendToDocusignButton dealId={deal.id} sendAction={sendViaDocusignNow} />}
       </div>
     </div>
     </>

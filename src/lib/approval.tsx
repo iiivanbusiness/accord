@@ -24,7 +24,7 @@ function appUrl(): string {
 // catch-all — see the doc comment on the ApprovalChain model. Returns null
 // when the workspace has no chains configured (send immediately, same as
 // before per-chain conditions existed).
-async function resolveApprovalChain(deal: { workspaceId: string; teamId: string | null; feeDisplay: string }) {
+export async function resolveApprovalChain(deal: { workspaceId: string; teamId: string | null; feeDisplay: string }) {
   const chains = await prisma.approvalChain.findMany({
     where: { workspaceId: deal.workspaceId },
     orderBy: { order: "asc" },

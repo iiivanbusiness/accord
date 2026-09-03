@@ -29,6 +29,37 @@ export async function retryExtraction(dealId: string) {
   redirect(`/deals/${dealId}`);
 }
 
+// One-click "send it right now" — meant for the moment a deal goes
+// "ready" mid-call: instead of the full Send page (to/cc/subject/message,
+// extra signers), this fires immediately with sane defaults, routed
+// through DocuSign so the client's own DocuSign email is what reaches
+// them. Still goes through requestOrSendContract, so a configured
+// approval chain still gates it exactly like any other send — this is a
+// shortcut to the same pipeline, not a way around it. A confirmation
+// click (not a fully silent auto-send) on purpose: the rep glances at the
+// terms and decides, rather than the system sending without anyone looking.
+export async function sendViaDocusignNow(dealId: string) {
+  const { where } = await dealVisibilityFilter();
+  const workspaceId = await requireWorkspaceId();
+  const deal = await prisma.deal.findFirst({
+    where: { id: dealId, workspaceId, ...where },
+    include: { client: true, template: true, contract: true, workspace: true },
+  });
+  if (!deal || !deal.contract || !deal.template) throw new Error("Deal not found");
+  if (!deal.workspace.docusignEnabled) throw new Error("DocuSign isn't connected for this workspace");
+  if (!deal.client.email) throw new Error("This client has no email on file yet — add one first");
+
+  await prisma.contract.update({ where: { id: deal.contract.id }, data: { deliveryMethod: "docusign" } });
+
+  const subject = `${deal.template.name} from ${deal.workspace.name}`;
+  const message = `Hi ${deal.client.name.split(" ")[0]},\n\nHere's the ${deal.template.name.toLowerCase()} we just discussed — take a look and sign whenever you're ready.`;
+
+  const session = await auth();
+  await requestOrSendContract(dealId, { to: deal.client.email, subject, message }, session?.user?.email);
+
+  revalidatePath(`/deals/${dealId}`);
+}
+
 export async function generateContract(dealId: string) {
   const { where } = await dealVisibilityFilter();
   const workspaceId = await requireWorkspaceId();
