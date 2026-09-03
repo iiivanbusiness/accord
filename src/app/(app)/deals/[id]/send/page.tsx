@@ -27,6 +27,8 @@ export default async function SendContractPage({
   ]);
   if (!deal || !deal.contract || !deal.template) notFound();
 
+  const docusignAvailable = Boolean(workspace?.docusignEnabled);
+
   const workspaceName = workspace?.name ?? "Your workspace";
   const configured = isEmailConfigured();
 
@@ -79,8 +81,17 @@ export default async function SendContractPage({
         </span>
       </label>
       <CountersignerFields clientName={deal.client.name} />
+      {docusignAvailable && (
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[13px] font-medium">Sign via</span>
+          <select name="deliveryMethod" defaultValue="sealme" className="input">
+            <option value="sealme">SealMe (built-in signing)</option>
+            <option value="docusign">DocuSign ({workspace?.docusignAccountEmail})</option>
+          </select>
+        </label>
+      )}
       <button type="submit" disabled={!configured} className="btn btn-primary mt-2 w-full justify-center">
-        Send email
+        Send
       </button>
     </form>
     </>

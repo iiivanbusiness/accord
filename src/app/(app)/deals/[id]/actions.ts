@@ -122,12 +122,14 @@ export async function sendContractEmail(dealId: string, formData: FormData) {
   const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId, ...where }, include: { contract: true } });
   if (!deal || !deal.contract) throw new Error("Deal not found");
 
-  // CC list and counter-signers are contract setup, not part of the
-  // approval-gated email content — stored immediately regardless of
-  // whether an approval chain holds the actual send.
+  const deliveryMethod = String(formData.get("deliveryMethod") ?? "sealme") === "docusign" ? "docusign" : "sealme";
+
+  // CC list, counter-signers, and delivery method are contract setup, not
+  // part of the approval-gated email content — stored immediately
+  // regardless of whether an approval chain holds the actual send.
   await prisma.contract.update({
     where: { id: deal.contract.id },
-    data: { ccEmails: ccList.length > 0 ? JSON.stringify(ccList) : null },
+    data: { ccEmails: ccList.length > 0 ? JSON.stringify(ccList) : null, deliveryMethod },
   });
   if (countersigners.length > 0) {
     await prisma.contractSigner.deleteMany({ where: { contractId: deal.contract.id, status: "pending" } });

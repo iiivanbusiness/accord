@@ -15,6 +15,8 @@ import SsoSettingsPanel from "@/components/SsoSettingsPanel";
 import DeveloperSettingsLink from "@/components/DeveloperSettingsLink";
 import SlackSettingsPanel from "@/components/SlackSettingsPanel";
 import HubspotSettingsPanel from "@/components/HubspotSettingsPanel";
+import DocusignSettingsPanel from "@/components/DocusignSettingsPanel";
+import { isDocusignConfigured } from "@/lib/docusign";
 import { listSlackChannels, isSlackConfigured } from "@/lib/slack";
 import {
   checkSenderDomainVerification,
@@ -40,6 +42,7 @@ import { createApprovalChain, deleteApprovalChain, moveApprovalChain, addApprova
 import { createDelegation, revokeDelegation } from "./delegation-actions";
 import { setSlackChannel, toggleSlack, disconnectSlack } from "./slack-actions";
 import { connectHubspot, toggleHubspot, disconnectHubspot } from "./hubspot-actions";
+import { toggleDocusign, disconnectDocusign } from "./docusign-actions";
 
 function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notifyOnSigned" | "autoRemind" }) {
   return (
@@ -436,6 +439,25 @@ export default async function SettingsPage({
           connectAction={connectHubspot}
           toggleAction={toggleHubspot}
           disconnectAction={disconnectHubspot}
+        />
+      </div>
+    )}
+
+    {canManageWorkspacePerm && (
+      <div className="card mb-4 max-w-[600px]">
+        <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
+          <h2 className="text-[15px] font-medium">DocuSign</h2>
+          <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
+            Hand a contract straight to your own DocuSign account for signing instead of SealMe&apos;s built-in flow — offered as a choice on the Send page once connected.
+          </div>
+        </div>
+        <DocusignSettingsPanel
+          configured={isDocusignConfigured()}
+          connected={Boolean(workspace.docusignRefreshToken)}
+          accountEmail={workspace.docusignAccountEmail}
+          enabled={workspace.docusignEnabled}
+          toggleAction={toggleDocusign}
+          disconnectAction={disconnectDocusign}
         />
       </div>
     )}

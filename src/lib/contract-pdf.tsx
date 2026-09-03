@@ -11,6 +11,9 @@ const styles = StyleSheet.create({
   clauseBody: { fontSize: 11, lineHeight: 1.5, color: "#3A403D" },
   signatureImage: { width: 160, height: 50, marginTop: 6, marginBottom: 4 },
   footer: { position: "absolute", bottom: 40, left: 56, right: 56, fontSize: 9, color: "#9AA19C", textAlign: "center" },
+  docusignBlock: { marginTop: 10, marginBottom: 8 },
+  docusignLine: { fontSize: 10, color: "#5B6461", marginBottom: 14 },
+  docusignAnchor: { fontSize: 6, color: "#F2F5F2" }, // near-invisible against a white page — DocuSign's anchor-string matching just needs the text to exist in the PDF's text layer, not to be legible
 });
 
 export function ContractPdfDocument({
@@ -22,6 +25,7 @@ export function ContractPdfDocument({
   signedBy,
   signedAt,
   signatureImage,
+  docusignAnchors,
 }: {
   templateName: string;
   agencyName: string;
@@ -31,6 +35,11 @@ export function ContractPdfDocument({
   signedBy?: string | null;
   signedAt?: Date | null;
   signatureImage?: string | null;
+  // One entry per DocuSign recipient — each anchor string gets placed in
+  // the PDF's text layer so DocuSign's anchor-tab matching can find it and
+  // drop a signature field right there, without SealMe ever computing an
+  // absolute x/y position on the page itself.
+  docusignAnchors?: { label: string; anchor: string }[];
 }) {
   return (
     <Document>
@@ -49,6 +58,14 @@ export function ContractPdfDocument({
             <Text style={styles.clauseTitle}>Signature</Text>
             {signatureImage && <Image style={styles.signatureImage} src={signatureImage} />}
             <Text style={styles.clauseBody}>Signed electronically by {signedBy} on {signedAt.toLocaleDateString()}.</Text>
+          </View>
+        )}
+        {docusignAnchors && docusignAnchors.length > 0 && (
+          <View style={styles.docusignBlock}>
+            <Text style={styles.clauseTitle}>Signatures</Text>
+            {docusignAnchors.map((a) => (
+              <Text key={a.anchor} style={styles.docusignLine}>{a.label}: <Text style={styles.docusignAnchor}>{a.anchor}</Text></Text>
+            ))}
           </View>
         )}
         <Text style={styles.footer} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} fixed />

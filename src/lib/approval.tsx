@@ -1,3 +1,4 @@
+import { renderToBuffer } from "@react-pdf/renderer";
 import { prisma } from "@/lib/db";
 import { sendContractEmail, sendApprovalRequestedEmail, sendChangesRequestedEmail } from "@/lib/email";
 import { logAudit } from "@/lib/audit";
@@ -6,6 +7,9 @@ import { parseFee } from "@/lib/money";
 import { dispatchWebhookEvent } from "@/lib/webhooks";
 import { notifySlack } from "@/lib/slack";
 import { syncDealToHubspot } from "@/lib/hubspot";
+import { fillClauses } from "@/lib/contract";
+import { ContractPdfDocument } from "@/lib/contract-pdf";
+import { sendDocusignEnvelope, type EnvelopeSigner } from "@/lib/docusign";
 
 export type PendingEmail = { to: string; subject: string; message: string };
 
@@ -88,13 +92,19 @@ export async function requestOrSendContract(
 // Actually emails the client — either right away (no chain configured) or
 // once the last approval step has signed off. pendingOverride lets the
 // immediate-send path skip a DB round-trip; the approval path relies on
-// what's already stored on the contract.
+// what's already stored on the contract. When the contract's
+// deliveryMethod is "docusign", the client never gets a SealMe email at
+// all — DocuSign sends its own, this just creates and sends the envelope.
 export async function performActualSend(contractId: string, pendingOverride?: PendingEmail): Promise<void> {
   const contract = await prisma.contract.findUnique({
     where: { id: contractId },
-    include: { deal: { include: { client: true, workspace: { include: { users: true } } } } },
+    include: {
+      deal: { include: { client: true, workspace: { include: { users: true } }, fields: true } },
+      template: true,
+      signers: { orderBy: { order: "asc" } },
+    },
   });
-  if (!contract) throw new Error("Contract not found");
+  if (!contract || !contract.template) throw new Error("Contract not found");
 
   const to = pendingOverride?.to ?? contract.pendingTo;
   const subject = pendingOverride?.subject ?? contract.pendingSubject;
@@ -104,27 +114,49 @@ export async function performActualSend(contractId: string, pendingOverride?: Pe
   const { deal } = contract;
   const { workspace } = deal;
   const signLink = `${appUrl()}/sign/${contract.id}`;
-  const replyTo = workspace.users[0]?.email ?? null;
-  const verifiedSenderEmail = workspace.senderDomainStatus === "verified" ? workspace.senderEmail : null;
 
-  const portalToken = await getOrMintPortalToken(deal.client.id);
-  const portalUrl = `${appUrl()}/portal/${portalToken}`;
+  let docusignEnvelopeId: string | undefined;
+  if (contract.deliveryMethod === "docusign") {
+    const anchorFor = (i: number) => `[[sig${i}]]`;
+    const signers: EnvelopeSigner[] = [
+      { name: to.split("@")[0], email: to, routingOrder: 1, anchor: anchorFor(1) },
+      ...contract.signers.map((s, i) => ({ name: s.name, email: s.email, routingOrder: i + 2, anchor: anchorFor(i + 2) })),
+    ];
+    const clauses = fillClauses(contract.template.clauses, deal.fields);
+    const pdfBuffer = await renderToBuffer(
+      <ContractPdfDocument
+        templateName={contract.template.name}
+        agencyName={workspace.name}
+        agencyLogo={workspace.logoImage}
+        clientName={deal.client.name}
+        clauses={clauses}
+        docusignAnchors={signers.map((s) => ({ label: `${s.name} (${s.routingOrder === 1 ? "Client" : "Signer " + s.routingOrder})`, anchor: s.anchor }))}
+      />
+    );
+    docusignEnvelopeId = await sendDocusignEnvelope(workspace.id, { pdfBuffer, emailSubject: subject, emailBlurb: message, signers });
+  } else {
+    const replyTo = workspace.users[0]?.email ?? null;
+    const verifiedSenderEmail = workspace.senderDomainStatus === "verified" ? workspace.senderEmail : null;
 
-  let cc: string[] | undefined;
-  try {
-    cc = contract.ccEmails ? (JSON.parse(contract.ccEmails) as string[]) : undefined;
-  } catch {
-    cc = undefined;
+    const portalToken = await getOrMintPortalToken(deal.client.id);
+    const portalUrl = `${appUrl()}/portal/${portalToken}`;
+
+    let cc: string[] | undefined;
+    try {
+      cc = contract.ccEmails ? (JSON.parse(contract.ccEmails) as string[]) : undefined;
+    } catch {
+      cc = undefined;
+    }
+
+    await sendContractEmail({ to, cc, subject, message, signLink, workspaceName: workspace.name, replyTo, verifiedSenderEmail, portalUrl });
   }
-
-  await sendContractEmail({ to, cc, subject, message, signLink, workspaceName: workspace.name, replyTo, verifiedSenderEmail, portalUrl });
 
   const sentAt = new Date();
   const expiresAt = workspace.signingExpiryDays ? new Date(sentAt.getTime() + workspace.signingExpiryDays * 24 * 60 * 60 * 1000) : null;
 
   await prisma.contract.update({
     where: { id: contractId },
-    data: { status: "sent", sentAt, expiresAt, pendingTo: null, pendingSubject: null, pendingMessage: null },
+    data: { status: "sent", sentAt, expiresAt, docusignEnvelopeId, pendingTo: null, pendingSubject: null, pendingMessage: null },
   });
   await prisma.deal.update({ where: { id: deal.id }, data: { status: "sent" } });
   // Resending is how the workspace answers open clause-change requests —
@@ -135,7 +167,7 @@ export async function performActualSend(contractId: string, pendingOverride?: Pe
     dealId: deal.id,
     contractId: contract.id,
     clientName: deal.client.name,
-    signLink,
+    signLink: contract.deliveryMethod === "docusign" ? undefined : signLink,
   });
   await notifySlack(workspace.id, { type: "contract.sent", dealId: deal.id, clientName: deal.client.name });
   await syncDealToHubspot(workspace.id, deal.id);

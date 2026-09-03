@@ -95,6 +95,25 @@ model Workspace {
   hubspotPortalId    String?
   hubspotAccessToken String?
 
+  // DocuSign — a per-workspace OAuth connection to the WORKSPACE'S OWN
+  // DocuSign account (not a SealMe-owned app installed like Slack; the
+  // workspace authorizes SealMe against the DocuSign account they already
+  // pay for). Lets "Send to client" hand the generated contract straight
+  // to DocuSign's own envelope/signing flow instead of SealMe's built-in
+  // one — see src/lib/docusign.ts. Access tokens expire (~8h) and need the
+  // refresh token to renew, same pattern as googleAccessToken/
+  // googleRefreshToken and hubspot's old OAuth fields above. accountId/
+  // baseUri come back from DocuSign at connect time and are required on
+  // every API call afterward — DocuSign accounts live on one of several
+  // data-center hosts, there's no single fixed API URL.
+  docusignEnabled       Boolean   @default(false)
+  docusignAccessToken   String?
+  docusignRefreshToken  String?
+  docusignTokenExpiresAt DateTime?
+  docusignAccountId     String?
+  docusignBaseUri       String?
+  docusignAccountEmail  String?
+
   createdAt          DateTime @default(now())
 
   users             User[]
@@ -480,6 +499,16 @@ model Contract {
   // Comma-separated emails that get a copy of the contract email (sent AND
   // resent) but never sign anything — DocuSign calls these "CC recipients".
   ccEmails String?
+
+  // "sealme" (default): SealMe's own /sign/[id] flow, everything already
+  // built. "docusign": "Send to client" instead creates and sends a
+  // DocuSign envelope for this contract's PDF — the client and any
+  // ContractSigner rows sign entirely on DocuSign's own site, our
+  // /sign/[id] and /countersign pages are never used for this contract.
+  // Chosen per-contract on the Send page (only offered once the workspace
+  // has connected DocuSign).
+  deliveryMethod    String  @default("sealme")
+  docusignEnvelopeId String?
 
   signers ContractSigner[]
 

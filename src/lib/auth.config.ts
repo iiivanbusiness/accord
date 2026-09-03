@@ -31,6 +31,7 @@ export const authConfig = {
         request.nextUrl.pathname.startsWith("/api/scim") ||
         request.nextUrl.pathname.startsWith("/api/sso") ||
         request.nextUrl.pathname.startsWith("/api/v1") ||
+        request.nextUrl.pathname.startsWith("/api/docusign/webhook") ||
         request.nextUrl.pathname.startsWith("/terms") ||
         request.nextUrl.pathname.startsWith("/privacy");
       if (isPublic) return true;
