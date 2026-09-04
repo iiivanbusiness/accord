@@ -34,8 +34,8 @@ export async function generateCallRecapScript(dealId: string): Promise<string | 
       "Write a short, warm, spoken-style recap for the rep who was on the call — 3 to 4 sentences, like a " +
       "colleague reporting back, not a form reading out field names. Mention the client/company and the key " +
       "terms naturally in flowing sentences. End by inviting them to fix anything that's off before it goes " +
-      "out. Match the language of the call summary and field values below — if they're in Serbian, reply in " +
-      "Serbian. Output only the spoken text itself — no headers, no bullet points, no quotation marks.",
+      "out. Always write the recap in English, even if the call summary and field values below are in " +
+      "another language. Output only the spoken text itself — no headers, no bullet points, no quotation marks.",
     messages: [
       {
         role: "user",
