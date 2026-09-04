@@ -27,12 +27,21 @@ function verifySignature(rawBody: string, signatureHeader: string | null, hmacKe
 export async function POST(req: Request) {
   const rawBody = await req.text();
 
+  // Fail closed: without a configured key there's no way to tell a real
+  // DocuSign Connect event from anyone who's found this URL and POSTed a
+  // fake "completed" payload for a guessed/leaked envelopeId, which would
+  // mark that contract signed without an actual signature ever happening.
+  // createConnectSubscription already refuses to register a subscription
+  // without this key set, so in practice no legitimate traffic is lost by
+  // rejecting here too — this just closes the same gap on the receiving end.
   const hmacKey = process.env.DOCUSIGN_CONNECT_HMAC_KEY;
-  if (hmacKey) {
-    const signature = req.headers.get("x-docusign-signature-1");
-    if (!verifySignature(rawBody, signature, hmacKey)) {
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-    }
+  if (!hmacKey) {
+    console.error("DocuSign webhook received but DOCUSIGN_CONNECT_HMAC_KEY isn't set — rejecting (see createConnectSubscription).");
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
+  }
+  const signature = req.headers.get("x-docusign-signature-1");
+  if (!verifySignature(rawBody, signature, hmacKey)) {
+    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
   let payload: ConnectPayload;

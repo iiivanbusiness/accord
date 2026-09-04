@@ -6,6 +6,7 @@ import { AuthError } from "next-auth";
 import { prisma } from "@/lib/db";
 import { signIn } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
+import { createOwnerRole } from "@/lib/permissions";
 import { buildDefaultTemplates } from "@/lib/default-templates";
 import { attachOnboardingProfile } from "@/lib/onboarding";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -41,9 +42,10 @@ export async function signup(formData: FormData) {
   const workspace = await prisma.workspace.create({
     data: { name: companyName },
   });
+  const ownerRole = await createOwnerRole(workspace.id);
 
   const user = await prisma.user.create({
-    data: { workspaceId: workspace.id, name, email, passwordHash: hashPassword(password) },
+    data: { workspaceId: workspace.id, name, email, passwordHash: hashPassword(password), roleId: ownerRole.id },
   });
 
   const templates = buildDefaultTemplates(companyName);
