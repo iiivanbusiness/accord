@@ -5,24 +5,28 @@ import { useRouter } from "next/navigation";
 
 type Proposal =
   | { intent: "update_field"; fieldKey: string; fieldLabel: string; currentValue: string | null; proposedValue: string; confirmationText: string }
+  | { intent: "send_for_review"; recipientUserId: string; recipientName: string; confirmationText: string }
   | { intent: "unclear"; confirmationText: string };
 
 type ApiResponse = { transcript?: string; proposal?: Proposal; audioBase64?: string | null; error?: string };
 
 type Status = "idle" | "recording" | "processing" | "confirming" | "applying";
 
-// Push-to-talk voice correction: hold the button, say what should change,
-// release. The proposed change is read back and shown — nothing is written
-// to the contract until the rep explicitly confirms, so a misheard number
-// surfaces as an odd-sounding confirmation instead of a silently wrong
-// contract. See /api/deals/[id]/voice-correction (propose) and
-// applyVoiceFieldCorrection (apply, only called from "Yes, apply" below).
+// Push-to-talk voice control: hold the button, say what should change (or
+// who to send this to for review), release. Nothing is written or sent
+// until the rep hears the proposal read back and explicitly taps "Yes" —
+// see /api/deals/[id]/voice-correction (propose, never writes/sends) and
+// applyAction/reviewAction below (apply, only called from that tap) — so a
+// misheard word surfaces as an odd-sounding confirmation instead of a
+// silently wrong contract or an email to the wrong person.
 export default function VoiceCorrectionButton({
   dealId,
   applyAction,
+  reviewAction,
 }: {
   dealId: string;
   applyAction: (dealId: string, fieldKey: string, newValue: string) => Promise<void>;
+  reviewAction: (dealId: string, recipientUserId: string) => Promise<void>;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<Status>("idle");
@@ -92,14 +96,22 @@ export default function VoiceCorrectionButton({
   }
 
   function handleConfirm() {
-    if (!proposal || proposal.intent !== "update_field") return;
+    if (!proposal) return;
     setStatus("applying");
     startTransition(async () => {
       try {
-        await applyAction(dealId, proposal.fieldKey, proposal.proposedValue);
+        if (proposal.intent === "update_field") {
+          await applyAction(dealId, proposal.fieldKey, proposal.proposedValue);
+        } else if (proposal.intent === "send_for_review") {
+          await reviewAction(dealId, proposal.recipientUserId);
+        }
         router.refresh();
       } catch {
-        setError("Couldn't save that change — try editing the field directly");
+        setError(
+          proposal.intent === "send_for_review"
+            ? "Couldn't send that email — check your Resend setup and try again"
+            : "Couldn't save that change — try editing the field directly"
+        );
       } finally {
         setProposal(null);
         setStatus("idle");
@@ -123,10 +135,10 @@ export default function VoiceCorrectionButton({
       {status === "confirming" && proposal ? (
         <div className="flex flex-col gap-2.5">
           <p className="text-[13px] leading-relaxed">{proposal.confirmationText}</p>
-          {proposal.intent === "update_field" && (
+          {(proposal.intent === "update_field" || proposal.intent === "send_for_review") && (
             <div className="flex gap-2">
               <button type="button" disabled={isPending} onClick={handleConfirm} className="btn btn-primary btn-sm flex-1 justify-center">
-                {isPending ? "Applying…" : "Yes, apply"}
+                {isPending ? "Working…" : proposal.intent === "send_for_review" ? "Yes, send" : "Yes, apply"}
               </button>
               <button type="button" disabled={isPending} onClick={handleCancel} className="btn btn-secondary btn-sm flex-1 justify-center">
                 Cancel
@@ -162,10 +174,10 @@ export default function VoiceCorrectionButton({
                 : { background: "var(--surface-1)", color: "var(--ink)", border: "1px solid var(--hairline)" }
             }
           >
-            {status === "recording" ? "🎙 Listening — release to send" : status === "processing" ? "Thinking…" : "🎙 Hold to correct by voice"}
+            {status === "recording" ? "🎙 Listening — release to send" : status === "processing" ? "Thinking…" : "🎙 Hold to talk"}
           </button>
           <span className="text-center text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            Hold the button, say what should change, let go.
+            Hold, say what should change (or who to send this to for review), let go.
           </span>
         </>
       )}

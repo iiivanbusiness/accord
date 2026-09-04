@@ -11,6 +11,7 @@ import { requestOrSendContract } from "@/lib/approval";
 import { logAudit } from "@/lib/audit";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import { currentUserWithRole } from "@/lib/permissions";
+import { sendReviewRequestedEmail } from "@/lib/email";
 import { randomBytes } from "crypto";
 
 export async function retryExtraction(dealId: string) {
@@ -154,6 +155,48 @@ export async function applyVoiceFieldCorrection(dealId: string, fieldKey: string
   }
 
   revalidatePath(`/deals/${dealId}`);
+}
+
+// Notifies one named teammate to take a look at the deal before it goes
+// out — triggered from the voice-correction UI only after the rep taps
+// "Yes, apply" on the spoken confirmation (see /api/deals/[id]/voice-correction).
+// Ad-hoc and informational, not a gate: unlike an ApprovalChain step, this
+// doesn't hold the contract or require a decision — it's the "hey can you
+// glance at this" equivalent of a Slack ping, just voice-triggered.
+export async function requestTeammateReview(dealId: string, recipientUserId: string) {
+  const { where } = await dealVisibilityFilter();
+  const workspaceId = await requireWorkspaceId();
+  const currentUser = await currentUserWithRole();
+  const deal = await prisma.deal.findFirst({
+    where: { id: dealId, workspaceId, ...where },
+    include: { client: true, template: true },
+  });
+  if (!deal) throw new Error("Deal not found");
+
+  const recipient = await prisma.user.findFirst({ where: { id: recipientUserId, workspaceId } });
+  if (!recipient) throw new Error("Teammate not found");
+
+  try {
+    await sendReviewRequestedEmail({
+      to: recipient.email,
+      requesterName: currentUser.name,
+      clientName: deal.client.name,
+      templateName: deal.template?.name ?? "contract",
+      dealUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/deals/${dealId}/contract`,
+    });
+  } catch (err) {
+    console.error(`Failed to send review-requested email for deal ${dealId}`, err);
+    throw new Error("Couldn't send the email — check your Resend setup and try again");
+  }
+
+  await logAudit({
+    workspaceId,
+    actorEmail: currentUser.email,
+    action: "deal.review_requested",
+    targetType: "Deal",
+    targetId: dealId,
+    metadata: { to: recipient.email, via: "voice" },
+  });
 }
 
 export async function sendContractEmail(dealId: string, formData: FormData) {

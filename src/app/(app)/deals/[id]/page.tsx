@@ -10,6 +10,7 @@ import { requireWorkspaceId, requireWorkspace } from "@/lib/workspace";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import {
   applyVoiceFieldCorrection,
+  requestTeammateReview,
   fillMissingFields,
   generateContract,
   retryExtraction,
@@ -172,7 +173,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         {deal.status !== "signed" && <ContinueCallButton dealId={deal.id} />}
 
         {deal.status !== "signed" && deal.status !== "sent" && deal.fields.some((f) => f.status !== "missing") && (
-          <VoiceCorrectionButton dealId={deal.id} applyAction={applyVoiceFieldCorrection} />
+          <VoiceCorrectionButton dealId={deal.id} applyAction={applyVoiceFieldCorrection} reviewAction={requestTeammateReview} />
         )}
 
         {deal.status === "processing" ? (

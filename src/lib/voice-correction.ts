@@ -10,70 +10,105 @@ export type ProposedCorrection =
       proposedValue: string;
       confirmationText: string;
     }
+  | {
+      intent: "send_for_review";
+      recipientUserId: string;
+      recipientName: string;
+      confirmationText: string;
+    }
   | { intent: "unclear"; confirmationText: string };
 
-// Turns one push-to-talk clip's transcript into a single proposed field
-// change — never applies it. The rep hears confirmationText read back and
-// has to explicitly confirm (see applyVoiceFieldCorrection in
-// deals/[id]/actions.ts) before anything is actually written to the
-// contract; a misheard number this way surfaces as a wrong-sounding
-// confirmation instead of a silently wrong contract.
-export async function interpretVoiceCorrection(dealId: string, transcript: string): Promise<ProposedCorrection | null> {
-  const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { fields: true } });
+// Turns one push-to-talk clip's transcript into a single proposed action —
+// either a field change or sending the deal to a named teammate for
+// review — and never applies it. The rep hears confirmationText read back
+// and has to explicitly confirm (applyVoiceFieldCorrection or
+// requestTeammateReview in deals/[id]/actions.ts, both only called from a
+// tap on "Yes, apply") before anything is written or sent; a misheard word
+// this way surfaces as a wrong-sounding confirmation instead of a silently
+// wrong contract or an email to the wrong person.
+export async function interpretVoiceCorrection(
+  dealId: string,
+  transcript: string,
+  currentUserId?: string
+): Promise<ProposedCorrection | null> {
+  const deal = await prisma.deal.findUnique({
+    where: { id: dealId },
+    include: { fields: true, workspace: { include: { users: true } } },
+  });
   if (!deal) return null;
 
   const editableFields = deal.fields.filter((f) => f.status !== "missing");
-  if (editableFields.length === 0) return null;
+  const teammates = deal.workspace.users.filter((u) => u.id !== currentUserId);
+  if (editableFields.length === 0 && teammates.length === 0) return null;
 
-  const fieldList = editableFields.map((f) => `${f.fieldKey} (${f.label}): currently "${f.value ?? "(empty)"}"`).join("\n");
+  const fieldList = editableFields.map((f) => `${f.fieldKey} (${f.label}): currently "${f.value ?? "(empty)"}"`).join("\n") || "(none)";
+  const teammateList = teammates.map((u) => `${u.id}: ${u.name}`).join("\n") || "(none)";
+
+  const tools: Anthropic.Tool[] = [
+    {
+      name: "unclear",
+      description: "Use this when what the rep said can't be confidently matched to a field change or a teammate to send to.",
+      input_schema: {
+        type: "object",
+        properties: {
+          confirmationText: {
+            type: "string",
+            description: "A short spoken line (in English) saying you didn't catch a clear instruction, asking them to try again.",
+          },
+        },
+        required: ["confirmationText"],
+      },
+    },
+  ];
+  if (editableFields.length > 0) {
+    tools.push({
+      name: "propose_field_change",
+      description: "Propose a single field change based on what the rep said.",
+      input_schema: {
+        type: "object",
+        properties: {
+          fieldKey: { type: "string", enum: editableFields.map((f) => f.fieldKey) },
+          proposedValue: { type: "string", description: "The new value, formatted naturally the way it should appear in the contract." },
+          confirmationText: { type: "string", description: "A short spoken question (in English) reading back the proposed change." },
+        },
+        required: ["fieldKey", "proposedValue", "confirmationText"],
+      },
+    });
+  }
+  if (teammates.length > 0) {
+    tools.push({
+      name: "send_for_review",
+      description: "The rep asked to send this deal to a named teammate for review — propose who, matched from the listed teammates only.",
+      input_schema: {
+        type: "object",
+        properties: {
+          recipientUserId: { type: "string", enum: teammates.map((u) => u.id) },
+          confirmationText: { type: "string", description: "A short spoken question (in English) confirming who it'll be sent to, e.g. \"Send this to Marko for review — confirm?\"" },
+        },
+        required: ["recipientUserId", "confirmationText"],
+      },
+    });
+  }
 
   const client = new Anthropic();
   const response = await client.messages.create({
     model: "claude-sonnet-5",
     max_tokens: 300,
     system:
-      "The rep just spoke a correction for a contract, right after hearing a spoken recap of what was filled " +
-      "in. Figure out which field they want changed and to what — match loosely (they might say \"price\" for " +
-      "a field labeled \"Fee\", or speak in a different language than the fields are recorded in). Only one " +
-      "field per correction. If you can't confidently match it to one of the listed fields, use the `unclear` " +
-      "tool instead of guessing. Always write confirmationText in English regardless of what language the rep " +
-      "spoke — a short, natural spoken line reading back exactly what you understood, e.g. \"Got it — changing " +
-      "the fee to three thousand dollars. Confirm?\"",
+      "The rep just spoke a voice command about a contract, right after hearing a spoken recap of what a call " +
+      "produced. It's one of two things: (1) a correction to a field's value — match loosely (they might say " +
+      "\"price\" for a field labeled \"Fee\", or speak a different language than the fields are recorded in), " +
+      "or (2) a request to send the deal to a specific named teammate for review — match the name loosely " +
+      "(nicknames, mispronunciations) against the listed teammates only, never invent a person who isn't " +
+      "listed. If it's neither, or the match isn't confident, use `unclear` instead of guessing. Always write " +
+      "confirmationText in English regardless of what language the rep spoke.",
     messages: [
       {
         role: "user",
-        content: `Current contract fields:\n${fieldList}\n\nWhat the rep just said: "${transcript}"`,
+        content: `Current contract fields:\n${fieldList}\n\nTeammates who can be sent this for review:\n${teammateList}\n\nWhat the rep just said: "${transcript}"`,
       },
     ],
-    tools: [
-      {
-        name: "propose_field_change",
-        description: "Propose a single field change based on what the rep said.",
-        input_schema: {
-          type: "object",
-          properties: {
-            fieldKey: { type: "string", enum: editableFields.map((f) => f.fieldKey) },
-            proposedValue: { type: "string", description: "The new value, formatted naturally the way it should appear in the contract." },
-            confirmationText: { type: "string", description: "A short spoken question (in English) reading back the proposed change." },
-          },
-          required: ["fieldKey", "proposedValue", "confirmationText"],
-        },
-      },
-      {
-        name: "unclear",
-        description: "Use this when the correction can't be confidently matched to a listed field.",
-        input_schema: {
-          type: "object",
-          properties: {
-            confirmationText: {
-              type: "string",
-              description: "A short spoken line (in English) saying you didn't catch a clear instruction, asking them to try again.",
-            },
-          },
-          required: ["confirmationText"],
-        },
-      },
-    ],
+    tools,
   });
 
   const toolUse = response.content.find((b) => b.type === "tool_use");
@@ -82,6 +117,13 @@ export async function interpretVoiceCorrection(dealId: string, transcript: strin
   if (toolUse.name === "unclear") {
     const input = toolUse.input as { confirmationText: string };
     return { intent: "unclear", confirmationText: input.confirmationText };
+  }
+
+  if (toolUse.name === "send_for_review") {
+    const input = toolUse.input as { recipientUserId: string; confirmationText: string };
+    const teammate = teammates.find((u) => u.id === input.recipientUserId);
+    if (!teammate) return null;
+    return { intent: "send_for_review", recipientUserId: teammate.id, recipientName: teammate.name, confirmationText: input.confirmationText };
   }
 
   const input = toolUse.input as { fieldKey: string; proposedValue: string; confirmationText: string };

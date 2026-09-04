@@ -228,6 +228,25 @@ export async function sendApprovalRequestedEmail(options: {
   });
 }
 
+export async function sendReviewRequestedEmail(options: {
+  to: string;
+  requesterName: string;
+  clientName: string;
+  templateName: string;
+  dealUrl: string;
+}): Promise<void> {
+  await sendSystemEmail({
+    to: [options.to],
+    subject: `${options.requesterName} asked you to review: ${options.clientName} — ${options.templateName}`,
+    bodyHtml: `
+      <p style="margin:0 0 14px;"><strong>${escapeHtml(options.requesterName)}</strong> asked you to take a look at the contract for <strong>${escapeHtml(options.clientName)}</strong> (${escapeHtml(options.templateName)}) before it goes out.</p>
+      <a href="${options.dealUrl}" style="display:inline-block;margin:0 0 20px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
+        Review deal
+      </a>
+    `,
+  });
+}
+
 export async function sendChangesRequestedEmail(options: {
   to: string[];
   clientName: string;
