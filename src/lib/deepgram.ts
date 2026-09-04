@@ -20,14 +20,25 @@ const CHANNEL_LABELS = ["Client", "You"];
 // already on separate channels (system audio vs. mic), so we get reliable
 // "who said what" from the channel index instead of guessed diarization.
 export async function transcribeWav(wavBytes: Buffer): Promise<string> {
-  // detect_language turned out unreliable for Serbian specifically — tested
-  // side by side, it misclassified Slavic speech as Polish/Russian and
-  // produced garbled text, while explicitly setting the language transcribed
-  // correctly. DEEPGRAM_LANGUAGE lets this be overridden per deployment;
-  // defaults to Serbian since that's this workspace's actual call language
-  // today. TODO before onboarding non-Serbian-speaking customers: make this
-  // a per-workspace setting instead of one env-wide default.
-  const language = process.env.DEEPGRAM_LANGUAGE || "sr";
+  // Nova, not Whisper — Whisper (no forced language) transcribes mixed-
+  // language calls far more accurately (verified side by side on the same
+  // clip), but Deepgram spins up whisper-large on demand: a cold-start call
+  // measured 318s, past even Vercel Hobby's 300s Fluid-compute ceiling, so
+  // a cold start doesn't just run slow, Vercel kills it outright. Smaller
+  // Whisper tiers (medium/small) come back fast but translate rather than
+  // transcribe and hallucinate wrong numbers doing it (a test fee of "two
+  // thousand" came back as "$9000" from whisper-medium, "$1,000" from
+  // whisper-small) — worse than garbled text for a field that ends up in a
+  // contract, since a plausible-looking wrong number is easy to miss on
+  // review. Real customer calls aren't with Serbian clients, so
+  // DEEPGRAM_LANGUAGE defaults to English now instead — override per
+  // deployment if that's wrong for a given workspace. Doesn't fix a call
+  // that code-switches languages mid-sentence (non-English segments still
+  // get dropped or mangled) — no fast+accurate option for that exists in
+  // Deepgram's current lineup; revisit if Vercel's function-duration
+  // ceiling changes (e.g. a paid plan) or Deepgram's Whisper cold-start
+  // improves.
+  const language = process.env.DEEPGRAM_LANGUAGE || "en";
   const res = await fetch(`https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&punctuate=true&multichannel=true&language=${language}`, {
     method: "POST",
     headers: {
@@ -74,7 +85,8 @@ export async function transcribeWav(wavBytes: Buffer): Promise<string> {
 // MediaRecorder produced (typically audio/webm) — Deepgram accepts it
 // directly, no client-side conversion to WAV needed.
 export async function transcribeVoiceClip(audioBytes: Buffer, contentType: string): Promise<string> {
-  const language = process.env.DEEPGRAM_LANGUAGE || "sr";
+  // Same reasoning and same model/language choice as transcribeWav.
+  const language = process.env.DEEPGRAM_LANGUAGE || "en";
   const res = await fetch(`https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&punctuate=true&language=${language}`, {
     method: "POST",
     headers: {
