@@ -1,0 +1,16 @@
+# The Tauri desktop app (source + Rust build artifacts) has nothing to do
+# with the Next.js web app Vercel deploys — including it (src-tauri/target
+# alone runs several GB of compiled Rust output) blew past Vercel's upload
+# file-count/size limits. See desktop-app/.gitignore, which doesn't cover
+# src-tauri/target since that folder was never meant to leave the desktop
+# build machine in the first place.
+desktop-app
+
+# Local reference/working files kept in the repo root — not part of the
+# deployed app.
+*.csv
+*.xlsx
+privacy-audit-findings.md
+SEALME-PRODUCT-OVERVIEW.md
+sealme-gtm-outreach-kit.md
+sealme-target-companies.md

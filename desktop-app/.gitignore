@@ -13,6 +13,11 @@ dist-ssr
 *.local
 .env
 
+# Rust build output — several GB of compiled artifacts, never meant to
+# leave the build machine (was previously untracked-but-not-ignored,
+# which let a plain deploy tool's directory walk pick it all up)
+src-tauri/target
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
