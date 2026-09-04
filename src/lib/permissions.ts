@@ -21,3 +21,28 @@ export async function requirePermission(permission: Permission) {
   if (!user.role?.[permission]) throw new Error("You don't have permission to do that");
   return user;
 }
+
+// Every workspace needs exactly one isOwner role, created alongside it (see
+// the Role model's doc comment) — full permissions, can't be deleted, so
+// there's always at least one person who can manage the workspace even if
+// every custom role gets deleted. Call this right after prisma.workspace.create
+// at every signup path (credentials, Google OAuth, ...) and assign the
+// founding user's roleId to the result — a workspace whose founder never
+// gets this role can never create a role, invite a role-holding teammate,
+// or reach any canManageTeam/canManageWorkspace setting, with no way back in
+// short of a database edit.
+export async function createOwnerRole(workspaceId: string) {
+  return prisma.role.create({
+    data: {
+      workspaceId,
+      name: "Owner",
+      isOwner: true,
+      canManageWorkspace: true,
+      canManageTeam: true,
+      canManageTemplates: true,
+      canApproveContracts: true,
+      canApproveTemplates: true,
+      canViewAllDeals: true,
+    },
+  });
+}

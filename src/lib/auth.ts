@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { verifyPassword } from "@/lib/password";
 import { buildDefaultTemplates } from "@/lib/default-templates";
 import { attachOnboardingProfile } from "@/lib/onboarding";
+import { createOwnerRole } from "@/lib/permissions";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
 import { verifyTotpCode, consumeBackupCode, type BackupCode } from "@/lib/two-factor";
@@ -94,8 +95,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!user) {
           const name = (profile.name as string | undefined) ?? email;
           const workspace = await prisma.workspace.create({ data: { name: `${name}'s Workspace` } });
+          const ownerRole = await createOwnerRole(workspace.id);
           user = await prisma.user.create({
-            data: { workspaceId: workspace.id, name, email, passwordHash: null, emailVerifiedAt: new Date() },
+            data: { workspaceId: workspace.id, name, email, passwordHash: null, emailVerifiedAt: new Date(), roleId: ownerRole.id },
           });
           const templates = buildDefaultTemplates(workspace.name);
           await prisma.contractTemplate.createMany({

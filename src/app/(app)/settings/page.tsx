@@ -158,7 +158,11 @@ export default async function SettingsPage({
             </div>
           </div>
           <form action={toggleWorkspaceFlag.bind(null, "zoomConnected")}>
-            <button type="submit" className={workspace.zoomConnected ? "chip chip-success" : "btn btn-secondary btn-sm"}>
+            <button
+              type="submit"
+              className="btn btn-secondary btn-sm"
+              style={workspace.zoomConnected ? { background: "var(--success-soft)", color: "var(--success)", borderColor: "transparent" } : undefined}
+            >
               {workspace.zoomConnected ? "Connected ✓" : "Connect"}
             </button>
           </form>
@@ -172,7 +176,11 @@ export default async function SettingsPage({
             </div>
           </div>
           <form action={toggleWorkspaceFlag.bind(null, "meetConnected")}>
-            <button type="submit" className={workspace.meetConnected ? "chip chip-success" : "btn btn-secondary btn-sm"}>
+            <button
+              type="submit"
+              className="btn btn-secondary btn-sm"
+              style={workspace.meetConnected ? { background: "var(--success-soft)", color: "var(--success)", borderColor: "transparent" } : undefined}
+            >
               {workspace.meetConnected ? "Connected ✓" : "Connect"}
             </button>
           </form>
