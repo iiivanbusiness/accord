@@ -49,6 +49,10 @@ export default function LocalCaptureBanner() {
       localStorage.removeItem(LOCAL_CAPTURE_STORAGE_KEY);
       const dealId = session.dealId;
       setSession(null);
+      // Best-effort spoken recap of what the call produced — 204 (not
+      // configured, nothing extracted, provider hiccup) just means no
+      // audio plays. Never blocks the navigation below.
+      new Audio(`/api/deals/${dealId}/call-recap`).play().catch(() => {});
       router.push(`/deals/${dealId}`);
       router.refresh();
     } catch (err) {
