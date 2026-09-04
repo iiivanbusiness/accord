@@ -4,10 +4,19 @@ import DealTermsCard from "@/components/DealTermsCard";
 import ContinueCallButton from "@/components/ContinueCallButton";
 import ActionItemsCard from "@/components/ActionItemsCard";
 import SendToDocusignButton from "@/components/SendToDocusignButton";
+import VoiceCorrectionButton from "@/components/VoiceCorrectionButton";
 import { prisma } from "@/lib/db";
 import { requireWorkspaceId, requireWorkspace } from "@/lib/workspace";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
-import { fillMissingFields, generateContract, retryExtraction, sendViaDocusignNow, toggleActionItem, updateFieldValues } from "./actions";
+import {
+  applyVoiceFieldCorrection,
+  fillMissingFields,
+  generateContract,
+  retryExtraction,
+  sendViaDocusignNow,
+  toggleActionItem,
+  updateFieldValues,
+} from "./actions";
 
 const CALL_SOURCE_LABEL: Record<string, string> = {
   local: "Recorded locally",
@@ -161,6 +170,10 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
 
       <div className="flex flex-col gap-4">
         {deal.status !== "signed" && <ContinueCallButton dealId={deal.id} />}
+
+        {deal.status !== "signed" && deal.status !== "sent" && deal.fields.some((f) => f.status !== "missing") && (
+          <VoiceCorrectionButton dealId={deal.id} applyAction={applyVoiceFieldCorrection} />
+        )}
 
         {deal.status === "processing" ? (
           <div className="card flex items-center gap-2.5 px-5 py-4 text-[13.5px] font-medium" style={{ color: "var(--ink-muted)" }}>

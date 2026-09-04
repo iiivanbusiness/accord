@@ -130,6 +130,32 @@ export async function updateFieldValues(dealId: string, formData: FormData) {
   redirect(`/deals/${dealId}`);
 }
 
+// Applies exactly one field change the rep already confirmed after hearing
+// it read back (see /api/deals/[id]/voice-correction) — same
+// value/history-tracking shape as updateFieldValues, just for a single
+// field triggered from the voice-correction UI instead of the edit form.
+export async function applyVoiceFieldCorrection(dealId: string, fieldKey: string, newValue: string) {
+  const { where } = await dealVisibilityFilter();
+  const workspaceId = await requireWorkspaceId();
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId, ...where }, include: { fields: true } });
+  if (!deal) throw new Error("Deal not found");
+
+  const field = deal.fields.find((f) => f.fieldKey === fieldKey);
+  if (!field) throw new Error("Field not found");
+
+  const value = newValue.trim();
+  if (value && value !== field.value) {
+    if (field.value) {
+      await prisma.dealFieldChange.create({
+        data: { dealId, fieldKey: field.fieldKey, oldValue: field.value, newValue: value, changedBy: "voice" },
+      });
+    }
+    await prisma.dealField.update({ where: { id: field.id }, data: { value, status: "user_edited" } });
+  }
+
+  revalidatePath(`/deals/${dealId}`);
+}
+
 export async function sendContractEmail(dealId: string, formData: FormData) {
   const to = String(formData.get("to") ?? "").trim();
   const subject = String(formData.get("subject") ?? "").trim();
