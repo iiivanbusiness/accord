@@ -10,6 +10,7 @@ const FIELD_META: Record<string, { label: string; groupLabel: string }> = {
   startDate: { label: "Start date", groupLabel: "Client & engagement" },
   duration: { label: "Duration", groupLabel: "Client & engagement" },
   deliverables: { label: "Deliverables", groupLabel: "Scope" },
+  platforms: { label: "Platforms", groupLabel: "Scope" },
   fee: { label: "Fee", groupLabel: "Commercial terms" },
   paymentTerms: { label: "Payment terms", groupLabel: "Commercial terms" },
   cancellation: { label: "Cancellation terms", groupLabel: "Commercial terms" },
