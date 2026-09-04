@@ -10,7 +10,13 @@ export function isFishAudioConfigured(): boolean {
 // human-style confirmation instead of having to read the deal page. Reuses
 // the same summary/fields the live extraction already produced; this is
 // just a second, small pass that turns them into something meant to be
-// heard rather than read (no bullet points, no "Field: Value" recitation).
+// heard rather than read. Deliberately terse (a hard word cap, not just an
+// instruction) — the call summary itself is NOT meant to be read aloud,
+// only used as context, since testing showed the model would otherwise
+// just recite it end to end instead of producing a short spoken update.
+// If anything is still missing, names it and asks what to put there — the
+// rep can answer that directly via the push-to-talk button, which now
+// accepts corrections for missing fields too (see interpretVoiceCorrection).
 // Returns null when there's nothing worth reading back yet (call ended
 // before anything was captured) — the caller treats that as "skip it".
 export async function generateCallRecapScript(dealId: string): Promise<string | null> {
@@ -21,25 +27,29 @@ export async function generateCallRecapScript(dealId: string): Promise<string | 
   if (!deal) return null;
 
   const filled = deal.fields.filter((f) => f.value && f.status !== "missing");
-  if (filled.length === 0 && !deal.summary) return null;
+  const missing = deal.fields.filter((f) => f.status === "missing");
+  if (filled.length === 0 && missing.length === 0 && !deal.summary) return null;
 
-  const fieldLines = filled.map((f) => `${f.label}: ${f.value}`).join("\n");
+  const filledLines = filled.map((f) => f.label).join(", ") || "(none)";
+  const missingLines = missing.map((f) => f.label).join(", ") || "(none)";
 
   const client = new Anthropic();
   const response = await client.messages.create({
     model: "claude-sonnet-5",
-    max_tokens: 300,
+    max_tokens: 120,
     system:
-      "You just finished listening in on a sales call and filled in a contract from what was said. " +
-      "Write a short, warm, spoken-style recap for the rep who was on the call — 3 to 4 sentences, like a " +
-      "colleague reporting back, not a form reading out field names. Mention the client/company and the key " +
-      "terms naturally in flowing sentences. End by inviting them to fix anything that's off before it goes " +
-      "out. Always write the recap in English, even if the call summary and field values below are in " +
-      "another language. Output only the spoken text itself — no headers, no bullet points, no quotation marks.",
+      "You just finished listening in on a sales call and filled in what you could of a contract. Write a " +
+      "SHORT spoken update for the rep — at most 2 sentences, under 35 words total, no exceptions. Do NOT " +
+      "restate or summarize the call summary below — it's context only, never read it back. Just briefly name " +
+      "what got filled in (e.g. \"Filled in the contract for Acme — fee, dates, and deliverables are set.\"). " +
+      "If anything is listed as missing, name it specifically and ask what to put there (e.g. \"I didn't catch " +
+      "payment terms — what should I put?\"). If nothing is missing, invite them to fix anything that's off. " +
+      "Always respond in English regardless of what language the call was in. Output only the spoken text " +
+      "itself — no headers, no bullet points, no quotation marks.",
     messages: [
       {
         role: "user",
-        content: `Call summary: ${deal.summary ?? "(none)"}\n\nFilled fields:\n${fieldLines || "(none yet)"}`,
+        content: `Call summary (context only, do not read aloud): ${deal.summary ?? "(none)"}\n\nFilled in: ${filledLines}\n\nStill missing: ${missingLines}`,
       },
     ],
   });

@@ -146,12 +146,25 @@ export async function applyVoiceFieldCorrection(dealId: string, fieldKey: string
 
   const value = newValue.trim();
   if (value && value !== field.value) {
-    if (field.value) {
-      await prisma.dealFieldChange.create({
-        data: { dealId, fieldKey: field.fieldKey, oldValue: field.value, newValue: value, changedBy: "voice" },
-      });
+    if (field.status === "missing") {
+      // Filling in a previously-missing field via voice — same status/group
+      // shift as the manual "missing info" form (fillMissingFields), so it
+      // moves out of the Missing card into the regular deal-terms groups
+      // instead of just sitting there with a value but the wrong status.
+      await prisma.dealField.update({ where: { id: field.id }, data: { value, status: "confirmed", groupLabel: "Confirmed details" } });
+    } else {
+      if (field.value) {
+        await prisma.dealFieldChange.create({
+          data: { dealId, fieldKey: field.fieldKey, oldValue: field.value, newValue: value, changedBy: "voice" },
+        });
+      }
+      await prisma.dealField.update({ where: { id: field.id }, data: { value, status: "user_edited" } });
     }
-    await prisma.dealField.update({ where: { id: field.id }, data: { value, status: "user_edited" } });
+
+    const stillMissing = await prisma.dealField.count({ where: { dealId, status: "missing" } });
+    if (stillMissing === 0 && deal.status === "missing_info") {
+      await prisma.deal.update({ where: { id: dealId }, data: { status: "ready" } });
+    }
   }
 
   revalidatePath(`/deals/${dealId}`);

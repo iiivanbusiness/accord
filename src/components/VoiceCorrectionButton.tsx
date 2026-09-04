@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 type Proposal =
@@ -37,9 +37,41 @@ export default function VoiceCorrectionButton({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
+  function stopRecording() {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop();
+      setStatus("processing");
+    }
+  }
+
+  // A "hold" gesture doesn't reliably keep the pointer over the button the
+  // whole time — the button's own size/label changes the instant recording
+  // starts, which can shift it under the cursor and fire mouseleave mid-hold
+  // (ending the clip after a few ms, every time but the first). Listening on
+  // window instead of the button catches the actual release wherever it
+  // happens, and only while a recording is genuinely in progress.
+  useEffect(() => {
+    if (status !== "recording") return;
+    window.addEventListener("mouseup", stopRecording);
+    window.addEventListener("touchend", stopRecording);
+    return () => {
+      window.removeEventListener("mouseup", stopRecording);
+      window.removeEventListener("touchend", stopRecording);
+    };
+  }, [status]);
+
   async function startRecording() {
     setError(null);
     setProposal(null);
+    // Guard against a leftover recorder from a cycle that didn't clean up
+    // properly — stopping it releases its mic stream before we ask for a
+    // fresh one, instead of leaving an orphaned stream held open.
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.onstop = null;
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
+      mediaRecorderRef.current = null;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
@@ -56,13 +88,6 @@ export default function VoiceCorrectionButton({
       setStatus("recording");
     } catch {
       setError("Couldn't access the microphone — check your browser/system permission");
-    }
-  }
-
-  function stopRecording() {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-      setStatus("processing");
     }
   }
 
@@ -156,16 +181,13 @@ export default function VoiceCorrectionButton({
           <button
             type="button"
             disabled={status === "processing" || status === "applying"}
-            onMouseDown={startRecording}
-            onMouseUp={stopRecording}
-            onMouseLeave={() => status === "recording" && stopRecording()}
-            onTouchStart={(e) => {
+            onMouseDown={(e) => {
               e.preventDefault();
               startRecording();
             }}
-            onTouchEnd={(e) => {
+            onTouchStart={(e) => {
               e.preventDefault();
-              stopRecording();
+              startRecording();
             }}
             className="btn w-full justify-center"
             style={

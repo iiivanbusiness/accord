@@ -37,11 +37,16 @@ export async function interpretVoiceCorrection(
   });
   if (!deal) return null;
 
-  const editableFields = deal.fields.filter((f) => f.status !== "missing");
+  // Every field is fair game via voice — not just already-filled ones. The
+  // recap explicitly asks about missing fields by name, so the rep's reply
+  // has to be able to fill those in, not just correct existing values.
+  const editableFields = deal.fields;
   const teammates = deal.workspace.users.filter((u) => u.id !== currentUserId);
   if (editableFields.length === 0 && teammates.length === 0) return null;
 
-  const fieldList = editableFields.map((f) => `${f.fieldKey} (${f.label}): currently "${f.value ?? "(empty)"}"`).join("\n") || "(none)";
+  const fieldList =
+    editableFields.map((f) => `${f.fieldKey} (${f.label}): currently ${f.status === "missing" ? "MISSING — not captured yet" : `"${f.value}"`}`).join("\n") ||
+    "(none)";
   const teammateList = teammates.map((u) => `${u.id}: ${u.name}`).join("\n") || "(none)";
 
   const tools: Anthropic.Tool[] = [
@@ -63,13 +68,16 @@ export async function interpretVoiceCorrection(
   if (editableFields.length > 0) {
     tools.push({
       name: "propose_field_change",
-      description: "Propose a single field change based on what the rep said.",
+      description: "Propose a single field's value — either correcting an already-filled field or filling one currently marked MISSING.",
       input_schema: {
         type: "object",
         properties: {
           fieldKey: { type: "string", enum: editableFields.map((f) => f.fieldKey) },
           proposedValue: { type: "string", description: "The new value, formatted naturally the way it should appear in the contract." },
-          confirmationText: { type: "string", description: "A short spoken question (in English) reading back the proposed change." },
+          confirmationText: {
+            type: "string",
+            description: "A short spoken question (in English) reading back the proposed value — say \"setting\" for a field that was missing, \"changing\" for one that already had a value.",
+          },
         },
         required: ["fieldKey", "proposedValue", "confirmationText"],
       },
