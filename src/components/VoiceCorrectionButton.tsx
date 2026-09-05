@@ -256,13 +256,11 @@ export default function VoiceCorrectionButton({
               startRecording();
             }}
           />
-          <span className="text-center text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            {status === "recording"
-              ? "Listening — release to send"
-              : status === "processing"
-                ? "Thinking…"
-                : "Hold, say what should change (or who to send this to for review), let go."}
-          </span>
+          {(status === "recording" || status === "processing") && (
+            <span className="text-center text-[12px]" style={{ color: "var(--ink-muted)" }}>
+              {status === "recording" ? "Listening — release to send" : "Thinking…"}
+            </span>
+          )}
         </>
       )}
     </div>
