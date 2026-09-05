@@ -54,10 +54,6 @@ function VoiceWaveformCard({ recording, onPress }: { recording: boolean; onPress
         />
       </div>
 
-      <div className="w-full text-left text-[10.5px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
-        {recording ? "Listening…" : "Your Audio"}
-      </div>
-
       <div className="flex h-9 w-full items-end justify-center gap-[3px]">
         {WAVEFORM_BARS.map((bar, i) => (
           <span
