@@ -383,6 +383,17 @@ a {
 }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
 
+/* ---------- voice waveform card (VoiceCorrectionButton) ---------- */
+@keyframes mic-pulse-ring { 0% { transform: scale(1); opacity: 0.55; } 100% { transform: scale(1.9); opacity: 0; } }
+@keyframes scrub-drift { 0%, 100% { left: 6%; } 50% { left: 70%; } }
+@keyframes waveform-bar { 0%, 100% { transform: scaleY(0.28); } 50% { transform: scaleY(1); } }
+@keyframes send-pop { 0% { opacity: 0; transform: scale(0.92); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes send-fly {
+  0% { transform: translate(-26px, 8px) rotate(-10deg); opacity: 0; }
+  55% { transform: translate(4px, -6px) rotate(6deg); opacity: 1; }
+  100% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+}
+
 /* ---------- inputs ---------- */
 .input {
   background: var(--surface-1);

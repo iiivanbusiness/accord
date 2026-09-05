@@ -1,5 +1,6 @@
 "use client";
 
+import type { SyntheticEvent } from "react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
@@ -11,6 +12,97 @@ type Proposal =
 type ApiResponse = { transcript?: string; proposal?: Proposal; audioBase64?: string | null; error?: string };
 
 type Status = "idle" | "recording" | "processing" | "confirming" | "applying";
+
+const WAVEFORM_BARS = Array.from({ length: 22 }, (_, i) => ({
+  delay: (i % 7) * 0.11,
+  duration: 0.8 + (i % 5) * 0.15,
+}));
+
+// Decorative, always-in-motion waveform — animates continuously regardless
+// of whether anything is actually being recorded (the visual is meant to
+// read as "alive" at rest, not to reflect real audio levels). Doubles as
+// the push-to-talk hit target via onPress.
+function VoiceWaveformCard({ recording, onPress }: { recording: boolean; onPress: (e: SyntheticEvent) => void }) {
+  return (
+    <div
+      onMouseDown={onPress}
+      onTouchStart={onPress}
+      className="relative flex cursor-pointer select-none flex-col items-center gap-4 overflow-hidden rounded-[20px] px-6 py-7"
+      style={{
+        background: "linear-gradient(155deg, rgba(106,76,245,0.18), rgba(212,77,240,0.12))",
+        border: "1px solid rgba(255,255,255,0.14)",
+      }}
+    >
+      <div
+        className="relative flex h-16 w-16 items-center justify-center rounded-full"
+        style={{ background: "linear-gradient(155deg, var(--gradient-magenta), var(--gradient-violet))" }}
+      >
+        <span
+          className="absolute inset-0 rounded-full"
+          style={{ border: "2px solid var(--gradient-magenta)", animation: "mic-pulse-ring 2s ease-out infinite" }}
+        />
+        <span
+          className="absolute inset-0 rounded-full"
+          style={{ border: "2px solid var(--gradient-violet)", animation: "mic-pulse-ring 2s ease-out infinite 0.6s" }}
+        />
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style={{ position: "relative" }}>
+          <rect x="9" y="2" width="6" height="12" rx="3" fill="#fff" />
+          <path d="M5 11a7 7 0 0 0 14 0" stroke="#fff" strokeWidth="2" strokeLinecap="round" fill="none" />
+          <path d="M12 18v3" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      </div>
+
+      <div className="relative h-1.5 w-full rounded-full" style={{ background: "rgba(255,255,255,0.2)" }}>
+        <span
+          className="absolute rounded-full"
+          style={{ top: -6, width: 14, height: 14, background: "#fff", boxShadow: "0 0 10px rgba(255,255,255,0.6)", animation: "scrub-drift 3.4s ease-in-out infinite" }}
+        />
+      </div>
+
+      <div className="w-full text-left text-[10.5px] font-medium uppercase tracking-wide" style={{ color: "rgba(255,255,255,0.6)" }}>
+        {recording ? "Listening…" : "Your Audio"}
+      </div>
+
+      <div className="flex h-10 w-full items-end justify-center gap-[3px]">
+        {WAVEFORM_BARS.map((bar, i) => (
+          <span
+            key={i}
+            className="w-[3px] rounded-full"
+            style={{
+              height: 32,
+              background: recording ? "#fff" : "rgba(255,255,255,0.75)",
+              animation: `waveform-bar ${bar.duration}s ease-in-out infinite`,
+              animationDelay: `${bar.delay}s`,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Plays for a moment right after a "send this to X for review" gets
+// confirmed — the visual payoff for that specific action, distinct from
+// the plainer "field updated" case.
+function SendConfirmedCard({ recipientName }: { recipientName: string }) {
+  return (
+    <div
+      className="flex flex-col items-center gap-2.5 rounded-[20px] px-6 py-7 text-center"
+      style={{ background: "linear-gradient(155deg, var(--success-soft), transparent)", animation: "send-pop 0.35s ease-out" }}
+    >
+      <div
+        className="flex h-12 w-12 items-center justify-center rounded-full"
+        style={{ background: "var(--success)", animation: "send-fly 0.9s ease-out" }}
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M22 2 11 13" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M22 2 15 22l-4-9-9-4 20-7Z" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+      <p className="text-[13px] font-medium">Sent to {recipientName} for review</p>
+    </div>
+  );
+}
 
 // Push-to-talk voice control: hold the button, say what should change (or
 // who to send this to for review), release. Nothing is written or sent
@@ -33,6 +125,7 @@ export default function VoiceCorrectionButton({
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [justSentTo, setJustSentTo] = useState<string | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -129,6 +222,8 @@ export default function VoiceCorrectionButton({
           await applyAction(dealId, proposal.fieldKey, proposal.proposedValue);
         } else if (proposal.intent === "send_for_review") {
           await reviewAction(dealId, proposal.recipientUserId);
+          setJustSentTo(proposal.recipientName);
+          setTimeout(() => setJustSentTo(null), 2200);
         }
         router.refresh();
       } catch {
@@ -157,7 +252,9 @@ export default function VoiceCorrectionButton({
         </div>
       )}
 
-      {status === "confirming" && proposal ? (
+      {justSentTo ? (
+        <SendConfirmedCard recipientName={justSentTo} />
+      ) : status === "confirming" && proposal ? (
         <div className="flex flex-col gap-2.5">
           <p className="text-[13px] leading-relaxed">{proposal.confirmationText}</p>
           {(proposal.intent === "update_field" || proposal.intent === "send_for_review") && (
@@ -178,28 +275,20 @@ export default function VoiceCorrectionButton({
         </div>
       ) : (
         <>
-          <button
-            type="button"
-            disabled={status === "processing" || status === "applying"}
-            onMouseDown={(e) => {
+          <VoiceWaveformCard
+            recording={status === "recording"}
+            onPress={(e) => {
               e.preventDefault();
+              if (status === "processing" || status === "applying") return;
               startRecording();
             }}
-            onTouchStart={(e) => {
-              e.preventDefault();
-              startRecording();
-            }}
-            className="btn w-full justify-center"
-            style={
-              status === "recording"
-                ? { background: "var(--warn)", color: "#fff" }
-                : { background: "var(--surface-1)", color: "var(--ink)", border: "1px solid var(--hairline)" }
-            }
-          >
-            {status === "recording" ? "🎙 Listening — release to send" : status === "processing" ? "Thinking…" : "🎙 Hold to talk"}
-          </button>
+          />
           <span className="text-center text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            Hold, say what should change (or who to send this to for review), let go.
+            {status === "recording"
+              ? "Listening — release to send"
+              : status === "processing"
+                ? "Thinking…"
+                : "Hold, say what should change (or who to send this to for review), let go."}
           </span>
         </>
       )}
