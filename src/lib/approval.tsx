@@ -50,7 +50,7 @@ export async function requestOrSendContract(
   dealId: string,
   pending: PendingEmail,
   actorEmail?: string | null
-): Promise<"sent" | "pending_approval"> {
+): Promise<{ status: "sent" } | { status: "pending_approval"; approverRoleName: string }> {
   const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { contract: true } });
   if (!deal || !deal.contract) throw new Error("Deal not found");
   const contractId = deal.contract.id;
@@ -60,7 +60,7 @@ export async function requestOrSendContract(
   if (!chain || chain.steps.length === 0) {
     await performActualSend(contractId, pending);
     await logAudit({ workspaceId: deal.workspaceId, actorEmail, action: "contract.sent", targetType: "Deal", targetId: dealId, metadata: { to: pending.to } });
-    return "sent";
+    return { status: "sent" };
   }
 
   // A contract re-entering approval after a rejection gets a fresh
@@ -86,7 +86,8 @@ export async function requestOrSendContract(
 
   await notifyStepApprovers(dealId, chain.steps[0].roleId);
 
-  return "pending_approval";
+  const firstRole = await prisma.role.findUnique({ where: { id: chain.steps[0].roleId } });
+  return { status: "pending_approval", approverRoleName: firstRole?.name ?? "the approver" };
 }
 
 // Actually emails the client — either right away (no chain configured) or

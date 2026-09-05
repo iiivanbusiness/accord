@@ -3,6 +3,7 @@
 import type { SyntheticEvent } from "react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import SentConfirmationCard from "./SentConfirmationCard";
 
 type Proposal =
   | { intent: "update_field"; fieldKey: string; fieldLabel: string; currentValue: string | null; proposedValue: string; confirmationText: string }
@@ -21,85 +22,57 @@ const WAVEFORM_BARS = Array.from({ length: 22 }, (_, i) => ({
 // Decorative, always-in-motion waveform — animates continuously regardless
 // of whether anything is actually being recorded (the visual is meant to
 // read as "alive" at rest, not to reflect real audio levels). Doubles as
-// the push-to-talk hit target via onPress.
+// the push-to-talk hit target via onPress. Monochrome on purpose, to match
+// the rest of the app rather than stand out as its own themed element.
 function VoiceWaveformCard({ recording, onPress }: { recording: boolean; onPress: (e: SyntheticEvent) => void }) {
   return (
     <div
       onMouseDown={onPress}
       onTouchStart={onPress}
-      className="relative flex cursor-pointer select-none flex-col items-center gap-4 overflow-hidden rounded-[20px] px-6 py-7"
-      style={{
-        background: "linear-gradient(155deg, rgba(106,76,245,0.18), rgba(212,77,240,0.12))",
-        border: "1px solid rgba(255,255,255,0.14)",
-      }}
+      className="relative flex cursor-pointer select-none flex-col items-center gap-4 rounded-[16px] px-6 py-6"
+      style={{ background: "var(--surface-2)", border: "1px solid var(--hairline)" }}
     >
       <div
-        className="relative flex h-16 w-16 items-center justify-center rounded-full"
-        style={{ background: "linear-gradient(155deg, var(--gradient-magenta), var(--gradient-violet))" }}
+        className="relative flex h-11 w-11 items-center justify-center rounded-full"
+        style={{ background: "var(--ink)" }}
       >
         <span
           className="absolute inset-0 rounded-full"
-          style={{ border: "2px solid var(--gradient-magenta)", animation: "mic-pulse-ring 2s ease-out infinite" }}
+          style={{ border: "1.5px solid var(--ink-muted)", animation: "mic-pulse-ring 2s ease-out infinite" }}
         />
-        <span
-          className="absolute inset-0 rounded-full"
-          style={{ border: "2px solid var(--gradient-violet)", animation: "mic-pulse-ring 2s ease-out infinite 0.6s" }}
-        />
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style={{ position: "relative" }}>
-          <rect x="9" y="2" width="6" height="12" rx="3" fill="#fff" />
-          <path d="M5 11a7 7 0 0 0 14 0" stroke="#fff" strokeWidth="2" strokeLinecap="round" fill="none" />
-          <path d="M12 18v3" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ position: "relative" }}>
+          <rect x="9" y="2" width="6" height="12" rx="3" fill="var(--surface-2)" />
+          <path d="M5 11a7 7 0 0 0 14 0" stroke="var(--surface-2)" strokeWidth="2" strokeLinecap="round" fill="none" />
+          <path d="M12 18v3" stroke="var(--surface-2)" strokeWidth="2" strokeLinecap="round" />
         </svg>
       </div>
 
-      <div className="relative h-1.5 w-full rounded-full" style={{ background: "rgba(255,255,255,0.2)" }}>
+      <div className="relative h-1 w-full rounded-full" style={{ background: "var(--hairline)" }}>
         <span
           className="absolute rounded-full"
-          style={{ top: -6, width: 14, height: 14, background: "#fff", boxShadow: "0 0 10px rgba(255,255,255,0.6)", animation: "scrub-drift 3.4s ease-in-out infinite" }}
+          style={{ top: -3.5, width: 8, height: 8, background: "var(--ink)", animation: "scrub-drift 3.4s ease-in-out infinite" }}
         />
       </div>
 
-      <div className="w-full text-left text-[10.5px] font-medium uppercase tracking-wide" style={{ color: "rgba(255,255,255,0.6)" }}>
+      <div className="w-full text-left text-[10.5px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
         {recording ? "Listening…" : "Your Audio"}
       </div>
 
-      <div className="flex h-10 w-full items-end justify-center gap-[3px]">
+      <div className="flex h-9 w-full items-end justify-center gap-[3px]">
         {WAVEFORM_BARS.map((bar, i) => (
           <span
             key={i}
             className="w-[3px] rounded-full"
             style={{
-              height: 32,
-              background: recording ? "#fff" : "rgba(255,255,255,0.75)",
+              height: 28,
+              background: recording ? "var(--ink)" : "var(--ink-muted)",
+              opacity: recording ? 1 : 0.55,
               animation: `waveform-bar ${bar.duration}s ease-in-out infinite`,
               animationDelay: `${bar.delay}s`,
             }}
           />
         ))}
       </div>
-    </div>
-  );
-}
-
-// Plays for a moment right after a "send this to X for review" gets
-// confirmed — the visual payoff for that specific action, distinct from
-// the plainer "field updated" case.
-function SendConfirmedCard({ recipientName }: { recipientName: string }) {
-  return (
-    <div
-      className="flex flex-col items-center gap-2.5 rounded-[20px] px-6 py-7 text-center"
-      style={{ background: "linear-gradient(155deg, var(--success-soft), transparent)", animation: "send-pop 0.35s ease-out" }}
-    >
-      <div
-        className="flex h-12 w-12 items-center justify-center rounded-full"
-        style={{ background: "var(--success)", animation: "send-fly 0.9s ease-out" }}
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M22 2 11 13" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M22 2 15 22l-4-9-9-4 20-7Z" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </div>
-      <p className="text-[13px] font-medium">Sent to {recipientName} for review</p>
     </div>
   );
 }
@@ -253,7 +226,7 @@ export default function VoiceCorrectionButton({
       )}
 
       {justSentTo ? (
-        <SendConfirmedCard recipientName={justSentTo} />
+        <SentConfirmationCard title={`Sent to ${justSentTo} for review`} />
       ) : status === "confirming" && proposal ? (
         <div className="flex flex-col gap-2.5">
           <p className="text-[13px] leading-relaxed">{proposal.confirmationText}</p>

@@ -5,7 +5,7 @@ import { isEmailConfigured } from "@/lib/email";
 import { requireWorkspace, requireWorkspaceId } from "@/lib/workspace";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import { sendContractEmail } from "../actions";
-import CountersignerFields from "@/components/CountersignerFields";
+import SendContractForm from "@/components/SendContractForm";
 
 export default async function SendContractPage({
   params,
@@ -60,40 +60,17 @@ export default async function SendContractPage({
       </div>
     )}
 
-    <form action={sendContractEmail.bind(null, deal.id)} className="card flex max-w-[560px] flex-col gap-4 p-6">
-      <label className="flex flex-col gap-1.5">
-        <span className="text-[13px] font-medium">To</span>
-        <input name="to" type="email" required defaultValue={deal.client.email ?? ""} placeholder="client@company.com" className="input" />
-      </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="text-[13px] font-medium">CC <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>(optional — comma-separated, gets a copy but doesn&apos;t sign)</span></span>
-        <input name="cc" placeholder="assistant@client.com, ops@yourcompany.com" className="input" />
-      </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="text-[13px] font-medium">Subject</span>
-        <input name="subject" required defaultValue={defaultSubject} className="input" />
-      </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="text-[13px] font-medium">Message</span>
-        <textarea name="message" required rows={7} defaultValue={defaultMessage} className="input" />
-        <span className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
-          The sign link is appended below your message automatically.
-        </span>
-      </label>
-      <CountersignerFields clientName={deal.client.name} />
-      {docusignAvailable && (
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-medium">Sign via</span>
-          <select name="deliveryMethod" defaultValue="sealme" className="input">
-            <option value="sealme">SealMe (built-in signing)</option>
-            <option value="docusign">DocuSign ({workspace?.docusignAccountEmail})</option>
-          </select>
-        </label>
-      )}
-      <button type="submit" disabled={!configured} className="btn btn-primary mt-2 w-full justify-center">
-        Send
-      </button>
-    </form>
+    <SendContractForm
+      dealId={deal.id}
+      configured={configured}
+      defaultTo={deal.client.email ?? ""}
+      defaultSubject={defaultSubject}
+      defaultMessage={defaultMessage}
+      clientName={deal.client.name}
+      docusignAvailable={docusignAvailable}
+      docusignAccountEmail={workspace?.docusignAccountEmail ?? null}
+      sendAction={sendContractEmail}
+    />
     </>
   );
 }

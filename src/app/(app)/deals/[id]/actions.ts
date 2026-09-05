@@ -259,13 +259,14 @@ export async function sendContractEmail(dealId: string, formData: FormData) {
   }
 
   const session = await auth();
+  let result: Awaited<ReturnType<typeof requestOrSendContract>>;
   try {
-    await requestOrSendContract(dealId, { to, subject, message }, session?.user?.email);
+    result = await requestOrSendContract(dealId, { to, subject, message }, session?.user?.email);
   } catch {
-    redirect(`/deals/${dealId}/send?error=${encodeURIComponent("Couldn't send the email — check your Resend setup and try again.")}`);
+    throw new Error("Couldn't send the email — check your Resend setup and try again.");
   }
 
-  redirect(`/deals/${dealId}/contract`);
+  return result;
 }
 
 // Spins up a fresh deal for the same client, pre-filled with the current
