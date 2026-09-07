@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { parseFee } from "@/lib/money";
+import { generatePkce } from "@/lib/sso";
+import { encode as encodeJwt, decode as decodeJwt } from "next-auth/jwt";
 
 // A per-workspace OAuth connection to the WORKSPACE'S OWN Salesforce org —
 // same shape as docusign.ts, not a SealMe-owned shared install like Slack.
@@ -24,12 +26,51 @@ function redirectUri(): string {
   return `${base}/api/salesforce/callback`;
 }
 
-export function buildSalesforceAuthorizeUrl(): string {
+// This org (like most recent Salesforce orgs) requires PKCE on its
+// Connected Apps — the plain authorize redirect gets rejected with
+// "missing required code challenge" otherwise. The verifier can't just
+// ride in a query param (it'd be visible to anyone watching the redirect,
+// defeating the point), so it travels the same way sso.ts's OIDC PKCE
+// verifier does: inside a short-lived signed JWT passed as `state`,
+// verified and consumed in the callback. No separate cookie or DB row
+// needed for something this short-lived.
+const SALESFORCE_STATE_SALT = "salesforce-oauth-state";
+const SALESFORCE_STATE_MAX_AGE = 10 * 60;
+
+function authSecret(): string {
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) throw new Error("AUTH_SECRET is not configured");
+  return secret;
+}
+
+type SalesforceState = { workspaceId: string; codeVerifier: string };
+
+async function signState(state: SalesforceState): Promise<string> {
+  return encodeJwt({ token: state, secret: authSecret(), salt: SALESFORCE_STATE_SALT, maxAge: SALESFORCE_STATE_MAX_AGE });
+}
+
+async function verifyState(token: string): Promise<SalesforceState | null> {
+  try {
+    const payload = await decodeJwt<SalesforceState>({ token, secret: authSecret(), salt: SALESFORCE_STATE_SALT });
+    if (!payload || typeof payload.workspaceId !== "string" || typeof payload.codeVerifier !== "string") return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+export async function buildSalesforceAuthorizeUrl(workspaceId: string): Promise<string> {
+  const { codeVerifier, codeChallenge } = generatePkce();
+  const state = await signState({ workspaceId, codeVerifier });
+
   const params = new URLSearchParams({
     response_type: "code",
     client_id: process.env.SALESFORCE_CLIENT_ID ?? "",
     redirect_uri: redirectUri(),
     scope: "api refresh_token offline_access",
+    state,
+    code_challenge: codeChallenge,
+    code_challenge_method: "S256",
   });
   return `${LOGIN_URL}/services/oauth2/authorize?${params.toString()}`;
 }
@@ -62,14 +103,20 @@ async function fetchIdentity(idUrl: string, accessToken: string): Promise<Salesf
   return res.json() as Promise<SalesforceIdentity>;
 }
 
-export async function exchangeSalesforceCode(code: string): Promise<{
-  accessToken: string; refreshToken: string; instanceUrl: string; accountEmail: string;
+export async function exchangeSalesforceCode(code: string, state: string): Promise<{
+  workspaceId: string; accessToken: string; refreshToken: string; instanceUrl: string; accountEmail: string;
 }> {
-  const tokens = await requestToken(new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: redirectUri() }));
+  const parsedState = await verifyState(state);
+  if (!parsedState) throw new Error("That Salesforce login link expired or was tampered with — try connecting again");
+
+  const tokens = await requestToken(
+    new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: redirectUri(), code_verifier: parsedState.codeVerifier })
+  );
   if (!tokens.refresh_token) throw new Error("Salesforce didn't return a refresh token — check the Connected App's OAuth scopes include 'refresh_token, offline_access'");
   const identity = await fetchIdentity(tokens.id, tokens.access_token);
 
   return {
+    workspaceId: parsedState.workspaceId,
     accessToken: tokens.access_token,
     refreshToken: tokens.refresh_token,
     instanceUrl: tokens.instance_url,

@@ -9,15 +9,19 @@ import { logAudit } from "@/lib/audit";
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
+  const state = url.searchParams.get("state");
   const error = url.searchParams.get("error");
 
   if (error) return NextResponse.redirect(new URL(`/settings?error=salesforce_${error}`, req.url));
-  if (!code) return NextResponse.redirect(new URL("/settings?error=salesforce_no_code", req.url));
+  if (!code || !state) return NextResponse.redirect(new URL("/settings?error=salesforce_no_code", req.url));
 
   try {
     await requirePermission("canManageWorkspace");
     const workspaceId = await requireWorkspaceId();
-    const tokens = await exchangeSalesforceCode(code);
+    const tokens = await exchangeSalesforceCode(code, state);
+    if (tokens.workspaceId !== workspaceId) {
+      throw new Error("Salesforce login started from a different workspace session");
+    }
 
     await prisma.workspace.update({
       where: { id: workspaceId },
