@@ -12,6 +12,7 @@ import { currentUserWithRole } from "@/lib/permissions";
 import { dispatchWebhookEvent } from "@/lib/webhooks";
 import { notifySlack } from "@/lib/slack";
 import { syncDealToHubspot } from "@/lib/hubspot";
+import { syncDealToSalesforce } from "@/lib/salesforce";
 
 // Every path here costs real money one way or another (Anthropic tokens for
 // extraction, a live Recall bot-minute for calls) — callsLimit was tracked
@@ -73,6 +74,7 @@ export async function createDeal(formData: FormData) {
   await dispatchWebhookEvent(workspaceId, "deal.created", { dealId: deal.id, clientName, company, service, feeDisplay, status: deal.status });
   await notifySlack(workspaceId, { type: "deal.created", dealId: deal.id, clientName, service });
   await syncDealToHubspot(workspaceId, deal.id);
+  await syncDealToSalesforce(workspaceId, deal.id);
 
   redirect(`/deals/${deal.id}`);
 }
@@ -143,6 +145,7 @@ export async function createDealFromTranscript(formData: FormData) {
   await dispatchWebhookEvent(workspaceId, "deal.created", { dealId: deal.id, clientName: extracted.clientName, service, feeDisplay: fee, status: deal.status });
   await notifySlack(workspaceId, { type: "deal.created", dealId: deal.id, clientName: extracted.clientName, service });
   await syncDealToHubspot(workspaceId, deal.id);
+  await syncDealToSalesforce(workspaceId, deal.id);
 
   redirect(`/deals/${deal.id}`);
 }
@@ -204,6 +207,7 @@ export async function startCallFromEvent(formData: FormData) {
   await dispatchWebhookEvent(workspaceId, "deal.created", { dealId: deal.id, clientName, status: deal.status });
   await notifySlack(workspaceId, { type: "deal.created", dealId: deal.id, clientName, service: "" });
   await syncDealToHubspot(workspaceId, deal.id);
+  await syncDealToSalesforce(workspaceId, deal.id);
 
   redirect(`/deals/${deal.id}`);
 }
@@ -256,6 +260,7 @@ export async function startLocalCapture(formData: FormData): Promise<{ dealId: s
   await dispatchWebhookEvent(workspaceId, "deal.created", { dealId: deal.id, clientName, status: deal.status });
   await notifySlack(workspaceId, { type: "deal.created", dealId: deal.id, clientName, service: "" });
   await syncDealToHubspot(workspaceId, deal.id);
+  await syncDealToSalesforce(workspaceId, deal.id);
 
   return { dealId: deal.id, token: rawToken };
 }
@@ -351,6 +356,7 @@ export async function startCallBot(formData: FormData) {
   await dispatchWebhookEvent(workspaceId, "deal.created", { dealId: deal.id, clientName, status: deal.status });
   await notifySlack(workspaceId, { type: "deal.created", dealId: deal.id, clientName, service: "" });
   await syncDealToHubspot(workspaceId, deal.id);
+  await syncDealToSalesforce(workspaceId, deal.id);
 
   redirect(`/deals/${deal.id}`);
 }

@@ -7,6 +7,7 @@ import { parseFee } from "@/lib/money";
 import { dispatchWebhookEvent } from "@/lib/webhooks";
 import { notifySlack } from "@/lib/slack";
 import { syncDealToHubspot } from "@/lib/hubspot";
+import { syncDealToSalesforce } from "@/lib/salesforce";
 import { fillClauses } from "@/lib/contract";
 import { ContractPdfDocument } from "@/lib/contract-pdf";
 import { sendDocusignEnvelope, type EnvelopeSigner } from "@/lib/docusign";
@@ -172,6 +173,7 @@ export async function performActualSend(contractId: string, pendingOverride?: Pe
   });
   await notifySlack(workspace.id, { type: "contract.sent", dealId: deal.id, clientName: deal.client.name });
   await syncDealToHubspot(workspace.id, deal.id);
+  await syncDealToSalesforce(workspace.id, deal.id);
 }
 
 // Notifies whoever currently holds the given role that a contract needs

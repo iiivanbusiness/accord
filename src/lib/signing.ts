@@ -4,6 +4,7 @@ import { extractRenewalTerms } from "@/lib/extract-renewal";
 import { dispatchWebhookEvent } from "@/lib/webhooks";
 import { notifySlack } from "@/lib/slack";
 import { syncDealToHubspot } from "@/lib/hubspot";
+import { syncDealToSalesforce } from "@/lib/salesforce";
 import { logAudit } from "@/lib/audit";
 
 function appUrl(): string {
@@ -66,6 +67,7 @@ export async function finalizeContractSigned(contractId: string): Promise<void> 
     signerName: contract.signerName ?? contract.deal.client.name,
   });
   await syncDealToHubspot(contract.deal.workspaceId, contract.dealId);
+  await syncDealToSalesforce(contract.deal.workspaceId, contract.dealId);
 }
 
 // Called right after ANY signer (the client, or a counter-signer) signs.

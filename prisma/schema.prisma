@@ -114,6 +114,21 @@ model Workspace {
   docusignBaseUri       String?
   docusignAccountEmail  String?
 
+  // Salesforce — same shape as DocuSign above: a per-workspace OAuth
+  // connection to the WORKSPACE'S OWN Salesforce org (a SealMe-registered
+  // Connected App, but the authorization and the org itself belong to the
+  // customer), not a SealMe-owned shared install like Slack. Access tokens
+  // expire and need the refresh token to renew. instanceUrl is required on
+  // every API call afterward — Salesforce orgs live on their own
+  // instance/domain, there's no single fixed API host. Pushes Client as
+  // Contact and Deal as Opportunity; see src/lib/salesforce.ts.
+  salesforceEnabled        Boolean   @default(false)
+  salesforceAccessToken    String?
+  salesforceRefreshToken   String?
+  salesforceTokenExpiresAt DateTime?
+  salesforceInstanceUrl    String?
+  salesforceAccountEmail   String?
+
   createdAt          DateTime @default(now())
 
   users             User[]
@@ -295,6 +310,9 @@ model Client {
   // later syncs update that same record instead of creating a duplicate.
   hubspotContactId String?
 
+  // Same idea, for Salesforce — set once pushed as a Contact there.
+  salesforceContactId String?
+
   deals Deal[]
 }
 
@@ -375,6 +393,9 @@ model Deal {
   // Set once this deal has been pushed to HubSpot as a Deal object — lets
   // a later status change (sent, signed) update that same record.
   hubspotDealId String?
+
+  // Same idea, for Salesforce — set once pushed as an Opportunity there.
+  salesforceOpportunityId String?
 
   fields       DealField[]
   contract     Contract?

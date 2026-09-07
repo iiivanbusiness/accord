@@ -16,7 +16,9 @@ import DeveloperSettingsLink from "@/components/DeveloperSettingsLink";
 import SlackSettingsPanel from "@/components/SlackSettingsPanel";
 import HubspotSettingsPanel from "@/components/HubspotSettingsPanel";
 import DocusignSettingsPanel from "@/components/DocusignSettingsPanel";
+import SalesforceSettingsPanel from "@/components/SalesforceSettingsPanel";
 import { isDocusignConfigured } from "@/lib/docusign";
+import { isSalesforceConfigured } from "@/lib/salesforce";
 import { listSlackChannels, isSlackConfigured } from "@/lib/slack";
 import {
   checkSenderDomainVerification,
@@ -43,6 +45,7 @@ import { createDelegation, revokeDelegation } from "./delegation-actions";
 import { setSlackChannel, toggleSlack, disconnectSlack } from "./slack-actions";
 import { connectHubspot, toggleHubspot, disconnectHubspot } from "./hubspot-actions";
 import { toggleDocusign, disconnectDocusign } from "./docusign-actions";
+import { toggleSalesforce, disconnectSalesforce } from "./salesforce-actions";
 
 function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notifyOnSigned" | "autoRemind" }) {
   return (
@@ -466,6 +469,25 @@ export default async function SettingsPage({
           enabled={workspace.docusignEnabled}
           toggleAction={toggleDocusign}
           disconnectAction={disconnectDocusign}
+        />
+      </div>
+    )}
+
+    {canManageWorkspacePerm && (
+      <div className="card mb-4 max-w-[600px]">
+        <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
+          <h2 className="text-[15px] font-medium">Salesforce</h2>
+          <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
+            Push clients and deals to your own Salesforce org as Contacts and Opportunities — one-directional, SealMe stays the source of truth until a contract is signed.
+          </div>
+        </div>
+        <SalesforceSettingsPanel
+          configured={isSalesforceConfigured()}
+          connected={Boolean(workspace.salesforceRefreshToken)}
+          accountEmail={workspace.salesforceAccountEmail}
+          enabled={workspace.salesforceEnabled}
+          toggleAction={toggleSalesforce}
+          disconnectAction={disconnectSalesforce}
         />
       </div>
     )}
