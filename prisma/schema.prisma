@@ -381,6 +381,27 @@ model Deal {
   calls        Call[]
   fieldChanges DealFieldChange[]
   actionItems  ActionItem[]
+  notes        DealNote[]
+}
+
+// A free-form internal note on a deal — the "leave a comment for a
+// colleague" gap ClauseComment/ApprovalStep notes don't cover (those are
+// both tied to a specific clause or approval decision, not a general
+// place for the team to leave context). Visible only inside the
+// workspace, never to the client. authorEmail/authorName are denormalized
+// (same pattern as AuditLog) rather than a User relation, so a note
+// survives the author leaving the workspace instead of needing an
+// onDelete policy decision.
+model DealNote {
+  id          String   @id @default(cuid())
+  dealId      String
+  deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  authorEmail String
+  authorName  String
+  body        String
+  createdAt   DateTime @default(now())
+
+  @@index([dealId, createdAt])
 }
 
 // One row per recording session attached to a deal — a deal that started

@@ -9,6 +9,38 @@ import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
 
+// Statuses a drag-and-drop board move is allowed to set directly — pure
+// review-state flags with no side effect on anything outside this row.
+// Everything else (pending_approval, sent, signed, extraction_failed) is
+// the result of a real action (an approval chain resolving, an email
+// actually going out, a signature actually being captured) and has to
+// stay reachable only through that action, not a drag — a board move
+// can't fake a signature or skip an approval gate. updateDealStatus
+// rejects any drop into or out of those with a clear error rather than
+// silently no-op'ing, so the board can tell the user why it didn't move.
+const DRAGGABLE_STATUSES = ["processing", "missing_info", "changes_requested", "ready"] as const;
+
+export async function updateDealStatus(dealId: string, newStatus: string): Promise<void> {
+  if (!DRAGGABLE_STATUSES.includes(newStatus as (typeof DRAGGABLE_STATUSES)[number])) {
+    throw new Error("That status can only be reached through its real action (send, approve, sign), not by dragging.");
+  }
+
+  const { where } = await dealVisibilityFilter();
+  const workspaceId = await requireWorkspaceId();
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId, ...where } });
+  if (!deal) throw new Error("Deal not found");
+  if (!DRAGGABLE_STATUSES.includes(deal.status as (typeof DRAGGABLE_STATUSES)[number])) {
+    throw new Error("This deal has already moved past manual review — its status can't be dragged anymore.");
+  }
+
+  await prisma.deal.update({ where: { id: dealId }, data: { status: newStatus } });
+
+  const session = await auth();
+  await logAudit({ workspaceId, actorEmail: session?.user?.email, action: "deal.status_dragged", targetType: "Deal", targetId: dealId, metadata: { from: deal.status, to: newStatus } });
+
+  revalidatePath("/deals");
+}
+
 // An explicit manual nudge, not the automated 3-day cron — bypasses that
 // cron's cutoff and its per-workspace autoRemind opt-in (someone actively
 // chose to remind these clients right now), but still sets reminderSentAt

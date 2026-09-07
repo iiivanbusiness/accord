@@ -1,9 +1,19 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireWorkspace, requireWorkspaceId } from "@/lib/workspace";
+import { parseFee } from "@/lib/money";
 import DealsBulkTable from "@/components/DealsBulkTable";
-import { bulkRemind, bulkSend } from "./bulk-actions";
+import DealsBoard from "@/components/DealsBoard";
+import DealsFilterBar from "@/components/DealsFilterBar";
+import { bulkRemind, bulkSend, updateDealStatus } from "./bulk-actions";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
+
+const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
+const STALE_STATUSES = new Set(["ready", "missing_info"]);
+
+function isDealStale(status: string, updatedAt: Date): boolean {
+  return STALE_STATUSES.has(status) && Date.now() - updatedAt.getTime() > STALE_AFTER_MS;
+}
 
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -40,17 +50,6 @@ const STATUS_CHIP: Record<string, string> = {
 
 const BOARD_COLUMNS = ["processing", "missing_info", "extraction_failed", "ready", "pending_approval", "changes_requested", "sent", "signed"] as const;
 
-const BOARD_COLUMN_LABEL: Record<string, string> = {
-  processing: "Analyzing",
-  missing_info: "Missing info",
-  extraction_failed: "Couldn't process",
-  ready: "Ready",
-  pending_approval: "Awaiting approval",
-  changes_requested: "Changes requested",
-  sent: "Sent",
-  signed: "Signed",
-};
-
 function ViewTab({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
   return (
     <Link
@@ -66,19 +65,34 @@ function ViewTab({ href, active, children }: { href: string; active: boolean; ch
 export default async function DealsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; q?: string; status?: string; owner?: string }>;
 }) {
-  const { view } = await searchParams;
+  const { view, q, status, owner } = await searchParams;
   const isBoard = view === "board";
   const workspaceId = await requireWorkspaceId();
   const { where: visibility, canViewAll } = await dealVisibilityFilter();
-  const [workspace, deals] = await Promise.all([
+
+  const filterWhere = {
+    ...(status ? { status } : {}),
+    ...(owner ? { ownerId: owner } : {}),
+    ...(q
+      ? {
+          OR: [
+            { client: { name: { contains: q, mode: "insensitive" as const } } },
+            { service: { contains: q, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
+
+  const [workspace, deals, owners] = await Promise.all([
     requireWorkspace(),
     prisma.deal.findMany({
-      where: { workspaceId, ...visibility },
+      where: { workspaceId, ...visibility, ...filterWhere },
       include: { client: true, contract: true, owner: true },
       orderBy: { updatedAt: "desc" },
     }),
+    canViewAll ? prisma.user.findMany({ where: { workspaceId }, select: { id: true, name: true }, orderBy: { name: "asc" } }) : Promise.resolve([]),
   ]);
 
   const tableRows = deals.map((deal) => ({
@@ -86,19 +100,28 @@ export default async function DealsPage({
     clientName: deal.client.name,
     service: deal.service,
     feeDisplay: deal.feeDisplay,
+    feeValue: parseFee(deal.feeDisplay),
     statusLabel: STATUS_LABEL[deal.status] ?? deal.status,
     statusChip: STATUS_CHIP[deal.status] ?? "chip-neutral",
     updatedAgo: timeAgo(deal.updatedAt),
+    updatedAt: deal.updatedAt.getTime(),
     ownerName: deal.owner?.name ?? null,
+    isStale: isDealStale(deal.status, deal.updatedAt),
     canRemind: deal.contract?.status === "sent" && Boolean(deal.client.email),
     canSend: deal.contract?.status === "draft" && Boolean(deal.client.email),
   }));
 
-  const byColumn = new Map<string, typeof deals>();
-  for (const col of BOARD_COLUMNS) byColumn.set(col, []);
+  const byColumn: Record<string, { id: string; clientName: string; service: string; feeDisplay: string; updatedAgo: string }[]> = {};
+  for (const col of BOARD_COLUMNS) byColumn[col] = [];
   for (const deal of deals) {
-    if (!byColumn.has(deal.status)) byColumn.set(deal.status, []);
-    byColumn.get(deal.status)!.push(deal);
+    if (!byColumn[deal.status]) byColumn[deal.status] = [];
+    byColumn[deal.status].push({
+      id: deal.id,
+      clientName: deal.client.name,
+      service: deal.service,
+      feeDisplay: deal.feeDisplay,
+      updatedAgo: timeAgo(deal.updatedAt),
+    });
   }
 
   return (
@@ -107,7 +130,7 @@ export default async function DealsPage({
       <div>
         <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Deals</h1>
         <div className="mt-1 text-[14px]" style={{ color: "var(--ink-muted)" }}>
-          {deals.length} active — from first call to signed contract
+          {deals.length} {deals.length === 1 ? "deal" : "deals"} — from first call to signed contract
         </div>
       </div>
       <Link href="/deals/new" className="btn btn-primary">
@@ -131,39 +154,10 @@ export default async function DealsPage({
       </div>
     </div>
 
+    <DealsFilterBar owners={owners} showOwnerFilter={canViewAll} />
+
     {isBoard ? (
-      <div className="flex gap-3.5 overflow-x-auto pb-2">
-        {BOARD_COLUMNS.map((col) => {
-          const colDeals = byColumn.get(col) ?? [];
-          return (
-            <div key={col} className="flex w-[240px] flex-none flex-col gap-2.5">
-              <div className="flex items-center justify-between px-1">
-                <span className="text-[12px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
-                  {BOARD_COLUMN_LABEL[col]}
-                </span>
-                <span className="font-mono-tab text-[11.5px]" style={{ color: "var(--ink-muted)" }}>{colDeals.length}</span>
-              </div>
-              <div className="flex flex-col gap-2">
-                {colDeals.map((deal) => (
-                  <Link key={deal.id} href={`/deals/${deal.id}`} className="card flex flex-col gap-1 p-3.5" style={{ color: "inherit" }}>
-                    <span className="text-[13px] font-medium">{deal.client.name}</span>
-                    <span className="truncate text-[12px]" style={{ color: "var(--ink-muted)" }}>{deal.service || "—"}</span>
-                    <div className="mt-1 flex items-center justify-between">
-                      <span className="font-mono-tab text-[12px] font-medium">{deal.feeDisplay || "—"}</span>
-                      <span className="text-[11px]" style={{ color: "var(--ink-muted)" }}>{timeAgo(deal.updatedAt)}</span>
-                    </div>
-                  </Link>
-                ))}
-                {colDeals.length === 0 && (
-                  <div className="rounded-[12px] px-3 py-4 text-center text-[12px]" style={{ border: "1px dashed var(--hairline)", color: "var(--ink-muted)" }}>
-                    Empty
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <DealsBoard byColumn={byColumn} updateStatusAction={updateDealStatus} />
     ) : (
       <DealsBulkTable rows={tableRows} remindAction={bulkRemind} sendAction={bulkSend} showOwnerColumn={canViewAll} />
     )}

@@ -338,3 +338,38 @@ export async function toggleActionItem(dealId: string, itemId: string) {
 
   revalidatePath(`/deals/${dealId}`);
 }
+
+// Internal-only note thread on a deal — never shown to the client, unlike
+// ClauseComment (client-authored, tied to one clause) or an approval
+// step's note (tied to one decision). This is just "the team left context
+// here," the gap a real CRM's activity feed fills.
+export async function addDealNote(dealId: string, body: string) {
+  const text = body.trim();
+  if (!text) throw new Error("Note can't be empty");
+
+  const { where } = await dealVisibilityFilter();
+  const workspaceId = await requireWorkspaceId();
+  const currentUser = await currentUserWithRole();
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId, ...where } });
+  if (!deal) throw new Error("Deal not found");
+
+  await prisma.dealNote.create({
+    data: { dealId, authorEmail: currentUser.email, authorName: currentUser.name, body: text },
+  });
+
+  revalidatePath(`/deals/${dealId}`);
+}
+
+export async function deleteDealNote(dealId: string, noteId: string) {
+  const { where } = await dealVisibilityFilter();
+  const workspaceId = await requireWorkspaceId();
+  const currentUser = await currentUserWithRole();
+  const note = await prisma.dealNote.findFirst({ where: { id: noteId, dealId, deal: { workspaceId, ...where } } });
+  if (!note) throw new Error("Note not found");
+  if (note.authorEmail !== currentUser.email && !currentUser.role?.canManageWorkspace) {
+    throw new Error("Only the author or a workspace admin can delete this note");
+  }
+
+  await prisma.dealNote.delete({ where: { id: noteId } });
+  revalidatePath(`/deals/${dealId}`);
+}

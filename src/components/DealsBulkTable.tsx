@@ -1,20 +1,37 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 type Row = {
   id: string;
   clientName: string;
   service: string;
   feeDisplay: string;
+  feeValue: number;
   statusLabel: string;
   statusChip: string;
   updatedAgo: string;
+  updatedAt: number;
   ownerName: string | null;
+  isStale: boolean;
   canRemind: boolean;
   canSend: boolean;
 };
+
+type SortKey = "clientName" | "feeValue" | "statusLabel" | "updatedAt" | "ownerName";
+
+const COLUMNS: { key: SortKey; label: string }[] = [
+  { key: "clientName", label: "Client" },
+  { key: "feeValue", label: "Value" },
+  { key: "statusLabel", label: "Status" },
+  { key: "updatedAt", label: "Updated" },
+];
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "—";
+}
 
 export default function DealsBulkTable({
   rows,
@@ -30,9 +47,31 @@ export default function DealsBulkTable({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [sortKey, setSortKey] = useState<SortKey>("updatedAt");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const eligibleForRemind = rows.filter((r) => selected.has(r.id) && r.canRemind).length;
   const eligibleForSend = rows.filter((r) => selected.has(r.id) && r.canSend).length;
+
+  const sortedRows = useMemo(() => {
+    const copy = [...rows];
+    copy.sort((a, b) => {
+      const av = a[sortKey];
+      const bv = b[sortKey];
+      const cmp = typeof av === "number" && typeof bv === "number" ? av - bv : String(av ?? "").localeCompare(String(bv ?? ""));
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return copy;
+  }, [rows, sortKey, sortDir]);
+
+  function handleSort(key: SortKey) {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "clientName" || key === "statusLabel" ? "asc" : "desc");
+    }
+  }
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -44,7 +83,7 @@ export default function DealsBulkTable({
   }
 
   function toggleAll() {
-    setSelected((prev) => (prev.size === rows.length ? new Set() : new Set(rows.map((r) => r.id))));
+    setSelected((prev) => (prev.size === sortedRows.length ? new Set() : new Set(sortedRows.map((r) => r.id))));
   }
 
   function run(action: (ids: string[]) => Promise<{ sent: number; skipped: number }>, verb: string) {
@@ -96,55 +135,98 @@ export default function DealsBulkTable({
           {message}
         </div>
       )}
-      <div className="overflow-x-auto">
+      <div className="max-h-[calc(100vh-260px)] overflow-auto">
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              <th className="border-b px-5 py-3.5" style={{ borderColor: "var(--hairline)", width: 36 }}>
-                <input type="checkbox" checked={rows.length > 0 && selected.size === rows.length} onChange={toggleAll} />
+              <th
+                className="sticky top-0 z-10 border-b px-5 py-3"
+                style={{ borderColor: "var(--hairline)", width: 36, background: "var(--surface-1)" }}
+              >
+                <input type="checkbox" checked={sortedRows.length > 0 && selected.size === sortedRows.length} onChange={toggleAll} />
               </th>
-              {["Client", "Value", "Status", "Updated", ...(showOwnerColumn ? ["Owner"] : [])].map((h) => (
+              {COLUMNS.map((c) => (
                 <th
-                  key={h}
-                  className="border-b px-5 py-3.5 text-left text-[12px] font-medium uppercase tracking-wide"
-                  style={{ color: "var(--ink-muted)", borderColor: "var(--hairline)" }}
+                  key={c.key}
+                  onClick={() => handleSort(c.key)}
+                  className="sticky top-0 z-10 cursor-pointer select-none whitespace-nowrap border-b px-5 py-3 text-left text-[11.5px] font-medium uppercase tracking-wide"
+                  style={{ color: sortKey === c.key ? "var(--ink)" : "var(--ink-muted)", borderColor: "var(--hairline)", background: "var(--surface-1)" }}
                 >
-                  {h}
+                  {c.label}
+                  {sortKey === c.key && <span style={{ marginLeft: 4 }}>{sortDir === "asc" ? "↑" : "↓"}</span>}
                 </th>
               ))}
+              {showOwnerColumn && (
+                <th
+                  onClick={() => handleSort("ownerName")}
+                  className="sticky top-0 z-10 cursor-pointer select-none whitespace-nowrap border-b px-5 py-3 text-left text-[11.5px] font-medium uppercase tracking-wide"
+                  style={{ color: sortKey === "ownerName" ? "var(--ink)" : "var(--ink-muted)", borderColor: "var(--hairline)", background: "var(--surface-1)" }}
+                >
+                  Owner
+                  {sortKey === "ownerName" && <span style={{ marginLeft: 4 }}>{sortDir === "asc" ? "↑" : "↓"}</span>}
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {sortedRows.map((row) => (
               <tr key={row.id} className="row-hover transition-colors">
-                <td className="border-b px-5 py-4" style={{ borderColor: "var(--hairline-soft)" }}>
+                <td className="border-b px-5 py-3" style={{ borderColor: "var(--hairline-soft)" }}>
                   <input type="checkbox" checked={selected.has(row.id)} onChange={() => toggle(row.id)} />
                 </td>
-                <td className="border-b px-5 py-4" style={{ borderColor: "var(--hairline-soft)" }}>
-                  <Link href={`/deals/${row.id}`} className="flex flex-col gap-0.5" style={{ color: "inherit" }}>
-                    <span className="font-medium" style={{ color: "var(--ink)" }}>{row.clientName}</span>
-                    <span className="text-[13px]" style={{ color: "var(--ink-muted)" }}>{row.service}</span>
+                <td className="border-b px-5 py-3" style={{ borderColor: "var(--hairline-soft)" }}>
+                  <Link href={`/deals/${row.id}`} className="flex items-center gap-2" style={{ color: "inherit" }}>
+                    {row.isStale && (
+                      <span
+                        title="No activity in 7+ days"
+                        className="h-1.5 w-1.5 flex-none rounded-full"
+                        style={{ background: "var(--warn)" }}
+                      />
+                    )}
+                    <span className="flex flex-col gap-0.5">
+                      <span className="font-medium" style={{ color: "var(--ink)" }}>{row.clientName}</span>
+                      <span className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>{row.service}</span>
+                    </span>
                   </Link>
                 </td>
-                <td className="font-mono-tab border-b px-5 py-4 font-medium" style={{ borderColor: "var(--hairline-soft)", color: "var(--ink)" }}>
+                <td className="font-mono-tab border-b px-5 py-3 font-semibold" style={{ borderColor: "var(--hairline-soft)", color: "var(--ink)" }}>
                   {row.feeDisplay}
                 </td>
-                <td className="border-b px-5 py-4" style={{ borderColor: "var(--hairline-soft)" }}>
+                <td className="border-b px-5 py-3" style={{ borderColor: "var(--hairline-soft)" }}>
                   <span className={`chip ${row.statusChip}`}>
                     <span className="chip-dot" />
                     {row.statusLabel}
                   </span>
                 </td>
-                <td className="border-b px-5 py-4 text-[13px]" style={{ color: "var(--ink-muted)", borderColor: "var(--hairline-soft)" }}>
+                <td className="border-b px-5 py-3 text-[12.5px]" style={{ color: "var(--ink-muted)", borderColor: "var(--hairline-soft)" }}>
                   {row.updatedAgo}
                 </td>
                 {showOwnerColumn && (
-                  <td className="border-b px-5 py-4 text-[13px]" style={{ color: "var(--ink-muted)", borderColor: "var(--hairline-soft)" }}>
-                    {row.ownerName ?? "—"}
+                  <td className="border-b px-5 py-3" style={{ borderColor: "var(--hairline-soft)" }}>
+                    {row.ownerName ? (
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="flex h-6 w-6 flex-none items-center justify-center rounded-full text-[10px] font-semibold"
+                          style={{ background: "var(--surface-2)", color: "var(--ink-muted)" }}
+                        >
+                          {initials(row.ownerName)}
+                        </span>
+                        <span className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>{row.ownerName}</span>
+                      </span>
+                    ) : (
+                      <span className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>—</span>
+                    )}
                   </td>
                 )}
               </tr>
             ))}
+            {sortedRows.length === 0 && (
+              <tr>
+                <td colSpan={showOwnerColumn ? 6 : 5} className="px-5 py-10 text-center text-[13px]" style={{ color: "var(--ink-muted)" }}>
+                  No deals match these filters.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

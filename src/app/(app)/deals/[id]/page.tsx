@@ -5,11 +5,15 @@ import ContinueCallButton from "@/components/ContinueCallButton";
 import ActionItemsCard from "@/components/ActionItemsCard";
 import SendToDocusignButton from "@/components/SendToDocusignButton";
 import VoiceCorrectionButton from "@/components/VoiceCorrectionButton";
+import DealNotes from "@/components/DealNotes";
 import { prisma } from "@/lib/db";
+import { auth } from "@/lib/auth";
 import { requireWorkspaceId, requireWorkspace } from "@/lib/workspace";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import {
+  addDealNote,
   applyVoiceFieldCorrection,
+  deleteDealNote,
   requestTeammateReview,
   fillMissingFields,
   generateContract,
@@ -66,7 +70,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const workspaceId = await requireWorkspaceId();
   const { where: visibility } = await dealVisibilityFilter();
-  const [deal, workspace] = await Promise.all([
+  const [deal, workspace, session] = await Promise.all([
     prisma.deal.findFirst({
       where: { id, workspaceId, ...visibility },
       include: {
@@ -77,9 +81,11 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         calls: { orderBy: { startedAt: "asc" } },
         fieldChanges: { orderBy: { changedAt: "asc" } },
         actionItems: { orderBy: { createdAt: "asc" } },
+        notes: { orderBy: { createdAt: "desc" } },
       },
     }),
     requireWorkspace(),
+    auth(),
   ]);
   if (!deal) notFound();
 
@@ -167,6 +173,14 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         )}
 
         <ActionItemsCard dealId={deal.id} items={deal.actionItems} toggleAction={toggleActionItem} />
+
+        <DealNotes
+          dealId={deal.id}
+          notes={deal.notes.map((n) => ({ id: n.id, authorName: n.authorName, authorEmail: n.authorEmail, body: n.body, createdAt: n.createdAt.toISOString() }))}
+          currentUserEmail={session?.user?.email ?? ""}
+          addAction={addDealNote}
+          deleteAction={deleteDealNote}
+        />
       </div>
 
       <div className="flex flex-col gap-4">
