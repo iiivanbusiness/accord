@@ -85,7 +85,18 @@ export default function DealsBoard({
       {error && (
         <div className="chip chip-warn w-fit px-3.5 py-2 text-[12.5px]">{error}</div>
       )}
-      <div className="flex gap-3.5 overflow-x-auto pb-2">
+      <div
+        className="flex gap-3.5 overflow-x-auto pb-2"
+        style={{
+          scrollSnapType: "x proximity",
+          scrollPadding: "0 20px",
+          // Fades the edge columns toward transparent instead of slicing them
+          // off mid-card when the row is scrolled — a visual cue that there's
+          // more to either side, rather than looking like clipped/broken layout.
+          maskImage: "linear-gradient(to right, transparent 0, black 20px, black calc(100% - 20px), transparent 100%)",
+          WebkitMaskImage: "linear-gradient(to right, transparent 0, black 20px, black calc(100% - 20px), transparent 100%)",
+        }}
+      >
         {COLUMNS.map((col) => {
           const colDeals = columns[col] ?? [];
           const droppable = DRAGGABLE_STATUSES.has(col);
@@ -100,7 +111,7 @@ export default function DealsBoard({
               onDragLeave={() => setDragOverCol((c) => (c === col ? null : c))}
               onDrop={() => handleDrop(col)}
               className="flex w-[240px] flex-none flex-col gap-2.5 rounded-[14px] p-1.5 transition-colors"
-              style={{ background: dragOverCol === col ? "var(--surface-2)" : "transparent" }}
+              style={{ background: dragOverCol === col ? "var(--surface-2)" : "transparent", scrollSnapAlign: "start" }}
             >
               <div className="flex items-center justify-between px-1">
                 <span className="text-[12px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
