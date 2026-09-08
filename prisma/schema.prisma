@@ -772,12 +772,19 @@ model CalendarEvent {
 // (signup, login, password reset) — one row per attempt, counted within a
 // sliding window. Rows are cheap and short-lived by nature of the check
 // (old ones just stop counting), no cleanup job needed yet.
+// One row per rate-limited key (login:email, signup:ip, api:apiKeyId, ...),
+// not one row per hit — count/windowStart get atomically upserted in place
+// by checkRateLimit() via a single INSERT ... ON CONFLICT DO UPDATE, which
+// Postgres serializes per-row internally, so concurrent hits on the same
+// key can't race past `max` the way separate count-then-insert calls could.
+// This also keeps the table's size bounded by the number of distinct keys
+// ever seen rather than growing by one row per hit forever — see
+// src/lib/rate-limit-cleanup.ts for the (now much smaller) periodic sweep
+// of keys that have gone quiet.
 model RateLimitHit {
-  id        String   @id @default(cuid())
-  key       String
-  createdAt DateTime @default(now())
-
-  @@index([key, createdAt])
+  key         String   @id
+  windowStart DateTime @default(now())
+  count       Int      @default(1)
 }
 
 // Short-lived, single-use token minted (server-side, while the user is

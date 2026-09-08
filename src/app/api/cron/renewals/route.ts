@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendAdminAlertEmail, sendRenewalReminderEmail } from "@/lib/email";
 import { runStaleDealsDigest } from "@/lib/stale-deals";
+import { cleanupRateLimitHits } from "@/lib/rate-limit-cleanup";
 
 const WINDOW_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -12,11 +13,13 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // informational to the team, not client-facing, so there's no reason to
 // gate it.
 //
-// Also runs the stale-deals digest (see src/lib/stale-deals.ts) in the same
+// Also runs the stale-deals digest (see src/lib/stale-deals.ts) and the
+// RateLimitHit table cleanup (see src/lib/rate-limit-cleanup.ts) in the same
 // request — Vercel's Hobby plan caps a project at 2 cron jobs, and this
-// project already has 2 without it (remind, renewals), so a 3rd daily job
-// gets piggybacked here instead of registered separately in vercel.json.
-// Each check is independent — a failure in one doesn't stop the other.
+// project already has 2 without them (remind, renewals), so extra daily
+// jobs get piggybacked here instead of registered separately in
+// vercel.json. Each check is independent — a failure in one doesn't stop
+// the others.
 export async function GET(req: Request) {
   const authHeader = req.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -72,7 +75,22 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ renewals: { checked: dueContracts.length, sent }, staleDeals: staleResult });
+    let rateLimitResult = { deleted: 0 };
+    try {
+      rateLimitResult = await cleanupRateLimitHits();
+    } catch (err) {
+      console.error("RateLimitHit cleanup (piggybacked on renewals cron) crashed", err);
+      try {
+        await sendAdminAlertEmail({
+          subject: "RateLimitHit cleanup crashed",
+          details: err instanceof Error ? (err.stack ?? err.message) : String(err),
+        });
+      } catch (alertErr) {
+        console.error("Failed to send admin alert email", alertErr);
+      }
+    }
+
+    return NextResponse.json({ renewals: { checked: dueContracts.length, sent }, staleDeals: staleResult, rateLimitCleanup: rateLimitResult });
   } catch (err) {
     console.error("Renewal reminder cron crashed", err);
     try {
