@@ -183,7 +183,7 @@ export default function ApprovalChainManager({
           </div>
         )}
         <form action={runCreate} className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <input name="name" placeholder="Chain name, e.g. Enterprise" className="input flex-1" style={{ fontSize: "12.5px", padding: "7px 10px" }} />
+          <input name="name" required placeholder="Chain name, e.g. Enterprise" className="input flex-1" style={{ fontSize: "12.5px", padding: "7px 10px" }} />
           <select name="teamId" className="input" style={{ fontSize: "12.5px", padding: "7px 10px", minWidth: 140 }} defaultValue="">
             <option value="">Any team</option>
             {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
