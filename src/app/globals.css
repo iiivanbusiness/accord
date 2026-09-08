@@ -23,6 +23,9 @@
   --font-display: var(--font-geist), -apple-system, "Helvetica Neue", Arial, sans-serif;
   --font-body: var(--font-inter), -apple-system, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* The actual "SealMe" wordmark typeface — bold/rounded, distinct from
+     --font-display which is for regular headings. */
+  --font-brand: var(--font-baloo), -apple-system, "Helvetica Neue", Arial, sans-serif;
 
   --r-xs: 4px;
   --r-sm: 6px;
@@ -115,6 +118,7 @@
   --font-display: var(--font-display);
   --font-body: var(--font-body);
   --font-mono: var(--font-mono);
+  --font-brand: var(--font-brand);
 }
 
 * {

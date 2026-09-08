@@ -31,12 +31,12 @@ export default function AppFooter() {
 
       <div
         className="relative flex select-none justify-center overflow-hidden"
-        style={{ height: "9vw", minHeight: 60, maxHeight: 170, background: "var(--canvas)" }}
+        style={{ height: "12vw", minHeight: 80, maxHeight: 220, background: "var(--canvas)" }}
         aria-hidden="true"
       >
         <span
-          className="font-display absolute top-0 font-semibold"
-          style={{ fontSize: "clamp(56px, 13vw, 190px)", lineHeight: 1, letterSpacing: "-0.02em", opacity: 0.06, color: "var(--ink)" }}
+          className="font-brand absolute top-0"
+          style={{ fontSize: "clamp(72px, 17vw, 260px)", lineHeight: 1, fontWeight: 800, opacity: 0.06, color: "var(--ink)" }}
         >
           SealMe
         </span>

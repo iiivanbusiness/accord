@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Inter } from "next/font/google";
+import { Geist, Inter, Baloo_2 } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 
@@ -12,6 +12,16 @@ const geist = Geist({
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
+});
+
+// The actual "SealMe" wordmark typeface — bold, rounded, geometric —
+// distinct from --font-display (Geist, used for regular headings). Only
+// used for the brand wordmark itself (BrandLogo, the footer watermark),
+// so a narrow weight range is enough.
+const baloo = Baloo_2({
+  variable: "--font-baloo",
+  subsets: ["latin"],
+  weight: ["700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -45,7 +55,7 @@ const THEME_INIT_SCRIPT = `
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geist.variable} ${inter.variable} h-full antialiased`} suppressHydrationWarning>
+    <html lang="en" className={`${geist.variable} ${inter.variable} ${baloo.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
         {/* Older iOS (pre-17.4) only recognizes the apple-prefixed tag; Next's
             appleWebApp metadata emits the newer standard one but not this. */}

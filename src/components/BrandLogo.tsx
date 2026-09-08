@@ -12,8 +12,8 @@ export default function BrandLogo({ height = 20, className = "" }: { height?: nu
       <Image src="/logo-light.png" alt="" width={iconWidth} height={height} priority className="brand-logo-light" />
       <Image src="/logo-dark.png" alt="" width={iconWidth} height={height} priority className="brand-logo-dark" />
       <span
-        className="font-display font-semibold"
-        style={{ fontSize: Math.round(height * 0.8), lineHeight: 1, letterSpacing: "-0.02em", color: "var(--ink)" }}
+        className="font-brand"
+        style={{ fontSize: Math.round(height * 0.85), lineHeight: 1, fontWeight: 800, color: "var(--ink)" }}
       >
         SealMe
       </span>
