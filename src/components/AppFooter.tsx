@@ -1,4 +1,3 @@
-import Image from "next/image";
 import InstagramIcon from "./InstagramIcon";
 
 export default function AppFooter() {
@@ -35,15 +34,12 @@ export default function AppFooter() {
         style={{ height: "9vw", minHeight: 60, maxHeight: 170, background: "var(--canvas)" }}
         aria-hidden="true"
       >
-        <Image
-          src="/wordmark.png"
-          alt=""
-          width={1261}
-          height={619}
-          loading="lazy"
-          className="absolute top-0"
-          style={{ width: "46vw", minWidth: 320, maxWidth: 620, height: "auto", opacity: 0.06, filter: "invert(var(--wordmark-invert))" }}
-        />
+        <span
+          className="font-display absolute top-0 font-semibold"
+          style={{ fontSize: "clamp(56px, 13vw, 190px)", lineHeight: 1, letterSpacing: "-0.02em", opacity: 0.06, color: "var(--ink)" }}
+        >
+          SealMe
+        </span>
       </div>
     </footer>
   );
