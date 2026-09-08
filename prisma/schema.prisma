@@ -294,6 +294,7 @@ model Client {
   name           String
   company        String
   email          String?
+  phone          String?
   billingAddress String?
   createdAt      DateTime  @default(now())
 
