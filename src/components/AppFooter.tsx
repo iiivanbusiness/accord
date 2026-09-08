@@ -38,8 +38,8 @@ export default function AppFooter() {
         <Image
           src="/wordmark.png"
           alt=""
-          width={1055}
-          height={240}
+          width={1261}
+          height={619}
           loading="lazy"
           className="absolute top-0"
           style={{ width: "46vw", minWidth: 320, maxWidth: 620, height: "auto", opacity: 0.06, filter: "invert(var(--wordmark-invert))" }}
