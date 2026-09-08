@@ -39,6 +39,8 @@ const STATUS_LABEL: Record<string, string> = {
   missing_info: "Missing info",
   extraction_failed: "Couldn't process call",
   ready: "Ready for review",
+  pending_approval: "Awaiting approval",
+  changes_requested: "Changes requested",
   sent: "Sent",
   signed: "Signed",
 };

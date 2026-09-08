@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireWorkspaceId } from "@/lib/workspace";
-import { applyExtractionToDeal } from "@/lib/deal-live";
+import { applyExtractionToDeal, syncCoreDealFields } from "@/lib/deal-live";
 import { extractPlaceholderKeys } from "@/lib/contract";
 import { auth } from "@/lib/auth";
 import { requestOrSendContract } from "@/lib/approval";
@@ -90,6 +90,7 @@ export async function fillMissingFields(dealId: string, formData: FormData) {
   if (!deal) throw new Error("Deal not found");
 
   const missingFields = deal.fields.filter((f) => f.status === "missing");
+  const changed: { fieldKey: string; value: string }[] = [];
   for (const field of missingFields) {
     const value = String(formData.get(field.id) ?? "").trim();
     if (!value) continue;
@@ -97,7 +98,9 @@ export async function fillMissingFields(dealId: string, formData: FormData) {
       where: { id: field.id },
       data: { value, status: "confirmed", groupLabel: "Confirmed details" },
     });
+    changed.push({ fieldKey: field.fieldKey, value });
   }
+  await syncCoreDealFields(dealId, deal.clientId, changed);
 
   const stillMissing = await prisma.dealField.count({ where: { dealId, status: "missing" } });
   if (stillMissing === 0 && deal.status === "missing_info") {
@@ -114,6 +117,7 @@ export async function updateFieldValues(dealId: string, formData: FormData) {
   if (!deal) throw new Error("Deal not found");
 
   const editableFields = deal.fields.filter((f) => f.status !== "missing");
+  const changed: { fieldKey: string; value: string }[] = [];
   for (const field of editableFields) {
     const value = String(formData.get(field.id) ?? "").trim();
     if (value === field.value) continue;
@@ -126,7 +130,9 @@ export async function updateFieldValues(dealId: string, formData: FormData) {
       where: { id: field.id },
       data: { value, status: "user_edited" },
     });
+    changed.push({ fieldKey: field.fieldKey, value });
   }
+  await syncCoreDealFields(dealId, deal.clientId, changed);
 
   redirect(`/deals/${dealId}`);
 }
@@ -160,6 +166,7 @@ export async function applyVoiceFieldCorrection(dealId: string, fieldKey: string
       }
       await prisma.dealField.update({ where: { id: field.id }, data: { value, status: "user_edited" } });
     }
+    await syncCoreDealFields(dealId, deal.clientId, [{ fieldKey: field.fieldKey, value }]);
 
     const stillMissing = await prisma.dealField.count({ where: { dealId, status: "missing" } });
     if (stillMissing === 0 && deal.status === "missing_info") {

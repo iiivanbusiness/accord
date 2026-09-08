@@ -96,3 +96,35 @@ export async function applyExtractionToDeal(
 
   return { hasMissing };
 }
+
+// Deal.service/feeDisplay and Client.name are denormalized copies of the
+// "service"/"fee"/"clientName" DealFields, kept in sync above whenever an
+// extraction pass runs — but every other write path that edits a DealField
+// by hand (the Deal Terms edit form, filling in a missing field, a voice
+// correction) was updating DealField.value alone, silently leaving those
+// copies stale. That's not just cosmetic: deal lists/boards, dashboard and
+// analytics totals, the Client profile page, the HubSpot/Salesforce sync,
+// and — most importantly — resolveApprovalChain's minDealValue matching
+// all read deal.feeDisplay directly rather than joining through
+// DealField, so an edited fee could keep matching the chain picked for
+// its original (lower) value. Call this after any such hand-edit so those
+// copies never drift from the field that's actually shown as current.
+export async function syncCoreDealFields(
+  dealId: string,
+  clientId: string,
+  changed: { fieldKey: string; value: string }[]
+): Promise<void> {
+  const service = changed.find((c) => c.fieldKey === "service")?.value;
+  const fee = changed.find((c) => c.fieldKey === "fee")?.value;
+  const clientName = changed.find((c) => c.fieldKey === "clientName")?.value;
+
+  if (service || fee) {
+    await prisma.deal.update({
+      where: { id: dealId },
+      data: { ...(service ? { service } : {}), ...(fee ? { feeDisplay: fee } : {}) },
+    });
+  }
+  if (clientName) {
+    await prisma.client.update({ where: { id: clientId }, data: { name: clientName } });
+  }
+}
