@@ -82,7 +82,7 @@ export default async function AnalyticsPage() {
     <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
       <StatCard label="Active deals" value={String(total)} />
       <StatCard label="Close rate" value={`${closeRate}%`} sub={`${signed} of ${total} signed`} />
-      <StatCard label="Combined deal value" value={`€${pipelineValue.toLocaleString()}`} sub="Across all active deals" />
+      <StatCard label="Combined deal value" value={`$${pipelineValue.toLocaleString()}`} sub="Across all active deals" />
       <StatCard label="Avg. time to signature" value={avgSignDays === "—" ? avgSignDays : `${avgSignDays}d`} sub="From send to signed" />
     </div>
 

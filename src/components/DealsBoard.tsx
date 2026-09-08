@@ -48,17 +48,8 @@ export default function DealsBoard({
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
-  function handleDrop(targetCol: string) {
-    setDragOverCol(null);
-    if (!draggingId || !DRAGGABLE_STATUSES.has(targetCol)) return;
-    const dealId = draggingId;
-    setDraggingId(null);
-
-    let sourceCol: string | null = null;
-    for (const [col, deals] of Object.entries(columns)) {
-      if (deals.some((d) => d.id === dealId)) sourceCol = col;
-    }
-    if (!sourceCol || sourceCol === targetCol || !DRAGGABLE_STATUSES.has(sourceCol)) return;
+  function moveDeal(dealId: string, sourceCol: string, targetCol: string) {
+    if (sourceCol === targetCol || !DRAGGABLE_STATUSES.has(sourceCol) || !DRAGGABLE_STATUSES.has(targetCol)) return;
 
     // Optimistic move — snap back on failure.
     const previous = columns;
@@ -78,6 +69,20 @@ export default function DealsBoard({
         setError(err instanceof Error ? err.message : "Couldn't move that deal");
       }
     });
+  }
+
+  function handleDrop(targetCol: string) {
+    setDragOverCol(null);
+    if (!draggingId || !DRAGGABLE_STATUSES.has(targetCol)) return;
+    const dealId = draggingId;
+    setDraggingId(null);
+
+    let sourceCol: string | null = null;
+    for (const [col, deals] of Object.entries(columns)) {
+      if (deals.some((d) => d.id === dealId)) sourceCol = col;
+    }
+    if (!sourceCol) return;
+    moveDeal(dealId, sourceCol, targetCol);
   }
 
   return (
@@ -142,6 +147,29 @@ export default function DealsBoard({
                       <span className="font-mono-tab text-[12px] font-medium">{deal.feeDisplay || "—"}</span>
                       <span className="text-[11px]" style={{ color: "var(--ink-muted)" }}>{deal.updatedAgo}</span>
                     </div>
+                    {droppable && (
+                      // Native HTML5 drag-and-drop (the desktop interaction
+                      // above) never fires on touch — there's no mouse to
+                      // hold — so a phone has no way to move a card between
+                      // columns without this. md:hidden keeps it out of the
+                      // way on desktop, where dragging already works.
+                      <select
+                        className="input md:hidden"
+                        style={{ fontSize: "11.5px", padding: "5px 8px", marginTop: 2 }}
+                        value=""
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          const target = e.target.value;
+                          if (target) moveDeal(deal.id, col, target);
+                        }}
+                      >
+                        <option value="" disabled>Move to…</option>
+                        {[...DRAGGABLE_STATUSES].filter((s) => s !== col).map((s) => (
+                          <option key={s} value={s}>{COLUMN_LABEL[s]}</option>
+                        ))}
+                      </select>
+                    )}
                   </Link>
                 ))}
                 {colDeals.length === 0 && (

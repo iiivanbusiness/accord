@@ -63,13 +63,17 @@ export default function BulkImportForm({
         style={{ fontSize: "12px", padding: "10px" }}
       />
 
-      <div className="flex items-center gap-2">
+      {/* flex-wrap + min-w-0 on the file input: its native "Choose file"
+          chrome refuses to shrink below its own content width, which on a
+          narrow (mobile) viewport pushed the Import button straight off
+          the edge of the card instead of wrapping under it. */}
+      <div className="flex flex-wrap items-center gap-2">
         <input
           ref={fileInputRef}
           type="file"
           accept=".csv,text/csv"
           onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-          className="text-[12px]"
+          className="min-w-0 text-[12px]"
         />
         <button type="button" disabled={isPending || !csv.trim()} onClick={handleImport} className="btn btn-primary btn-sm">
           {isPending ? "Importing…" : "Import"}

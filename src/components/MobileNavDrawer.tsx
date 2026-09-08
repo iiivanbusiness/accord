@@ -40,7 +40,7 @@ export default function MobileNavDrawer({ children }: { children: React.ReactNod
         <div className="fixed inset-0 z-50 flex md:hidden">
           <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.45)" }} onClick={() => setOpen(false)} />
           <div className="relative flex h-full w-[264px] flex-none">
-            <GlassPanel className="flex h-full w-full rounded-none px-3.5 py-[22px]">{children}</GlassPanel>
+            <GlassPanel className="mobile-nav-glass flex h-full w-full rounded-none px-3.5 py-[22px]">{children}</GlassPanel>
             <button
               type="button"
               onClick={() => setOpen(false)}

@@ -135,7 +135,18 @@ export default function DealsBulkTable({
           {message}
         </div>
       )}
-      <div className="max-h-[calc(100vh-260px)] overflow-auto">
+      <div
+        className="max-h-[calc(100vh-260px)] overflow-auto"
+        style={{
+          // On narrow viewports the table is wider than its container and
+          // scrolls sideways — without a cue, the Status column just looks
+          // clipped off rather than "scroll to see more" (the same issue
+          // the deal board's columns had). Fades the right edge toward
+          // transparent so a cut-off column reads as scrollable, not broken.
+          maskImage: "linear-gradient(to right, black calc(100% - 24px), transparent 100%)",
+          WebkitMaskImage: "linear-gradient(to right, black calc(100% - 24px), transparent 100%)",
+        }}
+      >
         <table className="w-full border-collapse">
           <thead>
             <tr>

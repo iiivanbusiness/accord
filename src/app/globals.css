@@ -311,6 +311,18 @@ a {
 .glass-glow-3 { bottom: -70px; left: -50px; width: 210px; height: 210px; background: var(--gradient-orange); opacity: 0.38; }
 :root[data-theme="dark"] .sm-theme .glass-glow { opacity: 0.5; filter: blur(52px); }
 
+/* The mobile nav drawer overlays live page content directly (unlike the
+   desktop sidebar, which sits beside a calm, static background) — a 50%
+   translucent glass panel over busy dashboard cards behind it reads as
+   illegible clutter, especially in any WebView where backdrop-filter is
+   silently ignored (it isn't universally supported), which leaves just
+   the raw translucent tint with no blur softening it at all. Bump the
+   drawer's own tint to near-opaque so it stays legible with or without
+   the blur actually rendering, without touching the desktop sidebar's
+   lighter glass look. */
+.mobile-nav-glass { --glass-panel-bg: rgba(255, 255, 255, 0.97); }
+:root[data-theme="dark"] .sm-theme .mobile-nav-glass { --glass-panel-bg: rgba(28, 28, 30, 0.97); }
+
 /* ---------- sidebar: liquid-glass active-item pill ----------
    Same split as .glass-nav: the outer box only rounds + clips, the blur
    lives on a separate absolutely-filled inner layer — WebKit won't reliably

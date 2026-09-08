@@ -165,7 +165,7 @@ export default async function DashboardPage() {
     </div>
 
     <div className="mb-5 grid grid-cols-2 gap-4 md:grid-cols-4">
-      <StatCard label="Combined deal value" value={`€${combinedValue.toLocaleString()}`} sub="Across all deals" />
+      <StatCard label="Combined deal value" value={`$${combinedValue.toLocaleString()}`} sub="Across all deals" />
       <StatCard label="Active deals" value={String(deals.length)} sub={`${newClientsThisMonth} started this month`} />
       <StatCard label="Contracts signed" value={String(signedCount)} sub={`of ${deals.length} deals`} />
       <StatCard label="Clients" value={String(clientCount)} sub="Total on file" />
@@ -204,7 +204,7 @@ export default async function DashboardPage() {
                       height: `${heightPct}%`,
                       background: isCurrent ? "var(--on-surface-inverted)" : "var(--surface-inverted-2)",
                     }}
-                    title={`€${m.value.toLocaleString()}`}
+                    title={`$${m.value.toLocaleString()}`}
                   />
                 </div>
                 <span className="text-[11.5px]" style={{ color: isCurrent ? "var(--on-surface-inverted)" : "var(--on-surface-inverted-muted)" }}>
@@ -256,7 +256,7 @@ export default async function DashboardPage() {
           <h2 className="text-[15px] font-medium">Upcoming renewals</h2>
           {renewalsAtRisk.length > 0 && (
             <span className="chip chip-warn flex-none" style={{ fontSize: 11 }}>
-              €{revenueAtRisk.toLocaleString()} in 90 days
+              ${revenueAtRisk.toLocaleString()} in 90 days
             </span>
           )}
         </div>

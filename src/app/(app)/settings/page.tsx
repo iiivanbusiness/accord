@@ -219,7 +219,12 @@ export default async function SettingsPage({
             </div>
           )}
           <form action={uploadLogo} className="flex gap-2">
-            <input name="logo" type="file" accept="image/*" required className="input flex-1" style={{ fontSize: "13px", padding: "7px 11px" }} />
+            {/* min-width:0 overrides the flex item's default min-width:auto —
+                a native file input's own "Choose file" chrome otherwise
+                refuses to shrink below its content width, pushing the
+                Upload button off a narrow (mobile) viewport instead of
+                letting the input itself truncate. */}
+            <input name="logo" type="file" accept="image/*" required className="input min-w-0 flex-1" style={{ fontSize: "13px", padding: "7px 11px" }} />
             <button type="submit" className="btn btn-secondary btn-sm">{workspace.logoImage ? "Replace" : "Upload"}</button>
           </form>
         </div>
