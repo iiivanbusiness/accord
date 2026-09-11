@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LOCAL_CAPTURE_STORAGE_KEY, LOCAL_CAPTURE_EVENT } from "./LocalCaptureForm";
 import CallHighlightsList, { type CallHighlightItem } from "./CallHighlightsList";
+import RecentNotesList, { type RecentNoteItem } from "./RecentNotesList";
 
 type Session = { dealId: string; token: string; startedAt: number };
 type StopResult = { ok: boolean; error?: string };
@@ -27,6 +28,8 @@ type UpcomingEvent = {
   meetingUrl: string | null;
   linkedDealId: string | null;
 };
+
+type View = "live" | "calendar" | "notes";
 
 const PLATFORM_LABEL: Record<string, string> = { zoom: "Zoom", meet: "Google Meet" };
 
@@ -85,27 +88,71 @@ function formatEventTime(iso: string): string {
   return sameDay ? time : `${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${time}`;
 }
 
-// The floating panel's content — a stripped-down view of the same deal
-// currently being recorded (read-only terms + notes) plus quick stop/
-// discard controls, so ending or checking on a call never requires
-// un-collapsing the main window. When no call is active, falls back to
-// showing what's coming up next instead of an empty panel. Sits directly
+function RailIcon({ view }: { view: View }) {
+  const common = { viewBox: "0 0 20 20", fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, width: 14, height: 14 };
+  if (view === "live") {
+    return (
+      <svg {...common}>
+        <path d="M6 12.5V7.5M10 14.5V5.5M14 12.5V7.5" />
+      </svg>
+    );
+  }
+  if (view === "calendar") {
+    return (
+      <svg {...common}>
+        <rect x="3.5" y="4.5" width="13" height="12" rx="1.6" />
+        <path d="M3.5 8.5h13M7 2.5v3M13 2.5v3" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...common}>
+      <rect x="4.5" y="2.5" width="11" height="15" rx="1.4" />
+      <path d="M7 7h6M7 10h6M7 13h3.5" />
+    </svg>
+  );
+}
+
+// The floating panel's content. An icon rail on the right edge switches
+// between three always-available destinations (`View`) rather than the
+// panel deciding for you based on call state — the one exception is
+// auto-jumping to "live" the moment a new recording starts, since that's
+// the reason you'd have the panel open in the first place. Sits directly
 // on the native vibrancy blur (see desktop-app's build_companion_window) —
 // nothing here paints a solid background, by design.
 export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: UpcomingEvent[] }) {
   const [isTauri, setIsTauri] = useState<boolean | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [dealState, setDealState] = useState<DealState | null>(null);
+  const [notes, setNotes] = useState<RecentNoteItem[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [copiedEventId, setCopiedEventId] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<View>("calendar");
+  const hadSessionRef = useRef(false);
 
   useEffect(() => {
     setIsTauri(typeof window !== "undefined" && "__TAURI_INTERNALS__" in window);
-    setSession(readSession());
-    const onChange = () => setSession(readSession());
+    const initial = readSession();
+    setSession(initial);
+    hadSessionRef.current = Boolean(initial);
+    if (initial) setActiveView("live");
+
+    // AppShell-style pattern (see LocalCaptureBanner) — this window's page
+    // never remounts across hide/show toggles, so a plain mount-time read
+    // wouldn't notice a recording that starts after the panel first opened.
+    // Jump to "live" only on the null -> non-null transition (a genuinely
+    // new call starting), never on the reverse or on re-fires with the same
+    // session — otherwise stopping a call while browsing Notes would yank
+    // you back to a tab about to go empty.
+    const onChange = () => {
+      const next = readSession();
+      setSession(next);
+      if (next && !hadSessionRef.current) setActiveView("live");
+      hadSessionRef.current = Boolean(next);
+    };
     window.addEventListener(LOCAL_CAPTURE_EVENT, onChange);
     return () => window.removeEventListener(LOCAL_CAPTURE_EVENT, onChange);
   }, []);
@@ -136,6 +183,26 @@ export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: Upc
       clearInterval(interval);
     };
   }, [session]);
+
+  // Lazy-loaded once, the first time the Notes tab is actually opened —
+  // cached afterward so flipping tabs back and forth doesn't re-fetch.
+  useEffect(() => {
+    if (activeView !== "notes" || notes !== null) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/companion/notes");
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as { items: RecentNoteItem[] };
+        if (!cancelled) setNotes(data.items);
+      } catch {
+        // Best-effort — leaves the tab showing its loading/empty state.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeView, notes]);
 
   async function joinCall(url: string) {
     try {
@@ -220,10 +287,7 @@ export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: Upc
   }
 
   return (
-    <div
-      className="flex h-full flex-col"
-      style={{ borderRadius: 16, overflow: "hidden" }}
-    >
+    <div className="flex h-full flex-col" style={{ borderRadius: 16, overflow: "hidden" }}>
       <div className="flex flex-none items-center justify-between gap-2 px-4 py-3" style={{ borderBottom: `1px solid ${glass.divider}` }}>
         <div className="flex min-w-0 items-center gap-2">
           <span
@@ -249,75 +313,179 @@ export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: Upc
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-3.5">
-        {error && (
-          <div className="mb-3 rounded-[8px] px-3 py-2 text-[11.5px]" style={{ background: glass.dangerDim, color: glass.danger }}>
-            {error}
-          </div>
-        )}
-
-        {session ? (
-          <div className="flex flex-col gap-5">
-            <div
-              className="flex flex-col gap-2 rounded-[12px] px-3.5 py-3"
-              style={{ background: glass.successDim, border: `1px solid rgba(95,227,172,0.22)` }}
-            >
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2 w-2 flex-none">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ background: glass.success }} />
-                  <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: glass.success }} />
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold" style={{ color: glass.text }}>
-                  {dealState?.clientName ?? "Recording…"}
-                </span>
-              </div>
-              {confirmingDiscard ? (
-                <div className="flex items-center gap-2">
-                  <span className="flex-1 text-[11.5px]" style={{ color: glass.textDim }}>Discard this recording?</span>
-                  <button type="button" disabled={busy} onClick={handleDiscard} style={glassButtonStyle("danger")}>
-                    Yes, discard
-                  </button>
-                  <button type="button" disabled={busy} onClick={() => setConfirmingDiscard(false)} style={glassButtonStyle("neutral")}>
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <button type="button" disabled={busy} onClick={handleStop} style={glassButtonStyle("success")}>
-                    {busy ? "Finishing…" : "Stop & finish"}
-                  </button>
-                  <button type="button" disabled={busy} onClick={() => setConfirmingDiscard(true)} style={glassButtonStyle("neutral")}>
-                    Discard
-                  </button>
-                </div>
-              )}
+      <div className="flex min-h-0 flex-1">
+        <div className="min-w-0 flex-1 overflow-y-auto px-4 py-3.5">
+          {error && (
+            <div className="mb-3 rounded-[8px] px-3 py-2 text-[11.5px]" style={{ background: glass.dangerDim, color: glass.danger }}>
+              {error}
             </div>
+          )}
 
-            <div>
-              <h2 className="mb-2 text-[10.5px] font-semibold uppercase" style={{ color: glass.textFaint, letterSpacing: "0.06em" }}>
-                Deal terms
-              </h2>
-              {groups.size === 0 ? (
-                <p className="text-[12px]" style={{ color: glass.textDim }}>Nothing captured yet — keep talking.</p>
-              ) : (
-                <div className="flex flex-col">
-                  {[...groups.entries()].map(([label, rows]) => (
-                    <div key={label} className="py-2 first:pt-0" style={{ borderTop: `1px solid ${glass.divider}` }}>
-                      <div className="pb-1 text-[10px] font-semibold uppercase" style={{ color: glass.textFaint, letterSpacing: "0.05em" }}>
-                        {label}
-                      </div>
-                      {rows.map((row) => (
-                        <div key={row.id} className="flex items-center justify-between gap-2 py-1">
-                          <span className="text-[12px]" style={{ color: glass.textDim }}>{row.label}</span>
-                          <span className="truncate text-[12px] font-medium" style={{ color: glass.text }}>{row.value ?? "—"}</span>
+          {activeView === "live" &&
+            (session ? (
+              <div className="flex flex-col gap-5">
+                <div
+                  className="flex flex-col gap-2 rounded-[12px] px-3.5 py-3"
+                  style={{ background: glass.successDim, border: `1px solid rgba(95,227,172,0.22)` }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2 w-2 flex-none">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ background: glass.success }} />
+                      <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: glass.success }} />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold" style={{ color: glass.text }}>
+                      {dealState?.clientName ?? "Recording…"}
+                    </span>
+                  </div>
+                  {confirmingDiscard ? (
+                    <div className="flex items-center gap-2">
+                      <span className="flex-1 text-[11.5px]" style={{ color: glass.textDim }}>Discard this recording?</span>
+                      <button type="button" disabled={busy} onClick={handleDiscard} style={glassButtonStyle("danger")}>
+                        Yes, discard
+                      </button>
+                      <button type="button" disabled={busy} onClick={() => setConfirmingDiscard(false)} style={glassButtonStyle("neutral")}>
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button type="button" disabled={busy} onClick={handleStop} style={glassButtonStyle("success")}>
+                        {busy ? "Finishing…" : "Stop & finish"}
+                      </button>
+                      <button type="button" disabled={busy} onClick={() => setConfirmingDiscard(true)} style={glassButtonStyle("neutral")}>
+                        Discard
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <h2 className="mb-2 text-[10.5px] font-semibold uppercase" style={{ color: glass.textFaint, letterSpacing: "0.06em" }}>
+                    Deal terms
+                  </h2>
+                  {groups.size === 0 ? (
+                    <p className="text-[12px]" style={{ color: glass.textDim }}>Nothing captured yet — keep talking.</p>
+                  ) : (
+                    <div className="flex flex-col">
+                      {[...groups.entries()].map(([label, rows]) => (
+                        <div key={label} className="py-2 first:pt-0" style={{ borderTop: `1px solid ${glass.divider}` }}>
+                          <div className="pb-1 text-[10px] font-semibold uppercase" style={{ color: glass.textFaint, letterSpacing: "0.05em" }}>
+                            {label}
+                          </div>
+                          {rows.map((row) => (
+                            <div key={row.id} className="flex items-center justify-between gap-2 py-1">
+                              <span className="text-[12px]" style={{ color: glass.textDim }}>{row.label}</span>
+                              <span className="truncate text-[12px] font-medium" style={{ color: glass.text }}>{row.value ?? "—"}</span>
+                            </div>
+                          ))}
                         </div>
                       ))}
                     </div>
-                  ))}
+                  )}
+                </div>
+
+                <div
+                  style={
+                    {
+                      "--ink-muted": glass.textDim,
+                      "--hairline-soft": glass.divider,
+                      "--surface-2": glass.chipBg,
+                      "--accent-blue": glass.accent,
+                    } as React.CSSProperties
+                  }
+                >
+                  <h2 className="mb-2 text-[10.5px] font-semibold uppercase" style={{ color: glass.textFaint, letterSpacing: "0.06em" }}>
+                    Call notes
+                  </h2>
+                  <div style={{ color: glass.text }}>
+                    <CallHighlightsList items={dealState?.callHighlights ?? []} />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="py-10 text-center text-[12.5px]" style={{ color: glass.textDim }}>
+                No active call. Start recording from the main app to see live terms here.
+              </p>
+            ))}
+
+          {activeView === "calendar" && (
+            <div>
+              <h2 className="mb-2 text-[10.5px] font-semibold uppercase" style={{ color: glass.textFaint, letterSpacing: "0.06em" }}>
+                Upcoming
+              </h2>
+              {upcomingEvents.length === 0 ? (
+                <p className="py-6 text-center text-[12.5px]" style={{ color: glass.textDim }}>
+                  Nothing scheduled — start a call from the main app to see it here.
+                </p>
+              ) : (
+                <div className="flex flex-col">
+                  {upcomingEvents.map((event) => {
+                    const open = expandedEventId === event.id;
+                    return (
+                      <div key={event.id} className="py-1 first:pt-0" style={{ borderTop: `1px solid ${glass.divider}` }}>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedEventId(open ? null : event.id)}
+                          className="flex w-full items-center gap-2 rounded-[8px] py-1.5 text-left"
+                          style={{ cursor: "pointer" }}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-[12.5px] font-medium" style={{ color: glass.text }}>{event.title}</div>
+                            <div className="text-[11px]" style={{ color: glass.textDim }}>{formatEventTime(event.startTime)}</div>
+                          </div>
+                          <svg
+                            viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"
+                            width={11} height={11}
+                            style={{ color: glass.textFaint, flexShrink: 0, transform: open ? "rotate(90deg)" : "none", transition: "transform 120ms" }}
+                          >
+                            <path d="M7 4l6 6-6 6" />
+                          </svg>
+                        </button>
+                        {open && (
+                          <div className="flex flex-col gap-2 rounded-[10px] px-2.5 py-2.5" style={{ background: glass.chipBg, marginBottom: 6 }}>
+                            <div className="flex items-center justify-between gap-2 text-[11.5px]" style={{ color: glass.textDim }}>
+                              <span>{PLATFORM_LABEL[event.platform] ?? event.platform} · {event.durationMinutes} min</span>
+                              {event.clientName && <span className="truncate" style={{ color: glass.text }}>{event.clientName}</span>}
+                            </div>
+                            {event.meetingUrl ? (
+                              <div className="flex items-center gap-2">
+                                <button type="button" onClick={() => joinCall(event.meetingUrl!)} style={{ ...glassButtonStyle("success"), flex: 1, cursor: "pointer" }}>
+                                  Join call
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => copyLink(event.id, event.meetingUrl!)}
+                                  title="Copy link"
+                                  aria-label="Copy link"
+                                  className="flex flex-none items-center justify-center rounded-[8px]"
+                                  style={{ width: 28, height: 28, border: `1px solid ${glass.chipBorder}`, color: glass.text, cursor: "pointer" }}
+                                >
+                                  {copiedEventId === event.id ? (
+                                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" width={12} height={12}>
+                                      <path d="M4 10l4 4 8-8" />
+                                    </svg>
+                                  ) : (
+                                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" width={12} height={12}>
+                                      <rect x="7" y="7" width="9" height="9" rx="1.5" />
+                                      <path d="M4.5 12.5V5.5a1 1 0 0 1 1-1h7" />
+                                    </svg>
+                                  )}
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[11.5px]" style={{ color: glass.textFaint }}>No call link on this event.</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
+          )}
 
+          {activeView === "notes" && (
             <div
               style={
                 {
@@ -329,89 +497,46 @@ export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: Upc
               }
             >
               <h2 className="mb-2 text-[10.5px] font-semibold uppercase" style={{ color: glass.textFaint, letterSpacing: "0.06em" }}>
-                Call notes
+                Notes
               </h2>
               <div style={{ color: glass.text }}>
-                <CallHighlightsList items={dealState?.callHighlights ?? []} />
+                {notes === null ? (
+                  <p className="py-6 text-center text-[12.5px]" style={{ color: glass.textDim }}>Loading…</p>
+                ) : (
+                  <RecentNotesList items={notes} />
+                )}
               </div>
             </div>
-          </div>
-        ) : (
-          <div>
-            <h2 className="mb-2 text-[10.5px] font-semibold uppercase" style={{ color: glass.textFaint, letterSpacing: "0.06em" }}>
-              Upcoming
-            </h2>
-            {upcomingEvents.length === 0 ? (
-              <p className="py-6 text-center text-[12.5px]" style={{ color: glass.textDim }}>
-                Nothing scheduled — start a call from the main app to see it here.
-              </p>
-            ) : (
-              <div className="flex flex-col">
-                {upcomingEvents.map((event) => {
-                  const open = expandedEventId === event.id;
-                  return (
-                    <div key={event.id} className="py-1 first:pt-0" style={{ borderTop: `1px solid ${glass.divider}` }}>
-                      <button
-                        type="button"
-                        onClick={() => setExpandedEventId(open ? null : event.id)}
-                        className="flex w-full items-center gap-2 rounded-[8px] py-1.5 text-left"
-                        style={{ cursor: "pointer" }}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-[12.5px] font-medium" style={{ color: glass.text }}>{event.title}</div>
-                          <div className="text-[11px]" style={{ color: glass.textDim }}>{formatEventTime(event.startTime)}</div>
-                        </div>
-                        <svg
-                          viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"
-                          width={11} height={11}
-                          style={{ color: glass.textFaint, flexShrink: 0, transform: open ? "rotate(90deg)" : "none", transition: "transform 120ms" }}
-                        >
-                          <path d="M7 4l6 6-6 6" />
-                        </svg>
-                      </button>
-                      {open && (
-                        <div className="flex flex-col gap-2 rounded-[10px] px-2.5 py-2.5" style={{ background: glass.chipBg, marginBottom: 6 }}>
-                          <div className="flex items-center justify-between gap-2 text-[11.5px]" style={{ color: glass.textDim }}>
-                            <span>{PLATFORM_LABEL[event.platform] ?? event.platform} · {event.durationMinutes} min</span>
-                            {event.clientName && <span className="truncate" style={{ color: glass.text }}>{event.clientName}</span>}
-                          </div>
-                          {event.meetingUrl ? (
-                            <div className="flex items-center gap-2">
-                              <button type="button" onClick={() => joinCall(event.meetingUrl!)} style={{ ...glassButtonStyle("success"), flex: 1, cursor: "pointer" }}>
-                                Join call
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => copyLink(event.id, event.meetingUrl!)}
-                                title="Copy link"
-                                aria-label="Copy link"
-                                className="flex flex-none items-center justify-center rounded-[8px]"
-                                style={{ width: 28, height: 28, border: `1px solid ${glass.chipBorder}`, color: glass.text, cursor: "pointer" }}
-                              >
-                                {copiedEventId === event.id ? (
-                                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" width={12} height={12}>
-                                    <path d="M4 10l4 4 8-8" />
-                                  </svg>
-                                ) : (
-                                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" width={12} height={12}>
-                                    <rect x="7" y="7" width="9" height="9" rx="1.5" />
-                                    <path d="M4.5 12.5V5.5a1 1 0 0 1 1-1h7" />
-                                  </svg>
-                                )}
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-[11.5px]" style={{ color: glass.textFaint }}>No call link on this event.</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
+
+        <div
+          className="flex flex-none flex-col items-center gap-1.5 py-3"
+          style={{ width: 36, borderLeft: `1px solid ${glass.divider}` }}
+        >
+          {(["live", "calendar", "notes"] as View[]).map((view) => {
+            const active = activeView === view;
+            return (
+              <button
+                key={view}
+                type="button"
+                onClick={() => setActiveView(view)}
+                aria-label={view}
+                title={view === "live" ? "Live" : view === "calendar" ? "Calendar" : "Notes"}
+                className="flex flex-none items-center justify-center rounded-[8px]"
+                style={{
+                  width: 26,
+                  height: 26,
+                  background: active ? glass.accentDim : "transparent",
+                  color: active ? glass.accent : glass.textFaint,
+                  cursor: "pointer",
+                }}
+              >
+                <RailIcon view={view} />
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
