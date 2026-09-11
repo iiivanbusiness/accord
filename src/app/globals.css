@@ -95,12 +95,15 @@
   --on-glow-dark: #ffffff;
   --on-glow-dark-muted: rgba(255, 255, 255, 0.62);
 
-  /* The Dashboard's one signature accent gradient (success/progress) —
-     used by DealValueHeroCard's progress bar and GlowRingStat's "green"
-     tone. Per-status hues live only in deal-status-theme.ts's
-     STATUS_COLOR, used solely by the folder-icon grid. */
-  --status-sent: #0d9488;
-  --status-signed: #15803d;
+  /* Folder-icon chrome — one glossy neutral folder, not colored per
+     status (matches the reference exactly: every folder in the grid is
+     the same material, only the label under it differs). Light theme:
+     bright white/silver glass. */
+  --folder-back: #c6c6cb;
+  --folder-front-top: #ffffff;
+  --folder-front-bottom: #e2e2e7;
+  --folder-paper: #ffffff;
+  --folder-shadow: rgba(20, 20, 30, 0.22);
 }
 :root[data-theme="dark"] .sm-theme {
   --primary: #ffffff;
@@ -137,8 +140,14 @@
   --glass-card-highlight: rgba(255, 255, 255, 0.5);
   --glass-card-blur: blur(20px) saturate(180%);
 
-  --status-sent: #3dd6c4;
-  --status-signed: #32d74b;
+  /* Dark chrome folder — matches the reference literally (a dark glossy
+     folder with a light diagonal sheen and a white paper corner), not a
+     re-themed version of the light folder. */
+  --folder-back: #1c1c1e;
+  --folder-front-top: #6e6e73;
+  --folder-front-bottom: #3a3a3c;
+  --folder-paper: #f5f5f7;
+  --folder-shadow: rgba(0, 0, 0, 0.55);
 }
 
 @theme inline {
@@ -344,9 +353,12 @@ a {
   border-radius: 9999px;
   filter: blur(46px);
 }
-.glass-glow-1 { top: -70px; left: -60px; width: 220px; height: 220px; background: var(--gradient-violet); opacity: 0.55; }
-.glass-glow-2 { top: 38%; right: -80px; width: 200px; height: 200px; background: var(--gradient-coral); opacity: 0.42; }
-.glass-glow-3 { bottom: -70px; left: -50px; width: 210px; height: 210px; background: var(--gradient-orange); opacity: 0.38; }
+/* Neutral white/gray ambient light, not a colored gradient — matches the
+   liquid-glass reference (a plain frosted sheen, not a tinted glow), and
+   now bleeds across two panels (rail + nav) instead of one. */
+.glass-glow-1 { top: -70px; left: -60px; width: 220px; height: 220px; background: #ffffff; opacity: 0.5; }
+.glass-glow-2 { top: 38%; right: -80px; width: 200px; height: 200px; background: #ffffff; opacity: 0.3; }
+.glass-glow-3 { bottom: -70px; left: -50px; width: 210px; height: 210px; background: #c7c7cc; opacity: 0.3; }
 :root[data-theme="dark"] .sm-theme .glass-glow { opacity: 0.5; filter: blur(52px); }
 
 /* The mobile nav drawer overlays live page content directly (unlike the
@@ -390,24 +402,6 @@ a {
    language via a plain opaque surface instead. */
 .glass-card-solid {
   background: var(--surface-1);
-}
-
-/* A soft, colored glow bleeding from a corner — used behind the status
-   folders and stat cards, tinted per status/accent via inline style. */
-.glass-card-glow {
-  position: absolute;
-  border-radius: 9999px;
-  filter: blur(40px);
-  opacity: 0.45;
-  pointer-events: none;
-}
-:root[data-theme="dark"] .sm-theme .glass-card-glow { opacity: 0.55; filter: blur(48px); }
-
-/* Dashboard's "Recent deals" table renders 10 rows server-side always (no
-   client JS/hydration risk) and just hides rows 6-10 below 2xl — genuinely
-   more data at ultra-wide, not a client-side reflow trick. */
-@media (max-width: 1535px) {
-  .dashboard-recent-row-extra { display: none; }
 }
 
 /* ---------- sidebar: liquid-glass active-item pill ----------

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { parseFee } from "@/lib/money";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
-import { STATUS_LABEL, BOARD_COLUMNS } from "@/lib/deal-status-theme";
+import { STATUS_LABEL, BOARD_COLUMNS } from "@/lib/deal-status";
 import GlassStatCard from "@/components/dashboard/GlassStatCard";
 import DealStatusFolders from "@/components/dashboard/DealStatusFolders";
 import DealValueHeroCard from "@/components/dashboard/DealValueHeroCard";
@@ -38,9 +38,7 @@ function daysUntil(date: Date): number {
   return Math.ceil((date.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
 }
 
-// Chip-tone map kept local (only used for the Recent deals table below) —
-// separate from STATUS_COLOR (the new per-status hue) which drives icons
-// and glows, not this semantic warn/active/success/neutral chip styling.
+// Chip-tone map kept local — only used for the Recent deals table below.
 const STATUS_CHIP: Record<string, string> = {
   processing: "chip-neutral chip-live",
   missing_info: "chip-warn",
@@ -101,7 +99,7 @@ export default async function DashboardPage() {
   const signedRate = deals.length > 0 ? Math.round((signedCount / deals.length) * 100) : 0;
   const newClientsPct = clientCount > 0 ? Math.round((newClientsThisMonth / clientCount) * 100) : 0;
 
-  const recentDeals = deals.slice(0, 10);
+  const recentDeals = deals.slice(0, 8);
 
   // Folders-by-status — reuses the `deals` array already fetched above
   // (dealVisibilityFilter already applied to it), no new query. Always all
@@ -136,19 +134,14 @@ export default async function DashboardPage() {
       </div>
     </div>
 
-    {/* Full-bleed breakout — escapes AppShell's shared max-w-[1180px] cap
-        (AppShell.tsx is never edited, so every other page is unaffected)
-        so wide/full-screen viewports actually surface more sections
-        instead of just more empty margin around the same content. */}
-    <div className="mx-[calc(50%-50vw)] w-screen px-3.5 md:px-6 xl:px-8">
-      <div className="mx-auto max-w-[1600px]">
-        <div className="mb-5 grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-6">
+    {/* Stays within AppShell's normal max-w-[1180px] content column, same
+        as every other page — an earlier full-bleed breakout here ignored
+        the sidebar's width and produced a horizontal scrollbar. */}
+        <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           <GlassStatCard label="Combined deal value" value={`$${combinedValue.toLocaleString()}`} sub="Across all deals" />
           <GlassStatCard label="Active deals" value={String(deals.length)} sub={`${newClientsThisMonth} started this month`} />
           <GlassStatCard label="Contracts signed" value={String(signedCount)} sub={`of ${deals.length} deals`} />
           <GlassStatCard label="Clients" value={String(clientCount)} sub="Total on file" />
-          {/* xl:-only — real data already fetched above, just not surfaced
-              as its own tile until there's room for it. */}
           <GlassStatCard
             label="Renewals at risk"
             value={String(renewalsAtRisk.length)}
@@ -303,12 +296,10 @@ export default async function DashboardPage() {
             )}
           </div>
 
-          {/* xl:-only third column — reuses signedRate/newClientsThisMonth,
-              already computed above, no new data. */}
-          <div className="hidden flex-col gap-3 xl:flex">
+          <div className="flex flex-col gap-3">
             <h2 className="text-[15px] font-medium">This month</h2>
-            <GlowRingStat pct={signedRate} value={`${signedRate}%`} label="Signed rate" tone="green" />
-            <GlowRingStat pct={newClientsPct} value={String(newClientsThisMonth)} label="New clients this month" tone="violet" />
+            <GlowRingStat pct={signedRate} value={`${signedRate}%`} label="Signed rate" />
+            <GlowRingStat pct={newClientsPct} value={String(newClientsThisMonth)} label="New clients this month" />
           </div>
         </div>
 
@@ -335,8 +326,8 @@ export default async function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {recentDeals.map((deal, i) => (
-                  <tr key={deal.id} className={`row-hover transition-colors ${i >= 5 ? "dashboard-recent-row-extra" : ""}`}>
+                {recentDeals.map((deal) => (
+                  <tr key={deal.id} className="row-hover transition-colors">
                     <td className="border-b px-5 py-3.5" style={{ borderColor: "var(--hairline-soft)" }}>
                       <Link href={`/deals/${deal.id}`} className="flex flex-col gap-0.5" style={{ color: "inherit" }}>
                         <span className="font-medium" style={{ color: "var(--ink)" }}>{deal.client.name}</span>
@@ -361,8 +352,6 @@ export default async function DashboardPage() {
             </table>
           </div>
         </div>
-      </div>
-    </div>
     </>
   );
 }

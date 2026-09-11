@@ -3,9 +3,10 @@ import RingChart from "./RingChart";
 type Month = { key: string; label: string; value: number };
 
 // The restyled "Deal value by month" card — same bar-chart/RingChart data
-// and logic as the old inline version (dashboard/page.tsx:174-217), now a
-// real glass surface plus a glow gradient progress bar for the signed
-// rate, matching the reference "Project Progress" card. Uses the
+// and logic as the old inline version, now a real glass surface. No
+// colored accent anywhere (no orb, no green/violet) — pure white-on-dark
+// liquid glass, matching the Mail-app reference popup's restraint rather
+// than the earlier colorful "Project Progress" motif. Uses the
 // always-dark --glow-dark-surface* tokens (not --surface-inverted, which
 // flips light in dark theme — right for a single accent card like
 // UpgradeCard.tsx, wrong once there are several "featured" dark glass
@@ -28,14 +29,6 @@ export default function DealValueHeroCard({
   return (
     <div className="glass-card card-hover relative p-5" style={{ border: "1px solid transparent" }}>
       <div className="glass-card-blur" aria-hidden="true" style={{ background: "var(--glow-dark-surface)" }} />
-      {/* One orb only — violet, the card's single accent alongside the
-          green/cyan progress bar below. A second competing orb was part
-          of why the first pass read as too colorful. */}
-      <div
-        className="glass-card-glow"
-        style={{ background: "var(--gradient-violet)", width: 200, height: 200, right: -50, top: -70, opacity: 0.25 }}
-        aria-hidden="true"
-      />
 
       <div className="relative z-10 mb-5 flex items-center justify-between">
         <h2 className="text-[15px] font-medium" style={{ color: "var(--on-glow-dark)" }}>
@@ -54,18 +47,13 @@ export default function DealValueHeroCard({
         </div>
       </div>
 
-      {/* Glow gradient progress bar — the "Project Progress" motif from the
-          reference images, reusing the same signedRate data as the ring
-          above rather than a separate metric. */}
+      {/* Progress bar reusing the same signedRate data as the ring above —
+          plain white fill, no color, matching the reference's restraint. */}
       <div className="relative z-10 mb-5">
         <div className="h-2 w-full overflow-hidden rounded-full" style={{ background: "var(--glow-dark-surface-2)" }}>
           <div
             className="h-full rounded-full transition-all duration-700 ease-out"
-            style={{
-              width: `${Math.max(4, signedRate)}%`,
-              background: "linear-gradient(90deg, var(--status-signed), var(--status-sent))",
-              boxShadow: "0 0 12px var(--status-signed)",
-            }}
+            style={{ width: `${Math.max(4, signedRate)}%`, background: "var(--on-glow-dark)" }}
           />
         </div>
         <div className="mt-1.5 text-[11px]" style={{ color: "var(--on-glow-dark-muted)" }}>

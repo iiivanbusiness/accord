@@ -8,6 +8,7 @@ import BrandLogo from "./BrandLogo";
 import MobileNavDrawer from "./MobileNavDrawer";
 import AppFooter from "./AppFooter";
 import SidebarNav from "./SidebarNav";
+import SidebarRail from "./SidebarRail";
 import UpgradeCard from "./UpgradeCard";
 import ScreenLabel from "./ScreenLabel";
 import GlassPanel from "./GlassPanel";
@@ -71,10 +72,24 @@ export default async function AppShell({ children }: { children: React.ReactNode
 
   return (
     <div className="sm-theme min-h-dvh" style={{ background: "var(--canvas)" }}>
-      <div className="grid min-h-dvh grid-cols-1 md:grid-cols-[232px_1fr]">
+      <div className="grid min-h-dvh grid-cols-1 md:grid-cols-[64px_208px_1fr]">
+        {/* Icon-only rail — a physically separate panel from the labeled
+            nav next to it (same rail/panel split used for the companion
+            window's CompanionRail + content windows), matching the
+            reference's narrow icon strip beside a wider list panel. */}
         <GlassPanel
           as="nav"
-          className="m-3.5 hidden rounded-[28px] px-3.5 py-[22px] md:flex md:sticky md:top-3.5 md:h-[calc(100dvh-28px)] md:self-start"
+          className="m-3.5 mr-0 hidden items-center rounded-[24px] px-2 py-[22px] md:flex md:sticky md:top-3.5 md:h-[calc(100dvh-28px)] md:self-start"
+        >
+          <div className="mb-6">
+            <BrandLogo height={22} iconOnly />
+          </div>
+          <SidebarRail items={navItems} />
+        </GlassPanel>
+
+        <GlassPanel
+          as="nav"
+          className="m-3.5 ml-2 hidden rounded-[24px] px-3.5 py-[22px] md:flex md:sticky md:top-3.5 md:h-[calc(100dvh-28px)] md:self-start"
         >
           <div className="mb-7 px-2">
             <BrandLogo height={20} />
