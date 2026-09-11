@@ -18,7 +18,7 @@ export default async function CompanionPage() {
     where: { workspaceId: workspace.id, startTime: { gte: new Date() } },
     orderBy: { startTime: "asc" },
     take: 5,
-    select: { id: true, title: true, clientName: true, startTime: true, platform: true, linkedDealId: true },
+    select: { id: true, title: true, clientName: true, startTime: true, durationMinutes: true, platform: true, meetingUrl: true, linkedDealId: true },
   });
 
   return (

@@ -22,9 +22,13 @@ type UpcomingEvent = {
   title: string;
   clientName: string | null;
   startTime: string;
+  durationMinutes: number;
   platform: string;
+  meetingUrl: string | null;
   linkedDealId: string | null;
 };
+
+const PLATFORM_LABEL: Record<string, string> = { zoom: "Zoom", meet: "Google Meet" };
 
 // A fixed dark-glass palette, independent of the main app's light/dark
 // theme (see the layout's doc comment) — this sits on top of a native
@@ -95,6 +99,8 @@ export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: Upc
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+  const [copiedEventId, setCopiedEventId] = useState<string | null>(null);
 
   useEffect(() => {
     setIsTauri(typeof window !== "undefined" && "__TAURI_INTERNALS__" in window);
@@ -130,6 +136,26 @@ export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: Upc
       clearInterval(interval);
     };
   }, [session]);
+
+  async function joinCall(url: string) {
+    try {
+      const { openUrl } = await import("@tauri-apps/plugin-opener");
+      await openUrl(url);
+    } catch (err) {
+      console.error("[companion] openUrl failed:", err);
+      setError("Couldn't open that link");
+    }
+  }
+
+  async function copyLink(eventId: string, url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedEventId(eventId);
+      setTimeout(() => setCopiedEventId((id) => (id === eventId ? null : id)), 1500);
+    } catch {
+      setError("Couldn't copy the link");
+    }
+  }
 
   async function goToMainApp() {
     try {
@@ -198,10 +224,7 @@ export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: Upc
       className="flex h-full flex-col"
       style={{ borderRadius: 16, overflow: "hidden" }}
     >
-      <div
-        className="flex flex-none items-center justify-between gap-2 px-4 py-3"
-        style={{ borderBottom: `1px solid ${glass.divider}`, WebkitAppRegion: "drag" } as React.CSSProperties}
-      >
+      <div className="flex flex-none items-center justify-between gap-2 px-4 py-3" style={{ borderBottom: `1px solid ${glass.divider}` }}>
         <div className="flex min-w-0 items-center gap-2">
           <span
             className="inline-flex h-1.5 w-1.5 flex-none rounded-full"
@@ -217,7 +240,7 @@ export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: Upc
           aria-label="Open main app"
           title="Open main app"
           className="flex flex-none items-center justify-center rounded-[7px]"
-          style={{ width: 22, height: 22, color: glass.textDim, WebkitAppRegion: "no-drag" } as React.CSSProperties}
+          style={{ width: 24, height: 24, color: glass.textDim, cursor: "pointer" }}
         >
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" width={13} height={13}>
             <path d="M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-3" />
@@ -324,14 +347,67 @@ export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: Upc
               </p>
             ) : (
               <div className="flex flex-col">
-                {upcomingEvents.map((event) => (
-                  <div key={event.id} className="py-2.5 first:pt-0" style={{ borderTop: `1px solid ${glass.divider}` }}>
-                    <div className="text-[12.5px] font-medium" style={{ color: glass.text }}>{event.title}</div>
-                    <div className="text-[11px]" style={{ color: glass.textDim }}>
-                      {formatEventTime(event.startTime)}
+                {upcomingEvents.map((event) => {
+                  const open = expandedEventId === event.id;
+                  return (
+                    <div key={event.id} className="py-1 first:pt-0" style={{ borderTop: `1px solid ${glass.divider}` }}>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedEventId(open ? null : event.id)}
+                        className="flex w-full items-center gap-2 rounded-[8px] py-1.5 text-left"
+                        style={{ cursor: "pointer" }}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-[12.5px] font-medium" style={{ color: glass.text }}>{event.title}</div>
+                          <div className="text-[11px]" style={{ color: glass.textDim }}>{formatEventTime(event.startTime)}</div>
+                        </div>
+                        <svg
+                          viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"
+                          width={11} height={11}
+                          style={{ color: glass.textFaint, flexShrink: 0, transform: open ? "rotate(90deg)" : "none", transition: "transform 120ms" }}
+                        >
+                          <path d="M7 4l6 6-6 6" />
+                        </svg>
+                      </button>
+                      {open && (
+                        <div className="flex flex-col gap-2 rounded-[10px] px-2.5 py-2.5" style={{ background: glass.chipBg, marginBottom: 6 }}>
+                          <div className="flex items-center justify-between gap-2 text-[11.5px]" style={{ color: glass.textDim }}>
+                            <span>{PLATFORM_LABEL[event.platform] ?? event.platform} · {event.durationMinutes} min</span>
+                            {event.clientName && <span className="truncate" style={{ color: glass.text }}>{event.clientName}</span>}
+                          </div>
+                          {event.meetingUrl ? (
+                            <div className="flex items-center gap-2">
+                              <button type="button" onClick={() => joinCall(event.meetingUrl!)} style={{ ...glassButtonStyle("success"), flex: 1, cursor: "pointer" }}>
+                                Join call
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => copyLink(event.id, event.meetingUrl!)}
+                                title="Copy link"
+                                aria-label="Copy link"
+                                className="flex flex-none items-center justify-center rounded-[8px]"
+                                style={{ width: 28, height: 28, border: `1px solid ${glass.chipBorder}`, color: glass.text, cursor: "pointer" }}
+                              >
+                                {copiedEventId === event.id ? (
+                                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" width={12} height={12}>
+                                    <path d="M4 10l4 4 8-8" />
+                                  </svg>
+                                ) : (
+                                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" width={12} height={12}>
+                                    <rect x="7" y="7" width="9" height="9" rx="1.5" />
+                                    <path d="M4.5 12.5V5.5a1 1 0 0 1 1-1h7" />
+                                  </svg>
+                                )}
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-[11.5px]" style={{ color: glass.textFaint }}>No call link on this event.</span>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

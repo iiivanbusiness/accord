@@ -98,7 +98,14 @@ fn build_companion_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow
         .decorations(false)
         .skip_taskbar(true)
         .resizable(true)
-        .shadow(true);
+        .shadow(true)
+        .focused(true)
+        // Without this, a click on the panel while it's not the active
+        // window only activates/focuses it — the click itself doesn't
+        // reach any button/link, you'd need a second click. An
+        // always-on-top utility panel like this one should feel clickable
+        // on the first try, every time.
+        .accept_first_mouse(true);
 
     // transparent() + HudWindow gives it the native macOS "liquid glass"
     // look — a frosted, blurred-desktop-behind panel, the same material
@@ -161,37 +168,43 @@ fn toggle_companion_window(app: tauri::AppHandle) -> Result<(), String> {
         })?;
         eprintln!("[companion] existing window found, visible={visible}");
         if visible {
-            companion.hide().map_err(|e| { eprintln!("[companion] hide failed: {e}"); e.to_string() })?;
+            // Show main BEFORE hiding companion — never let both windows be
+            // invisible at once, even for an instant. Tauri/macOS treats
+            // "zero visible windows" as "nothing left to run for" and quits
+            // the whole app out from under you if the two calls land in the
+            // other order (confirmed: this crashed the dev process).
             if let Some(main) = main {
                 main.show().map_err(|e| { eprintln!("[companion] main.show failed: {e}"); e.to_string() })?;
                 main.set_focus().map_err(|e| { eprintln!("[companion] main.set_focus failed: {e}"); e.to_string() })?;
             }
+            companion.hide().map_err(|e| { eprintln!("[companion] hide failed: {e}"); e.to_string() })?;
             eprintln!("[companion] hidden, main restored");
             return Ok(());
         }
         // Window exists (created once, then hidden rather than destroyed on
         // every toggle) but isn't currently shown — reposition in case the
-        // monitor layout changed since it was last opened, then show it.
+        // monitor layout changed since it was last opened, then show it
+        // before hiding main (see the same ordering note above).
         let (x, y) = companion_position(&app);
         companion
             .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }))
             .map_err(|e| { eprintln!("[companion] set_position failed: {e}"); e.to_string() })?;
+        companion.show().map_err(|e| { eprintln!("[companion] show failed: {e}"); e.to_string() })?;
+        companion.set_focus().map_err(|e| { eprintln!("[companion] set_focus failed: {e}"); e.to_string() })?;
         if let Some(main) = main {
             main.hide().map_err(|e| { eprintln!("[companion] main.hide failed: {e}"); e.to_string() })?;
         }
-        companion.show().map_err(|e| { eprintln!("[companion] show failed: {e}"); e.to_string() })?;
-        companion.set_focus().map_err(|e| { eprintln!("[companion] set_focus failed: {e}"); e.to_string() })?;
         eprintln!("[companion] shown");
         return Ok(());
     }
 
     eprintln!("[companion] no existing window, building one");
     let companion = build_companion_window(&app)?;
+    companion.show().map_err(|e| { eprintln!("[companion] show failed: {e}"); e.to_string() })?;
+    companion.set_focus().map_err(|e| { eprintln!("[companion] set_focus failed: {e}"); e.to_string() })?;
     if let Some(main) = main {
         main.hide().map_err(|e| { eprintln!("[companion] main.hide failed: {e}"); e.to_string() })?;
     }
-    companion.show().map_err(|e| { eprintln!("[companion] show failed: {e}"); e.to_string() })?;
-    companion.set_focus().map_err(|e| { eprintln!("[companion] set_focus failed: {e}"); e.to_string() })?;
     eprintln!("[companion] shown (first time)");
     Ok(())
 }
