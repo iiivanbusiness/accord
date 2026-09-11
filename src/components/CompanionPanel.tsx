@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { LOCAL_CAPTURE_STORAGE_KEY, LOCAL_CAPTURE_EVENT } from "./LocalCaptureForm";
 import CallHighlightsList, { type CallHighlightItem } from "./CallHighlightsList";
 import RecentNotesList, { type RecentNoteItem } from "./RecentNotesList";
@@ -88,39 +89,17 @@ function formatEventTime(iso: string): string {
   return sameDay ? time : `${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${time}`;
 }
 
-function RailIcon({ view }: { view: View }) {
-  const common = { viewBox: "0 0 20 20", fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, width: 14, height: 14 };
-  if (view === "live") {
-    return (
-      <svg {...common}>
-        <path d="M6 12.5V7.5M10 14.5V5.5M14 12.5V7.5" />
-      </svg>
-    );
-  }
-  if (view === "calendar") {
-    return (
-      <svg {...common}>
-        <rect x="3.5" y="4.5" width="13" height="12" rx="1.6" />
-        <path d="M3.5 8.5h13M7 2.5v3M13 2.5v3" />
-      </svg>
-    );
-  }
-  return (
-    <svg {...common}>
-      <rect x="4.5" y="2.5" width="11" height="15" rx="1.4" />
-      <path d="M7 7h6M7 10h6M7 13h3.5" />
-    </svg>
-  );
-}
-
-// The floating panel's content. An icon rail on the right edge switches
-// between three always-available destinations (`View`) rather than the
-// panel deciding for you based on call state — the one exception is
-// auto-jumping to "live" the moment a new recording starts, since that's
-// the reason you'd have the panel open in the first place. Sits directly
-// on the native vibrancy blur (see desktop-app's build_companion_window) —
-// nothing here paints a solid background, by design.
+// The floating panel's content — content-only now (see CompanionRail.tsx
+// for the separate, persistent icon rail that opens/switches this window).
+// Which of the three `View` bodies renders is read from the `?view=`
+// query param this window was navigated to (see desktop-app's
+// select_companion_view) — the one exception is auto-jumping to "live" in
+// place if a new recording starts while this window is already open on
+// something else. Sits directly on the native vibrancy blur (see
+// desktop-app's build_content_window) — nothing here paints a solid
+// background, by design.
 export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: UpcomingEvent[] }) {
+  const searchParams = useSearchParams();
   const [isTauri, setIsTauri] = useState<boolean | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [dealState, setDealState] = useState<DealState | null>(null);
@@ -130,7 +109,10 @@ export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: Upc
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [copiedEventId, setCopiedEventId] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<View>("calendar");
+  const [activeView, setActiveView] = useState<View>(() => {
+    const param = searchParams.get("view");
+    return param === "live" || param === "notes" ? param : "calendar";
+  });
   const hadSessionRef = useRef(false);
 
   useEffect(() => {
@@ -138,13 +120,19 @@ export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: Upc
     const initial = readSession();
     setSession(initial);
     hadSessionRef.current = Boolean(initial);
-    if (initial) setActiveView("live");
+    // Deliberately NOT forcing activeView to "live" here even if a call is
+    // already active on mount — this window only mounts fresh when the rail
+    // navigates it to a specific ?view=, and CompanionRail.tsx is what
+    // decides to send it to "live" for a genuinely NEW recording. Doing it
+    // here too would override an explicit pick of Calendar/Notes made while
+    // a call happened to already be running.
 
-    // AppShell-style pattern (see LocalCaptureBanner) — this window's page
-    // never remounts across hide/show toggles, so a plain mount-time read
-    // wouldn't notice a recording that starts after the panel first opened.
-    // Jump to "live" only on the null -> non-null transition (a genuinely
-    // new call starting), never on the reverse or on re-fires with the same
+    // AppShell-style pattern (see LocalCaptureBanner) — this window doesn't
+    // remount on its own just because a call starts, so a plain mount-time
+    // read wouldn't notice one beginning after this window was already
+    // open. Jump to "live" only on the null -> non-null transition (a
+    // genuinely new call starting while this window is sitting open on
+    // something else), never on the reverse or on re-fires with the same
     // session — otherwise stopping a call while browsing Notes would yank
     // you back to a tab about to go empty.
     const onChange = () => {
@@ -227,9 +215,9 @@ export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: Upc
   async function goToMainApp() {
     try {
       const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("toggle_companion_window");
+      await invoke("toggle_companion_rail");
     } catch (err) {
-      console.error("[companion] toggle_companion_window failed:", err);
+      console.error("[companion] toggle_companion_rail failed:", err);
       setError(typeof err === "string" ? err : err instanceof Error ? err.message : "Couldn't open the main app");
     }
   }
@@ -313,9 +301,8 @@ export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: Upc
         </button>
       </div>
 
-      <div className="flex min-h-0 flex-1">
-        <div className="min-w-0 flex-1 overflow-y-auto px-4 py-3.5">
-          {error && (
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3.5">
+        {error && (
             <div className="mb-3 rounded-[8px] px-3 py-2 text-[11.5px]" style={{ background: glass.dangerDim, color: glass.danger }}>
               {error}
             </div>
@@ -508,35 +495,6 @@ export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: Upc
               </div>
             </div>
           )}
-        </div>
-
-        <div
-          className="flex flex-none flex-col items-center gap-1.5 py-3"
-          style={{ width: 36, borderLeft: `1px solid ${glass.divider}` }}
-        >
-          {(["live", "calendar", "notes"] as View[]).map((view) => {
-            const active = activeView === view;
-            return (
-              <button
-                key={view}
-                type="button"
-                onClick={() => setActiveView(view)}
-                aria-label={view}
-                title={view === "live" ? "Live" : view === "calendar" ? "Calendar" : "Notes"}
-                className="flex flex-none items-center justify-center rounded-[8px]"
-                style={{
-                  width: 26,
-                  height: 26,
-                  background: active ? glass.accentDim : "transparent",
-                  color: active ? glass.accent : glass.textFaint,
-                  cursor: "pointer",
-                }}
-              >
-                <RailIcon view={view} />
-              </button>
-            );
-          })}
-        </div>
       </div>
     </div>
   );

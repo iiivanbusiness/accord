@@ -12,11 +12,16 @@ const APP_BASE_URL: &str = "https://app.sealme.net";
 
 // The floating companion window's own route — a chrome-less view of the
 // same app.sealme.net session (see src/app/companion/page.tsx), not the
-// full sidebared app.
+// full sidebared app. The rail is a second, separate route/window — see
+// src/app/companion/rail/page.tsx.
 const COMPANION_URL: &str = "https://app.sealme.net/companion";
+const RAIL_URL: &str = "https://app.sealme.net/companion/rail";
 const COMPANION_WIDTH: f64 = 340.0;
 const COMPANION_HEIGHT: f64 = 520.0;
+const RAIL_WIDTH: f64 = 44.0;
+const RAIL_HEIGHT: f64 = 172.0;
 const COMPANION_MARGIN: f64 = 16.0;
+const COMPANION_GAP: f64 = 8.0;
 #[cfg(not(feature = "mas"))]
 const COMPANION_RADIUS: f64 = 16.0;
 
@@ -65,11 +70,11 @@ fn is_local_capturing() -> bool {
     audio::is_capturing()
 }
 
-// Top-right-anchored logical position for the companion window on whatever
-// monitor it's opening on. Falls back to a fixed spot if the OS can't tell
-// us about a primary monitor (shouldn't normally happen, but the builder
-// still needs *some* position rather than failing the whole toggle).
-fn companion_position(app: &tauri::AppHandle) -> (f64, f64) {
+// Top-right-anchored logical position for the rail on whatever monitor it's
+// opening on. Falls back to a fixed spot if the OS can't tell us about a
+// primary monitor (shouldn't normally happen, but the builder still needs
+// *some* position rather than failing the whole toggle).
+fn rail_position(app: &tauri::AppHandle) -> (f64, f64) {
     if let Ok(Some(monitor)) = app.primary_monitor() {
         let scale = monitor.scale_factor();
         let mon_pos = monitor.position();
@@ -77,20 +82,90 @@ fn companion_position(app: &tauri::AppHandle) -> (f64, f64) {
         let mon_x = mon_pos.x as f64 / scale;
         let mon_y = mon_pos.y as f64 / scale;
         let mon_w = mon_size.width as f64 / scale;
-        return (mon_x + mon_w - COMPANION_WIDTH - COMPANION_MARGIN, mon_y + COMPANION_MARGIN);
+        return (mon_x + mon_w - RAIL_WIDTH - COMPANION_MARGIN, mon_y + COMPANION_MARGIN);
     }
     (100.0, 100.0)
 }
 
-fn build_companion_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow, String> {
-    let (x, y) = companion_position(app);
-    eprintln!("[companion] creating window at ({x}, {y}), url={COMPANION_URL}");
-    let url = tauri::Url::parse(COMPANION_URL).map_err(|e| {
-        eprintln!("[companion] bad URL: {e}");
+// The content window sits immediately to the left of the rail, top-aligned
+// with it — computed independently from the same monitor geometry (not by
+// querying the rail's live position) so the two always line up consistently
+// even if this runs before the rail has actually been shown yet.
+fn content_position(app: &tauri::AppHandle) -> (f64, f64) {
+    let (rail_x, rail_y) = rail_position(app);
+    (rail_x - COMPANION_GAP - COMPANION_WIDTH, rail_y)
+}
+
+// transparent() + HudWindow gives a window the native macOS "liquid glass"
+// look — a frosted, blurred-desktop-behind panel, the same material
+// Spotlight/Notification Center widgets use — with rounded corners from
+// `radius`. The webview's own CSS paints nothing solid behind its content
+// (see CompanionPanel.tsx / CompanionRail.tsx) so the blur actually shows
+// through instead of sitting behind an opaque backing. Not applied for
+// `mas` builds — see the tauri dependency comment in Cargo.toml for why the
+// Cargo feature itself still has to stay unconditionally on regardless.
+fn apply_glass_or_plain<'a>(
+    builder: tauri::WebviewWindowBuilder<'a, tauri::Wry, tauri::AppHandle>,
+) -> tauri::WebviewWindowBuilder<'a, tauri::Wry, tauri::AppHandle> {
+    #[cfg(not(feature = "mas"))]
+    {
+        builder.transparent(true).effects(
+            EffectsBuilder::new()
+                .effect(Effect::HudWindow)
+                .state(EffectState::Active)
+                .radius(COMPANION_RADIUS)
+                .build(),
+        )
+    }
+    #[cfg(feature = "mas")]
+    {
+        builder.background_color(tauri::webview::Color(245, 245, 247, 255))
+    }
+}
+
+fn build_rail_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow, String> {
+    let (x, y) = rail_position(app);
+    eprintln!("[companion] creating rail window at ({x}, {y}), url={RAIL_URL}");
+    let url = tauri::Url::parse(RAIL_URL).map_err(|e| {
+        eprintln!("[companion] bad rail URL: {e}");
         e.to_string()
     })?;
-    #[cfg_attr(feature = "mas", allow(unused_mut))]
-    let mut builder = tauri::WebviewWindowBuilder::new(app, "companion", tauri::WebviewUrl::External(url))
+    let builder = tauri::WebviewWindowBuilder::new(app, "rail", tauri::WebviewUrl::External(url))
+        .title("SealMe")
+        .inner_size(RAIL_WIDTH, RAIL_HEIGHT)
+        .position(x, y)
+        .always_on_top(true)
+        .decorations(false)
+        .skip_taskbar(true)
+        .resizable(false)
+        .shadow(true)
+        .focused(true)
+        // Without this, a click on the panel while it's not the active
+        // window only activates/focuses it — the click itself doesn't
+        // reach any button, you'd need a second click. An always-on-top
+        // utility panel like this one should feel clickable first try.
+        .accept_first_mouse(true);
+    match apply_glass_or_plain(builder).build() {
+        Ok(w) => {
+            eprintln!("[companion] rail window created");
+            Ok(w)
+        }
+        Err(e) => {
+            eprintln!("[companion] failed to create rail window: {e}");
+            Err(e.to_string())
+        }
+    }
+}
+
+fn build_content_window(app: &tauri::AppHandle, view: &str) -> Result<tauri::WebviewWindow, String> {
+    let (x, y) = content_position(app);
+    let full_url = format!("{COMPANION_URL}?view={view}");
+    eprintln!("[companion] creating content window at ({x}, {y}), url={full_url}");
+    let url = tauri::Url::parse(&full_url).map_err(|e| {
+        eprintln!("[companion] bad content URL: {e}");
+        e.to_string()
+    })?;
+    let builder = tauri::WebviewWindowBuilder::new(app, "companion", tauri::WebviewUrl::External(url))
         .title("SealMe Companion")
         .inner_size(COMPANION_WIDTH, COMPANION_HEIGHT)
         .position(x, y)
@@ -100,112 +175,123 @@ fn build_companion_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow
         .resizable(true)
         .shadow(true)
         .focused(true)
-        // Without this, a click on the panel while it's not the active
-        // window only activates/focuses it — the click itself doesn't
-        // reach any button/link, you'd need a second click. An
-        // always-on-top utility panel like this one should feel clickable
-        // on the first try, every time.
         .accept_first_mouse(true);
-
-    // transparent() + HudWindow gives it the native macOS "liquid glass"
-    // look — a frosted, blurred-desktop-behind panel, the same material
-    // Spotlight/Notification Center widgets use — with rounded corners from
-    // `radius`. The webview's own CSS paints nothing solid behind its
-    // content (see CompanionPanel.tsx) so the blur actually shows through
-    // instead of sitting behind an opaque backing. Not called for `mas`
-    // builds — see the tauri dependency comment in Cargo.toml for why the
-    // Cargo feature itself still has to stay unconditionally on.
-    #[cfg(not(feature = "mas"))]
-    {
-        builder = builder.transparent(true).effects(
-            EffectsBuilder::new()
-                .effect(Effect::HudWindow)
-                .state(EffectState::Active)
-                .radius(COMPANION_RADIUS)
-                .build(),
-        );
-    }
-    // MAS builds get a plain opaque panel instead — no glass effect, but the
-    // capability is never actually exercised.
-    #[cfg(feature = "mas")]
-    {
-        builder = builder.background_color(tauri::webview::Color(245, 245, 247, 255));
-    }
-
-    let result = builder.build();
-    match result {
+    match apply_glass_or_plain(builder).build() {
         Ok(w) => {
-            eprintln!("[companion] window created");
+            eprintln!("[companion] content window created");
             Ok(w)
         }
         Err(e) => {
-            eprintln!("[companion] failed to create window: {e}");
+            eprintln!("[companion] failed to create content window: {e}");
             Err(e.to_string())
         }
     }
 }
 
-// Manual toggle only — not tied to call start/stop. Collapses the main app
-// into a small always-on-top panel (and back), rather than showing both at
-// once: exactly one of "main" / "companion" is visible after this returns.
-// Called from a button in the main window's AppShell, and symmetrically
-// from a "back to app" control inside the companion panel itself (see
-// src/components/CompanionPanel.tsx) — same command either way. Logs every
-// step to stderr (visible in the `tauri dev` terminal) since this has no
-// other feedback channel if something in here fails.
+// Manual toggle only — not tied to call start/stop. Shows/hides the small
+// persistent rail (and the content window along with it, if one happens to
+// be open) in sync with the main window — exactly one of "main" / "rail" is
+// visible after this returns; the content window is independent from then
+// on, only ever shown via select_companion_view. Called from a button in
+// the main window's AppShell, and symmetrically from a "back to app"
+// control on the rail itself and inside the content window's header. Logs
+// every step to stderr (visible in the `tauri dev` terminal) since this has
+// no other feedback channel if something in here fails.
 #[tauri::command]
-fn toggle_companion_window(app: tauri::AppHandle) -> Result<(), String> {
-    eprintln!("[companion] toggle invoked");
+fn toggle_companion_rail(app: tauri::AppHandle) -> Result<(), String> {
+    eprintln!("[companion] rail toggle invoked");
     let main = app.get_webview_window("main");
     if main.is_none() {
         eprintln!("[companion] warning: no window labeled \"main\" found");
     }
 
-    if let Some(companion) = app.get_webview_window("companion") {
-        let visible = companion.is_visible().map_err(|e| {
-            eprintln!("[companion] is_visible failed: {e}");
+    if let Some(rail) = app.get_webview_window("rail") {
+        let visible = rail.is_visible().map_err(|e| {
+            eprintln!("[companion] rail is_visible failed: {e}");
             e.to_string()
         })?;
-        eprintln!("[companion] existing window found, visible={visible}");
+        eprintln!("[companion] existing rail found, visible={visible}");
         if visible {
-            // Show main BEFORE hiding companion — never let both windows be
+            // Show main BEFORE hiding the rail — never let every window be
             // invisible at once, even for an instant. Tauri/macOS treats
             // "zero visible windows" as "nothing left to run for" and quits
-            // the whole app out from under you if the two calls land in the
+            // the whole app out from under you if the calls land in the
             // other order (confirmed: this crashed the dev process).
             if let Some(main) = main {
                 main.show().map_err(|e| { eprintln!("[companion] main.show failed: {e}"); e.to_string() })?;
                 main.set_focus().map_err(|e| { eprintln!("[companion] main.set_focus failed: {e}"); e.to_string() })?;
             }
-            companion.hide().map_err(|e| { eprintln!("[companion] hide failed: {e}"); e.to_string() })?;
-            eprintln!("[companion] hidden, main restored");
+            rail.hide().map_err(|e| { eprintln!("[companion] rail hide failed: {e}"); e.to_string() })?;
+            if let Some(content) = app.get_webview_window("companion") {
+                content.hide().map_err(|e| { eprintln!("[companion] content hide failed: {e}"); e.to_string() })?;
+            }
+            eprintln!("[companion] rail hidden, main restored");
             return Ok(());
         }
-        // Window exists (created once, then hidden rather than destroyed on
-        // every toggle) but isn't currently shown — reposition in case the
-        // monitor layout changed since it was last opened, then show it
-        // before hiding main (see the same ordering note above).
-        let (x, y) = companion_position(&app);
-        companion
-            .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }))
-            .map_err(|e| { eprintln!("[companion] set_position failed: {e}"); e.to_string() })?;
-        companion.show().map_err(|e| { eprintln!("[companion] show failed: {e}"); e.to_string() })?;
-        companion.set_focus().map_err(|e| { eprintln!("[companion] set_focus failed: {e}"); e.to_string() })?;
+        let (x, y) = rail_position(&app);
+        rail.set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }))
+            .map_err(|e| { eprintln!("[companion] rail set_position failed: {e}"); e.to_string() })?;
+        rail.show().map_err(|e| { eprintln!("[companion] rail show failed: {e}"); e.to_string() })?;
+        rail.set_focus().map_err(|e| { eprintln!("[companion] rail set_focus failed: {e}"); e.to_string() })?;
         if let Some(main) = main {
             main.hide().map_err(|e| { eprintln!("[companion] main.hide failed: {e}"); e.to_string() })?;
         }
-        eprintln!("[companion] shown");
+        eprintln!("[companion] rail shown");
         return Ok(());
     }
 
-    eprintln!("[companion] no existing window, building one");
-    let companion = build_companion_window(&app)?;
-    companion.show().map_err(|e| { eprintln!("[companion] show failed: {e}"); e.to_string() })?;
-    companion.set_focus().map_err(|e| { eprintln!("[companion] set_focus failed: {e}"); e.to_string() })?;
+    eprintln!("[companion] no existing rail, building one");
+    let rail = build_rail_window(&app)?;
+    rail.show().map_err(|e| { eprintln!("[companion] rail show failed: {e}"); e.to_string() })?;
+    rail.set_focus().map_err(|e| { eprintln!("[companion] rail set_focus failed: {e}"); e.to_string() })?;
     if let Some(main) = main {
         main.hide().map_err(|e| { eprintln!("[companion] main.hide failed: {e}"); e.to_string() })?;
     }
-    eprintln!("[companion] shown (first time)");
+    eprintln!("[companion] rail shown (first time)");
+    Ok(())
+}
+
+// Picks (or collapses) the content window from the rail. Creates it on
+// first use, positioned next to wherever the rail currently is; after
+// that, re-shows/navigates the same window rather than recreating it each
+// time — WebviewWindow::navigate() changes its URL in place. Picking the
+// view that's already showing collapses the window back to rail-only, the
+// same "tap the active icon again to close" the rail itself uses.
+#[tauri::command]
+fn select_companion_view(app: tauri::AppHandle, view: String) -> Result<(), String> {
+    eprintln!("[companion] select_companion_view({view})");
+
+    if let Some(content) = app.get_webview_window("companion") {
+        let visible = content.is_visible().map_err(|e| { eprintln!("[companion] content is_visible failed: {e}"); e.to_string() })?;
+        let current_url = content.url().map(|u| u.to_string()).unwrap_or_default();
+        let already_on_view = current_url.ends_with(&format!("view={view}"));
+        eprintln!("[companion] existing content found, visible={visible}, already_on_view={already_on_view}");
+
+        if visible && already_on_view {
+            content.hide().map_err(|e| { eprintln!("[companion] content hide failed: {e}"); e.to_string() })?;
+            eprintln!("[companion] content hidden (same view re-picked)");
+            return Ok(());
+        }
+        if !already_on_view {
+            let full_url = format!("{COMPANION_URL}?view={view}");
+            let url = tauri::Url::parse(&full_url).map_err(|e| { eprintln!("[companion] bad content URL: {e}"); e.to_string() })?;
+            content.navigate(url).map_err(|e| { eprintln!("[companion] navigate failed: {e}"); e.to_string() })?;
+        }
+        let (x, y) = content_position(&app);
+        content
+            .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }))
+            .map_err(|e| { eprintln!("[companion] content set_position failed: {e}"); e.to_string() })?;
+        content.show().map_err(|e| { eprintln!("[companion] content show failed: {e}"); e.to_string() })?;
+        content.set_focus().map_err(|e| { eprintln!("[companion] content set_focus failed: {e}"); e.to_string() })?;
+        eprintln!("[companion] content shown at view={view}");
+        return Ok(());
+    }
+
+    eprintln!("[companion] no existing content window, building one at view={view}");
+    let content = build_content_window(&app, &view)?;
+    content.show().map_err(|e| { eprintln!("[companion] content show failed: {e}"); e.to_string() })?;
+    content.set_focus().map_err(|e| { eprintln!("[companion] content set_focus failed: {e}"); e.to_string() })?;
+    eprintln!("[companion] content shown (first time) at view={view}");
     Ok(())
 }
 
@@ -354,7 +440,8 @@ pub fn run() {
             is_local_capturing,
             discard_local_capture,
             stop_local_capture_and_upload,
-            toggle_companion_window
+            toggle_companion_rail,
+            select_companion_view
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

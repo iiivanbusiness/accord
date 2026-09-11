@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 
-// Manual toggle for the floating companion panel (see desktop-app's
-// toggle_companion_window command) — collapses the main window and shows
-// the small always-on-top panel instead, or the reverse if it's already
-// showing. Only rendered inside the desktop app; same isTauri detection
-// pattern as ContinueCallButton/LocalCaptureForm.
+// Manual toggle for the floating icon rail (see desktop-app's
+// toggle_companion_rail command) — collapses the main window and shows the
+// small always-on-top rail instead (content only opens once you pick
+// something from it), or the reverse if it's already showing. Only
+// rendered inside the desktop app; same isTauri detection pattern as
+// ContinueCallButton/LocalCaptureForm.
 export default function CompanionToggleButton() {
   const [isTauri, setIsTauri] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,13 +22,13 @@ export default function CompanionToggleButton() {
     setError(null);
     try {
       const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("toggle_companion_window");
+      await invoke("toggle_companion_rail");
     } catch (err) {
       // Surfaced two ways: a visible dot + tooltip here (there's no room for
       // more in the header), and a console.error so it shows up in devtools
       // even if this button re-renders before it's read.
       const message = typeof err === "string" ? err : err instanceof Error ? err.message : "Couldn't open the panel";
-      console.error("[companion] toggle_companion_window failed:", err);
+      console.error("[companion] toggle_companion_rail failed:", err);
       setError(message);
     }
   }
