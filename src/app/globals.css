@@ -73,6 +73,39 @@
   /* the sidebar's own glass panel — lighter/more transparent than the active pill */
   --glass-panel-bg: rgba(255, 255, 255, 0.5);
   --glass-panel-border: rgba(255, 255, 255, 0.5);
+
+  /* Dashboard's card-level glass — separate from --glass-panel-* above on
+     purpose: that one's tuned for the sidebar's narrow fixed nav over a
+     calm background, this one's tuned for content-dense cards sitting over
+     each other and over scrolling data. Keeping them distinct means a
+     later tweak to one can't silently reflow the other. */
+  --glass-card-bg: rgba(255, 255, 255, 0.55);
+  --glass-card-border: rgba(255, 255, 255, 0.6);
+  --glass-card-highlight: rgba(255, 255, 255, 0.5);
+  --glass-card-blur: blur(20px) saturate(170%);
+
+  /* Deliberately NOT redefined in the dark-theme block below — the "hero"
+     glass cards (DealValueHeroCard, GlowRingStat) stay a consistently dark
+     glossy surface in both themes, matching the reference images, rather
+     than flipping light in dark mode the way --surface-inverted does
+     (that token stays untouched here — UpgradeCard.tsx and others still
+     rely on its flip, out of scope to change). */
+  --glow-dark-surface: rgba(20, 20, 24, 0.92);
+  --glow-dark-surface-2: rgba(255, 255, 255, 0.14);
+  --on-glow-dark: #ffffff;
+  --on-glow-dark-muted: rgba(255, 255, 255, 0.62);
+
+  /* Per-deal-status color — nothing like this existed before the Dashboard
+     redesign (see src/lib/deal-status-theme.ts); the 8 keys match
+     Deal.status exactly (BOARD_COLUMNS in deals/page.tsx). */
+  --status-processing: #0a84ff;
+  --status-missing-info: #b45309;
+  --status-extraction-failed: #d92d20;
+  --status-ready: #7c4dff;
+  --status-pending-approval: #c2410c;
+  --status-changes-requested: #e11d48;
+  --status-sent: #0d9488;
+  --status-signed: #15803d;
 }
 :root[data-theme="dark"] .sm-theme {
   --primary: #ffffff;
@@ -103,6 +136,20 @@
   --glass-border: rgba(255, 255, 255, 0.22);
   --glass-panel-bg: rgba(28, 28, 30, 0.55);
   --glass-panel-border: rgba(255, 255, 255, 0.14);
+
+  --glass-card-bg: rgba(28, 28, 30, 0.6);
+  --glass-card-border: rgba(255, 255, 255, 0.12);
+  --glass-card-highlight: rgba(255, 255, 255, 0.5);
+  --glass-card-blur: blur(20px) saturate(180%);
+
+  --status-processing: #409cff;
+  --status-missing-info: #ffb340;
+  --status-extraction-failed: #ff6961;
+  --status-ready: #9d7bff;
+  --status-pending-approval: #ff8a3d;
+  --status-changes-requested: #ff5577;
+  --status-sent: #3dd6c4;
+  --status-signed: #32d74b;
 }
 
 @theme inline {
@@ -324,6 +371,55 @@ a {
    lighter glass look. */
 .mobile-nav-glass { --glass-panel-bg: rgba(255, 255, 255, 0.97); }
 :root[data-theme="dark"] .sm-theme .mobile-nav-glass { --glass-panel-bg: rgba(28, 28, 30, 0.97); }
+
+/* ---------- dashboard: card-level liquid-glass ----------
+   Same split-layer technique as .glass-nav above (see that comment for
+   why) — .glass-card only rounds/clips/borders, .glass-card-blur (a
+   separate child) carries the actual backdrop-filter. Uses the
+   --glass-card-* tokens, not the sidebar's --glass-panel-*, so the two
+   surfaces can be tuned independently. */
+.glass-card {
+  position: relative;
+  border: 1px solid var(--glass-card-border);
+  border-radius: var(--r-xl);
+  box-shadow: inset 0 1px 0 var(--glass-card-highlight), 0 8px 30px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  isolation: isolate;
+}
+.glass-card-blur {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--glass-card-bg);
+  backdrop-filter: var(--glass-card-blur);
+  -webkit-backdrop-filter: var(--glass-card-blur);
+}
+/* A handful of cards (the four list/table cards — see DashboardListCard
+   usage) skip the live blur for performance (a content-dense dashboard
+   can have 15+ simultaneous backdrop-filter layers, well beyond the
+   sidebar's single instance) but keep the same border/shadow/rounding
+   language via a plain opaque surface instead. */
+.glass-card-solid {
+  background: var(--surface-1);
+}
+
+/* A soft, colored glow bleeding from a corner — used behind the status
+   folders and stat cards, tinted per status/accent via inline style. */
+.glass-card-glow {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(40px);
+  opacity: 0.45;
+  pointer-events: none;
+}
+:root[data-theme="dark"] .sm-theme .glass-card-glow { opacity: 0.55; filter: blur(48px); }
+
+/* Dashboard's "Recent deals" table renders 10 rows server-side always (no
+   client JS/hydration risk) and just hides rows 6-10 below 2xl — genuinely
+   more data at ultra-wide, not a client-side reflow trick. */
+@media (max-width: 1535px) {
+  .dashboard-recent-row-extra { display: none; }
+}
 
 /* ---------- sidebar: liquid-glass active-item pill ----------
    Same split as .glass-nav: the outer box only rounds + clips, the blur

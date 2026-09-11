@@ -7,6 +7,7 @@ import DealsBoard from "@/components/DealsBoard";
 import DealsFilterBar from "@/components/DealsFilterBar";
 import { bulkRemind, bulkSend, updateDealStatus } from "./bulk-actions";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
+import { STATUS_LABEL, STATUS_CHIP, BOARD_COLUMNS } from "@/lib/deal-status";
 
 const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 const STALE_STATUSES = new Set(["ready", "missing_info"]);
@@ -25,30 +26,6 @@ function timeAgo(date: Date): string {
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
 }
-
-const STATUS_LABEL: Record<string, string> = {
-  processing: "Analyzing call…",
-  missing_info: "Missing info",
-  extraction_failed: "Couldn't process call",
-  ready: "Ready for review",
-  pending_approval: "Awaiting approval",
-  changes_requested: "Changes requested",
-  sent: "Sent — awaiting signature",
-  signed: "Signed",
-};
-
-const STATUS_CHIP: Record<string, string> = {
-  processing: "chip-neutral chip-live",
-  missing_info: "chip-warn",
-  extraction_failed: "chip-warn",
-  ready: "chip-active",
-  pending_approval: "chip-neutral",
-  changes_requested: "chip-warn",
-  sent: "chip-neutral",
-  signed: "chip-success",
-};
-
-const BOARD_COLUMNS = ["processing", "missing_info", "extraction_failed", "ready", "pending_approval", "changes_requested", "sent", "signed"] as const;
 
 function ViewTab({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
   return (

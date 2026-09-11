@@ -4,6 +4,11 @@ import { prisma } from "@/lib/db";
 import { parseFee } from "@/lib/money";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
+import { STATUS_LABEL, STATUS_COLOR, BOARD_COLUMNS } from "@/lib/deal-status-theme";
+import GlassStatCard from "@/components/dashboard/GlassStatCard";
+import DealStatusFolders from "@/components/dashboard/DealStatusFolders";
+import DealValueHeroCard from "@/components/dashboard/DealValueHeroCard";
+import GlowRingStat from "@/components/dashboard/GlowRingStat";
 
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -33,62 +38,19 @@ function daysUntil(date: Date): number {
   return Math.ceil((date.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  processing: "Analyzing call…",
-  missing_info: "Missing info",
-  extraction_failed: "Couldn't process call",
-  ready: "Ready for review",
-  sent: "Sent",
-  signed: "Signed",
-};
-
+// Chip-tone map kept local (only used for the Recent deals table below) —
+// separate from STATUS_COLOR (the new per-status hue) which drives icons
+// and glows, not this semantic warn/active/success/neutral chip styling.
 const STATUS_CHIP: Record<string, string> = {
   processing: "chip-neutral chip-live",
   missing_info: "chip-warn",
   extraction_failed: "chip-warn",
   ready: "chip-active",
+  pending_approval: "chip-neutral",
+  changes_requested: "chip-warn",
   sent: "chip-neutral",
   signed: "chip-success",
 };
-
-function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="card card-hover p-5">
-      <div className="text-[11px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
-        {label}
-      </div>
-      <div className="font-mono-tab mt-2 text-[26px] font-medium">{value}</div>
-      {sub && (
-        <div className="mt-1 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-          {sub}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function RingChart({ pct, size = 46, stroke = 5, color, track }: { pct: number; size?: number; stroke?: number; color: string; track: string }) {
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const offset = c * (1 - Math.min(100, Math.max(0, pct)) / 100);
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: "rotate(-90deg)", flex: "none" }}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={track} strokeWidth={stroke} />
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={r}
-        fill="none"
-        stroke={color}
-        strokeWidth={stroke}
-        strokeLinecap="round"
-        strokeDasharray={c}
-        strokeDashoffset={offset}
-        style={{ transition: "stroke-dashoffset .7s cubic-bezier(.2,.7,.3,1)" }}
-      />
-    </svg>
-  );
-}
 
 export default async function DashboardPage() {
   const now = new Date();
@@ -137,8 +99,18 @@ export default async function DashboardPage() {
   const maxMonthValue = Math.max(...months.map((m) => m.value), 1);
   const currentMonthKey = `${now.getFullYear()}-${now.getMonth()}`;
   const signedRate = deals.length > 0 ? Math.round((signedCount / deals.length) * 100) : 0;
+  const newClientsPct = clientCount > 0 ? Math.round((newClientsThisMonth / clientCount) * 100) : 0;
 
-  const recentDeals = deals.slice(0, 5);
+  const recentDeals = deals.slice(0, 10);
+
+  // Folders-by-status — reuses the `deals` array already fetched above
+  // (dealVisibilityFilter already applied to it), no new query. Always all
+  // 8 statuses, in canonical order, so a status with zero deals still
+  // renders (dimmed) rather than silently disappearing from the grid.
+  const statusCounts = new Map<string, number>();
+  for (const col of BOARD_COLUMNS) statusCounts.set(col, 0);
+  for (const deal of deals) statusCounts.set(deal.status, (statusCounts.get(deal.status) ?? 0) + 1);
+  const statusFolderCounts = BOARD_COLUMNS.map((status) => ({ status, count: statusCounts.get(status) ?? 0 }));
 
   return (
     <>
@@ -164,231 +136,233 @@ export default async function DashboardPage() {
       </div>
     </div>
 
-    <div className="mb-5 grid grid-cols-2 gap-4 md:grid-cols-4">
-      <StatCard label="Combined deal value" value={`$${combinedValue.toLocaleString()}`} sub="Across all deals" />
-      <StatCard label="Active deals" value={String(deals.length)} sub={`${newClientsThisMonth} started this month`} />
-      <StatCard label="Contracts signed" value={String(signedCount)} sub={`of ${deals.length} deals`} />
-      <StatCard label="Clients" value={String(clientCount)} sub="Total on file" />
-    </div>
+    {/* Full-bleed breakout — escapes AppShell's shared max-w-[1180px] cap
+        (AppShell.tsx is never edited, so every other page is unaffected)
+        so wide/full-screen viewports actually surface more sections
+        instead of just more empty margin around the same content. */}
+    <div className="mx-[calc(50%-50vw)] w-screen px-3.5 md:px-6 xl:px-8">
+      <div className="mx-auto max-w-[1600px]">
+        <div className="mb-5 grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-6">
+          <GlassStatCard label="Combined deal value" value={`$${combinedValue.toLocaleString()}`} sub="Across all deals" glow="var(--gradient-violet)" />
+          <GlassStatCard label="Active deals" value={String(deals.length)} sub={`${newClientsThisMonth} started this month`} glow="var(--status-processing)" />
+          <GlassStatCard label="Contracts signed" value={String(signedCount)} sub={`of ${deals.length} deals`} glow="var(--status-signed)" />
+          <GlassStatCard label="Clients" value={String(clientCount)} sub="Total on file" glow="var(--gradient-coral)" />
+          {/* xl:-only — real data already fetched above, just not surfaced
+              as its own tile until there's room for it. */}
+          <GlassStatCard
+            label="Renewals at risk"
+            value={String(renewalsAtRisk.length)}
+            sub={renewalsAtRisk.length > 0 ? `$${revenueAtRisk.toLocaleString()} in 90 days` : "None in the next 90 days"}
+            glow="var(--status-pending-approval)"
+          />
+          <GlassStatCard
+            label="Stuck deals"
+            value={String(staleDeals.length)}
+            sub={staleDeals.length > 0 ? "Untouched 7+ days" : "Nothing sitting idle"}
+            glow="var(--status-changes-requested)"
+          />
+        </div>
 
-    <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr]">
-      <div
-        className="card-hover relative overflow-hidden rounded-[20px] p-5"
-        style={{ background: "var(--surface-inverted)", color: "var(--on-surface-inverted)", border: "1px solid transparent" }}
-      >
-        <div
-          className="pointer-events-none absolute -right-10 -top-16 h-52 w-52 rounded-full blur-3xl"
-          style={{ background: "radial-gradient(circle, var(--gradient-violet), transparent 70%)", opacity: 0.35 }}
-          aria-hidden="true"
-        />
-        <div className="relative mb-5 flex items-center justify-between">
-          <h2 className="text-[15px] font-medium">Deal value by month</h2>
-          <div className="flex items-center gap-2.5">
-            <RingChart pct={signedRate} color="var(--on-surface-inverted)" track="var(--surface-inverted-2)" />
-            <div className="leading-tight">
-              <div className="font-mono-tab text-[15px] font-semibold">{signedRate}%</div>
-              <div className="text-[11px]" style={{ color: "var(--on-surface-inverted-muted)" }}>signed</div>
+        <div className="mb-5">
+          <h2 className="mb-3 text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
+            Deals by status
+          </h2>
+          <DealStatusFolders counts={statusFolderCounts} />
+        </div>
+
+        <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_1fr]">
+          <DealValueHeroCard
+            months={months}
+            maxMonthValue={maxMonthValue}
+            currentMonthKey={currentMonthKey}
+            signedRate={signedRate}
+            signedCount={signedCount}
+            dealCount={deals.length}
+          />
+
+          <div className="glass-card glass-card-solid card-hover p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-[15px] font-medium">Upcoming calls</h2>
+              <Link href="/calendar" className="text-[12.5px] font-medium" style={{ color: "var(--accent-blue)" }}>
+                View all
+              </Link>
             </div>
+            {upcomingEvents.length === 0 ? (
+              <div className="py-6 text-center text-[13px]" style={{ color: "var(--ink-muted)" }}>
+                Nothing scheduled yet.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {upcomingEvents.map((event) => (
+                  <div key={event.id} className="flex items-center gap-3 border-t py-2.5 first:border-t-0" style={{ borderColor: "var(--hairline-soft)" }}>
+                    <div
+                      className="font-mono-tab flex w-[64px] flex-none flex-col items-start rounded-[8px] px-2 py-1 text-[11.5px] font-medium"
+                      style={{ background: "var(--surface-2)" }}
+                    >
+                      {formatEventDay(event.startTime)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px] font-medium">{event.title}</div>
+                      <div className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
+                        {formatEventTime(event.startTime)} · {event.clientName ?? "No client"}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-        <div className="relative flex h-[160px] items-end gap-3">
-          {months.map((m) => {
-            const heightPct = maxMonthValue > 0 ? Math.max(4, Math.round((m.value / maxMonthValue) * 100)) : 4;
-            const isCurrent = m.key === currentMonthKey;
-            return (
-              <div key={m.key} className="flex flex-1 flex-col items-center gap-2">
-                <div className="flex h-[120px] w-full items-end">
-                  <div
-                    className="w-full rounded-t-[6px] transition-all duration-500 ease-out"
-                    style={{
-                      height: `${heightPct}%`,
-                      background: isCurrent ? "var(--on-surface-inverted)" : "var(--surface-inverted-2)",
-                    }}
-                    title={`$${m.value.toLocaleString()}`}
-                  />
-                </div>
-                <span className="text-[11.5px]" style={{ color: isCurrent ? "var(--on-surface-inverted)" : "var(--on-surface-inverted-muted)" }}>
-                  {m.label}
+
+        <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          <div className="glass-card glass-card-solid card-hover p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-[15px] font-medium">Upcoming renewals</h2>
+              {renewalsAtRisk.length > 0 && (
+                <span className="chip chip-warn flex-none" style={{ fontSize: 11 }}>
+                  ${revenueAtRisk.toLocaleString()} in 90 days
                 </span>
+              )}
+            </div>
+            {upcomingRenewals.length === 0 ? (
+              <div className="py-6 text-center text-[13px]" style={{ color: "var(--ink-muted)" }}>
+                No contracts renewing soon.
               </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="card card-hover p-5">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-[15px] font-medium">Upcoming calls</h2>
-          <Link href="/calendar" className="text-[12.5px] font-medium" style={{ color: "var(--accent-blue)" }}>
-            View all
-          </Link>
-        </div>
-        {upcomingEvents.length === 0 ? (
-          <div className="py-6 text-center text-[13px]" style={{ color: "var(--ink-muted)" }}>
-            Nothing scheduled yet.
-          </div>
-        ) : (
-          <div className="flex flex-col gap-1">
-            {upcomingEvents.map((event) => (
-              <div key={event.id} className="flex items-center gap-3 border-t py-2.5 first:border-t-0" style={{ borderColor: "var(--hairline-soft)" }}>
-                <div
-                  className="font-mono-tab flex w-[64px] flex-none flex-col items-start rounded-[8px] px-2 py-1 text-[11.5px] font-medium"
-                  style={{ background: "var(--surface-2)" }}
-                >
-                  {formatEventDay(event.startTime)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-medium">{event.title}</div>
-                  <div className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
-                    {formatEventTime(event.startTime)} · {event.clientName ?? "No client"}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-
-    <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <div className="card card-hover p-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-[15px] font-medium">Upcoming renewals</h2>
-          {renewalsAtRisk.length > 0 && (
-            <span className="chip chip-warn flex-none" style={{ fontSize: 11 }}>
-              ${revenueAtRisk.toLocaleString()} in 90 days
-            </span>
-          )}
-        </div>
-        {upcomingRenewals.length === 0 ? (
-          <div className="py-6 text-center text-[13px]" style={{ color: "var(--ink-muted)" }}>
-            No contracts renewing soon.
-          </div>
-        ) : (
-          <div className="flex flex-col gap-1">
-            {upcomingRenewals.map((contract) => (
-              <Link
-                key={contract.id}
-                href={`/deals/${contract.dealId}/contract`}
-                className="flex items-center gap-3 border-t py-2.5 first:border-t-0"
-                style={{ borderColor: "var(--hairline-soft)", color: "inherit" }}
-              >
-                <div
-                  className="font-mono-tab flex w-[64px] flex-none flex-col items-start rounded-[8px] px-2 py-1 text-[11.5px] font-medium"
-                  style={{ background: "var(--surface-2)" }}
-                >
-                  {daysUntil(contract.renewalDate as Date)}d
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-medium">{contract.deal.client.name}</div>
-                  <div className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
-                    {contract.autoRenews ? "Auto-renews" : "Term ends"} {(contract.renewalDate as Date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                  </div>
-                </div>
-              </Link>
-            ))}
-            {renewalsAtRisk.length > upcomingRenewals.length && (
-              <div className="pt-2 text-center text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
-                +{renewalsAtRisk.length - upcomingRenewals.length} more in the next 90 days
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="card card-hover p-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-[15px] font-medium">Stuck deals</h2>
-          {staleDeals.length > 0 && (
-            <span className="chip chip-warn flex-none" style={{ fontSize: 11 }}>
-              {staleDeals.length} untouched 7+ days
-            </span>
-          )}
-        </div>
-        {staleDeals.length === 0 ? (
-          <div className="py-6 text-center text-[13px]" style={{ color: "var(--ink-muted)" }}>
-            Nothing sitting idle — nice.
-          </div>
-        ) : (
-          <div className="flex flex-col gap-1">
-            {staleDeals.slice(0, 5).map((deal) => (
-              <Link
-                key={deal.id}
-                href={`/deals/${deal.id}`}
-                className="flex items-center gap-3 border-t py-2.5 first:border-t-0"
-                style={{ borderColor: "var(--hairline-soft)", color: "inherit" }}
-              >
-                <div
-                  className="font-mono-tab flex w-[64px] flex-none flex-col items-start rounded-[8px] px-2 py-1 text-[11.5px] font-medium"
-                  style={{ background: "var(--surface-2)" }}
-                >
-                  {timeAgo(deal.updatedAt)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] font-medium">{deal.client.name}</div>
-                  <div className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
-                    {STATUS_LABEL[deal.status] ?? deal.status}
-                  </div>
-                </div>
-              </Link>
-            ))}
-            {staleDeals.length > 5 && (
-              <div className="pt-2 text-center text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
-                +{staleDeals.length - 5} more
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-
-    <div className="card card-hover overflow-hidden">
-      <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--hairline)" }}>
-        <h2 className="text-[15px] font-medium">Recent deals</h2>
-        <Link href="/deals" className="text-[12.5px] font-medium" style={{ color: "var(--accent-blue)" }}>
-          View all
-        </Link>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr>
-              {["Client", "Value", "Status", "Updated"].map((h) => (
-                <th
-                  key={h}
-                  className="border-b px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wide"
-                  style={{ color: "var(--ink-muted)", borderColor: "var(--hairline)" }}
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {recentDeals.map((deal) => (
-              <tr key={deal.id} className="row-hover transition-colors">
-                <td className="border-b px-5 py-3.5" style={{ borderColor: "var(--hairline-soft)" }}>
-                  <Link href={`/deals/${deal.id}`} className="flex flex-col gap-0.5" style={{ color: "inherit" }}>
-                    <span className="font-medium" style={{ color: "var(--ink)" }}>{deal.client.name}</span>
-                    <span className="text-[13px]" style={{ color: "var(--ink-muted)" }}>{deal.service}</span>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {upcomingRenewals.map((contract) => (
+                  <Link
+                    key={contract.id}
+                    href={`/deals/${contract.dealId}/contract`}
+                    className="flex items-center gap-3 border-t py-2.5 first:border-t-0"
+                    style={{ borderColor: "var(--hairline-soft)", color: "inherit" }}
+                  >
+                    <div
+                      className="font-mono-tab flex w-[64px] flex-none flex-col items-start rounded-[8px] px-2 py-1 text-[11.5px] font-medium"
+                      style={{ background: "var(--surface-2)" }}
+                    >
+                      {daysUntil(contract.renewalDate as Date)}d
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px] font-medium">{contract.deal.client.name}</div>
+                      <div className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
+                        {contract.autoRenews ? "Auto-renews" : "Term ends"} {(contract.renewalDate as Date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                      </div>
+                    </div>
                   </Link>
-                </td>
-                <td className="font-mono-tab border-b px-5 py-3.5 font-medium" style={{ borderColor: "var(--hairline-soft)", color: "var(--ink)" }}>
-                  {deal.feeDisplay}
-                </td>
-                <td className="border-b px-5 py-3.5" style={{ borderColor: "var(--hairline-soft)" }}>
-                  <span className={`chip ${STATUS_CHIP[deal.status] ?? "chip-neutral"}`}>
-                    <span className="chip-dot" />
-                    {STATUS_LABEL[deal.status] ?? deal.status}
-                  </span>
-                </td>
-                <td className="border-b px-5 py-3.5 text-[13px]" style={{ color: "var(--ink-muted)", borderColor: "var(--hairline-soft)" }}>
-                  {timeAgo(deal.updatedAt)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                ))}
+                {renewalsAtRisk.length > upcomingRenewals.length && (
+                  <div className="pt-2 text-center text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
+                    +{renewalsAtRisk.length - upcomingRenewals.length} more in the next 90 days
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="glass-card glass-card-solid card-hover p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-[15px] font-medium">Stuck deals</h2>
+              {staleDeals.length > 0 && (
+                <span className="chip chip-warn flex-none" style={{ fontSize: 11 }}>
+                  {staleDeals.length} untouched 7+ days
+                </span>
+              )}
+            </div>
+            {staleDeals.length === 0 ? (
+              <div className="py-6 text-center text-[13px]" style={{ color: "var(--ink-muted)" }}>
+                Nothing sitting idle — nice.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {staleDeals.slice(0, 5).map((deal) => (
+                  <Link
+                    key={deal.id}
+                    href={`/deals/${deal.id}`}
+                    className="flex items-center gap-3 border-t py-2.5 first:border-t-0"
+                    style={{ borderColor: "var(--hairline-soft)", color: "inherit" }}
+                  >
+                    <div
+                      className="font-mono-tab flex w-[64px] flex-none flex-col items-start rounded-[8px] px-2 py-1 text-[11.5px] font-medium"
+                      style={{ background: "var(--surface-2)" }}
+                    >
+                      {timeAgo(deal.updatedAt)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px] font-medium">{deal.client.name}</div>
+                      <div className="text-[11.5px]" style={{ color: STATUS_COLOR[deal.status] ?? "var(--ink-muted)" }}>
+                        {STATUS_LABEL[deal.status] ?? deal.status}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+                {staleDeals.length > 5 && (
+                  <div className="pt-2 text-center text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
+                    +{staleDeals.length - 5} more
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* xl:-only third column — reuses signedRate/newClientsThisMonth,
+              already computed above, no new data. */}
+          <div className="hidden flex-col gap-3 xl:flex">
+            <h2 className="text-[15px] font-medium">This month</h2>
+            <GlowRingStat pct={signedRate} value={`${signedRate}%`} label="Signed rate" tone="green" />
+            <GlowRingStat pct={newClientsPct} value={String(newClientsThisMonth)} label="New clients this month" tone="magenta" />
+          </div>
+        </div>
+
+        <div className="glass-card glass-card-solid card-hover overflow-hidden">
+          <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--hairline)" }}>
+            <h2 className="text-[15px] font-medium">Recent deals</h2>
+            <Link href="/deals" className="text-[12.5px] font-medium" style={{ color: "var(--accent-blue)" }}>
+              View all
+            </Link>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  {["Client", "Value", "Status", "Updated"].map((h) => (
+                    <th
+                      key={h}
+                      className="border-b px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wide"
+                      style={{ color: "var(--ink-muted)", borderColor: "var(--hairline)" }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {recentDeals.map((deal, i) => (
+                  <tr key={deal.id} className={`row-hover transition-colors ${i >= 5 ? "dashboard-recent-row-extra" : ""}`}>
+                    <td className="border-b px-5 py-3.5" style={{ borderColor: "var(--hairline-soft)" }}>
+                      <Link href={`/deals/${deal.id}`} className="flex flex-col gap-0.5" style={{ color: "inherit" }}>
+                        <span className="font-medium" style={{ color: "var(--ink)" }}>{deal.client.name}</span>
+                        <span className="text-[13px]" style={{ color: "var(--ink-muted)" }}>{deal.service}</span>
+                      </Link>
+                    </td>
+                    <td className="font-mono-tab border-b px-5 py-3.5 font-medium" style={{ borderColor: "var(--hairline-soft)", color: "var(--ink)" }}>
+                      {deal.feeDisplay}
+                    </td>
+                    <td className="border-b px-5 py-3.5" style={{ borderColor: "var(--hairline-soft)" }}>
+                      <span className={`chip ${STATUS_CHIP[deal.status] ?? "chip-neutral"}`}>
+                        <span className="chip-dot" />
+                        {STATUS_LABEL[deal.status] ?? deal.status}
+                      </span>
+                    </td>
+                    <td className="border-b px-5 py-3.5 text-[13px]" style={{ color: "var(--ink-muted)", borderColor: "var(--hairline-soft)" }}>
+                      {timeAgo(deal.updatedAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
     </>
