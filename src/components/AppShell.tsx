@@ -3,6 +3,7 @@ import { requireWorkspace } from "@/lib/workspace";
 import { isAdminEmail } from "@/lib/admin";
 import { NAV_ITEMS, ADMIN_ITEM } from "@/lib/nav-config";
 import ThemeToggle from "./ThemeToggle";
+import CompanionToggleButton from "./CompanionToggleButton";
 import BrandLogo from "./BrandLogo";
 import MobileNavDrawer from "./MobileNavDrawer";
 import AppFooter from "./AppFooter";
@@ -99,7 +100,10 @@ export default async function AppShell({ children }: { children: React.ReactNode
               </MobileNavDrawer>
               <ScreenLabel />
             </div>
-            <ThemeToggle />
+            <div className="flex items-center gap-1">
+              <CompanionToggleButton />
+              <ThemeToggle />
+            </div>
           </header>
 
           <EmailVerifyBanner />

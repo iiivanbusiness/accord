@@ -398,12 +398,13 @@ model Deal {
   // Same idea, for Salesforce — set once pushed as an Opportunity there.
   salesforceOpportunityId String?
 
-  fields       DealField[]
-  contract     Contract?
-  calls        Call[]
-  fieldChanges DealFieldChange[]
-  actionItems  ActionItem[]
-  notes        DealNote[]
+  fields         DealField[]
+  contract       Contract?
+  calls          Call[]
+  fieldChanges   DealFieldChange[]
+  actionItems    ActionItem[]
+  callHighlights CallHighlight[]
+  notes          DealNote[]
 }
 
 // A free-form internal note on a deal — the "leave a comment for a
@@ -445,6 +446,7 @@ model Call {
   localCaptureTokens LocalCaptureToken[]
   fieldChanges       DealFieldChange[]
   actionItems        ActionItem[]
+  callHighlights     CallHighlight[]
 
   @@index([dealId])
 }
@@ -468,6 +470,28 @@ model ActionItem {
   sourceQuote String?
   doneAt      DateTime?
   createdAt   DateTime  @default(now())
+
+  @@index([dealId])
+}
+
+// A discussion-shaped call artifact — the richer counterpart to Deal.summary's
+// 2-3 sentence recap, which stays exactly as-is. Extracted once, at call end,
+// from the same final-pass call sites as ActionItem (see
+// extractCallHighlights) — never re-derived on a later pass, so there's no
+// risk of the same point reappearing as a duplicate. callId is nullable
+// because the Recall.ai bot-call flow never creates a Call row (see
+// extract-call-highlights.ts) — unlike ActionItem, this is extracted there
+// too, just without a callId to attach to.
+model CallHighlight {
+  id          String   @id @default(cuid())
+  dealId      String
+  deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  callId      String?
+  call        Call?    @relation(fields: [callId], references: [id], onDelete: SetNull)
+  type        String // discussion_point | objection | competitor_mention | next_step
+  body        String
+  sourceQuote String?
+  createdAt   DateTime @default(now())
 
   @@index([dealId])
 }

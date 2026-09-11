@@ -38,3 +38,29 @@ Neither is set up yet — add them under `src-tauri/tauri.conf.json` → `bundle
 ```bash
 npx tauri icon icon-source/icon-1024.png
 ```
+
+## Mac App Store build
+
+`npm run tauri build` (above) is the **direct-distribution** build — notarized DMG from sealme.net, self-updating via the `updater` plugin. The Mac App Store needs a separate build, because Apple doesn't allow either of those things there:
+
+```bash
+npm run build:mas
+```
+
+This merges `src-tauri/tauri.macos-mas.conf.json` over the base config and compiles with the `mas` Cargo feature, which:
+
+- Sandboxes the app (`entitlements.plist` — sandbox + network client + mic input; screen/system-audio capture in `audio.rs` is gated by the Screen Recording TCC prompt, not a sandbox entitlement, so nothing extra is needed there)
+- Compiles the self-updater out entirely (`#[cfg(not(feature = "mas"))]` in `lib.rs`) rather than just leaving it unconfigured — the Store is the only update channel for a Store build
+- Sets `bundle.targets` to just `["app"]` and turns off updater-artifact generation, since a `.dmg`/update bundle has no purpose in a Store submission
+
+**Signing** isn't wired up yet — that needs an Apple Distribution certificate + Mac App Store provisioning profile from the Apple Developer portal (Individual account), which don't exist until the account is enrolled. Once they do, set these env vars before running `npm run build:mas` (Tauri's bundler picks them up automatically, no config change needed):
+
+```bash
+export APPLE_SIGNING_IDENTITY="Apple Distribution: Your Name (TEAMID)"
+export APPLE_CERTIFICATE=...        # base64 .p12
+export APPLE_CERTIFICATE_PASSWORD=...
+```
+
+The signed `.app` this produces still needs to be wrapped in a `.pkg` (via `productbuild`, using the *3rd Party Mac Developer Installer* cert, not the Distribution one above) before it can be uploaded through Transporter — Tauri's bundler doesn't do that last step.
+
+**Review-risk note**: this app is a thin WKWebView pointed at `app.sealme.net` (see the module doc at the top of this file) — Apple's Guideline 4.2 rejects apps that are *just* a website in a window. The mic/system-audio capture in `audio.rs` (real native functionality, not something a browser tab can do) is the argument against that; mention it explicitly in the App Review notes when submitting so the reviewer doesn't have to go find it themselves.

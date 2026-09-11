@@ -14,6 +14,14 @@ edition = "2021"
 name = "desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+# Mac App Store builds can't self-update — Apple requires updates to go
+# through the Store, so this feature compiles the updater plugin/check out
+# entirely instead of just leaving it unconfigured. Direct-distribution
+# builds (npm run tauri build) don't pass this, so they keep updating as
+# before.
+mas = []
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

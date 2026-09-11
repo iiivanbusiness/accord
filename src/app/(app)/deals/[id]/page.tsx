@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import DealTermsCard from "@/components/DealTermsCard";
 import ContinueCallButton from "@/components/ContinueCallButton";
 import ActionItemsCard from "@/components/ActionItemsCard";
+import CallHighlightsOverlay from "@/components/CallHighlightsOverlay";
 import SendToDocusignButton from "@/components/SendToDocusignButton";
 import VoiceCorrectionButton from "@/components/VoiceCorrectionButton";
 import DealNotes from "@/components/DealNotes";
@@ -81,6 +82,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         calls: { orderBy: { startedAt: "asc" } },
         fieldChanges: { orderBy: { changedAt: "asc" } },
         actionItems: { orderBy: { createdAt: "asc" } },
+        callHighlights: { orderBy: { createdAt: "asc" } },
         notes: { orderBy: { createdAt: "desc" } },
       },
     }),
@@ -137,9 +139,12 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
       <div className="flex flex-col gap-[18px]">
         {deal.summary && (
           <div className="card p-5">
-            <h2 className="mb-1.5 text-[12px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
-              Call summary
-            </h2>
+            <div className="mb-1.5 flex items-center justify-between gap-3">
+              <h2 className="text-[12px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
+                Call summary
+              </h2>
+              {deal.callHighlights.length > 0 && <CallHighlightsOverlay items={deal.callHighlights} />}
+            </div>
             <p className="text-[13.5px] leading-relaxed">{deal.summary}</p>
           </div>
         )}

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Required for any Mac App Store build — sandboxed apps get no
+	     filesystem/network/device access beyond what's listed here. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+
+	<!-- The window loads https://app.sealme.net, and upload_chunk() in
+	     lib.rs posts recorded audio to it over reqwest — both go through
+	     this, sandboxed or not. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+
+	<!-- audio.rs's ScreenCaptureKit bridge captures the mic side of a call.
+	     Screen/system-audio capture itself isn't gated by a sandbox
+	     entitlement (macOS handles that via the Screen Recording TCC
+	     prompt), but the mic tap needs this one. -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+</dict>
+</plist>

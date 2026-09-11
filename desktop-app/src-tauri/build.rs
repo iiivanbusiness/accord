@@ -17,6 +17,7 @@ fn main() {
             "is_local_capturing",
             "discard_local_capture",
             "stop_local_capture_and_upload",
+            "toggle_companion_window",
         ])),
     )
     .expect("failed to run tauri-build");

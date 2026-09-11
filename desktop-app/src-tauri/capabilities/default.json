@@ -13,6 +13,7 @@
     "allow-begin-live-updates",
     "allow-is-local-capturing",
     "allow-discard-local-capture",
-    "allow-stop-local-capture-and-upload"
+    "allow-stop-local-capture-and-upload",
+    "allow-toggle-companion-window"
   ]
 }

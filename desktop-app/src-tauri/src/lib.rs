@@ -8,6 +8,14 @@ use tauri::Manager;
 // page passes in.
 const APP_BASE_URL: &str = "https://app.sealme.net";
 
+// The floating companion window's own route — a chrome-less view of the
+// same app.sealme.net session (see src/app/companion/page.tsx), not the
+// full sidebared app.
+const COMPANION_URL: &str = "https://app.sealme.net/companion";
+const COMPANION_WIDTH: f64 = 340.0;
+const COMPANION_HEIGHT: f64 = 520.0;
+const COMPANION_MARGIN: f64 = 16.0;
+
 // How often to send a live chunk while the call is still going, mirroring
 // the ~1 minute delay the existing Recall bot flow already has.
 const LIVE_UPDATE_INTERVAL_SECS: u64 = 60;
@@ -51,6 +59,81 @@ fn begin_live_updates(app: tauri::AppHandle, token: String) {
 #[tauri::command]
 fn is_local_capturing() -> bool {
     audio::is_capturing()
+}
+
+// Top-right-anchored logical position for the companion window on whatever
+// monitor it's opening on. Falls back to a fixed spot if the OS can't tell
+// us about a primary monitor (shouldn't normally happen, but the builder
+// still needs *some* position rather than failing the whole toggle).
+fn companion_position(app: &tauri::AppHandle) -> (f64, f64) {
+    if let Ok(Some(monitor)) = app.primary_monitor() {
+        let scale = monitor.scale_factor();
+        let mon_pos = monitor.position();
+        let mon_size = monitor.size();
+        let mon_x = mon_pos.x as f64 / scale;
+        let mon_y = mon_pos.y as f64 / scale;
+        let mon_w = mon_size.width as f64 / scale;
+        return (mon_x + mon_w - COMPANION_WIDTH - COMPANION_MARGIN, mon_y + COMPANION_MARGIN);
+    }
+    (100.0, 100.0)
+}
+
+fn build_companion_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow, String> {
+    let (x, y) = companion_position(app);
+    let url = tauri::Url::parse(COMPANION_URL).map_err(|e| e.to_string())?;
+    tauri::WebviewWindowBuilder::new(app, "companion", tauri::WebviewUrl::External(url))
+        .title("SealMe Companion")
+        .inner_size(COMPANION_WIDTH, COMPANION_HEIGHT)
+        .position(x, y)
+        .always_on_top(true)
+        .decorations(false)
+        .skip_taskbar(true)
+        .resizable(true)
+        .background_color(tauri::webview::Color(245, 245, 247, 255))
+        .build()
+        .map_err(|e| e.to_string())
+}
+
+// Manual toggle only — not tied to call start/stop. Collapses the main app
+// into a small always-on-top panel (and back), rather than showing both at
+// once: exactly one of "main" / "companion" is visible after this returns.
+// Called from a button in the main window's AppShell, and symmetrically
+// from a "back to app" control inside the companion panel itself (see
+// src/components/CompanionPanel.tsx) — same command either way.
+#[tauri::command]
+fn toggle_companion_window(app: tauri::AppHandle) -> Result<(), String> {
+    let main = app.get_webview_window("main");
+
+    if let Some(companion) = app.get_webview_window("companion") {
+        let visible = companion.is_visible().map_err(|e| e.to_string())?;
+        if visible {
+            companion.hide().map_err(|e| e.to_string())?;
+            if let Some(main) = main {
+                main.show().map_err(|e| e.to_string())?;
+                main.set_focus().map_err(|e| e.to_string())?;
+            }
+            return Ok(());
+        }
+        // Window exists (created once, then hidden rather than destroyed on
+        // every toggle) but isn't currently shown — reposition in case the
+        // monitor layout changed since it was last opened, then show it.
+        let (x, y) = companion_position(&app);
+        companion.set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y })).map_err(|e| e.to_string())?;
+        if let Some(main) = main {
+            main.hide().map_err(|e| e.to_string())?;
+        }
+        companion.show().map_err(|e| e.to_string())?;
+        companion.set_focus().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    let companion = build_companion_window(&app)?;
+    if let Some(main) = main {
+        main.hide().map_err(|e| e.to_string())?;
+    }
+    companion.show().map_err(|e| e.to_string())?;
+    companion.set_focus().map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 // Used when capture started successfully but the deal it was meant for
@@ -136,7 +219,11 @@ async fn upload_chunk(app: &tauri::AppHandle, token: &str, wav_bytes: Vec<u8>, i
 // restarts so it takes effect. Entirely on the Rust side — the webview never
 // gets a say in whether/when this happens, since it's just the remote page,
 // not something we want triggering updates.
-#[cfg(desktop)]
+//
+// Not compiled into `mas` builds at all — Apple doesn't allow apps
+// distributed through the Mac App Store to update themselves; the Store is
+// the only update channel there.
+#[cfg(all(desktop, not(feature = "mas")))]
 async fn check_for_update(app: tauri::AppHandle) {
     use tauri_plugin_updater::UpdaterExt;
 
@@ -168,11 +255,15 @@ async fn check_for_update(app: tauri::AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // `mut` is only needed to re-assign it in the updater block below, which
+    // `mas` builds compile out entirely.
+    #[cfg_attr(feature = "mas", allow(unused_mut))]
     let mut builder = tauri::Builder::default().plugin(tauri_plugin_opener::init());
 
     // Updater is desktop-only — there's no mobile build of this app today,
-    // but gating it keeps that true if one is ever added later.
-    #[cfg(desktop)]
+    // but gating it keeps that true if one is ever added later. Also
+    // skipped for `mas` builds (see check_for_update's doc comment above).
+    #[cfg(all(desktop, not(feature = "mas")))]
     {
         builder = builder
             .plugin(tauri_plugin_updater::Builder::new().build())
@@ -189,7 +280,8 @@ pub fn run() {
             begin_live_updates,
             is_local_capturing,
             discard_local_capture,
-            stop_local_capture_and_upload
+            stop_local_capture_and_upload,
+            toggle_companion_window
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

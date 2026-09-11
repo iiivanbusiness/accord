@@ -6,6 +6,7 @@ import { applyExtractionToDeal } from "@/lib/deal-live";
 import { extractPlaceholderKeys } from "@/lib/contract";
 import { autoGenerateAndSendContract } from "@/lib/auto-send";
 import { extractActionItems } from "@/lib/extract-action-items";
+import { extractCallHighlights } from "@/lib/extract-call-highlights";
 import { sendAdminAlertEmail } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
@@ -88,6 +89,11 @@ export async function POST(req: Request) {
         await extractActionItems(record.callId);
       } catch (err) {
         console.error(`Failed to extract action items for call ${record.callId}`, err);
+      }
+      try {
+        await extractCallHighlights(deal.id, fresh?.liveTranscript ?? "", record.callId);
+      } catch (err) {
+        console.error(`Failed to extract call highlights for call ${record.callId}`, err);
       }
       if (!hasMissing && !deal.workspace.requireApproval) {
         await autoGenerateAndSendContract(deal.id);

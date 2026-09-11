@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { fetchBotTranscript, verifyRecallWebhook } from "@/lib/recall";
 import { applyExtractionToDeal } from "@/lib/deal-live";
+import { extractCallHighlights } from "@/lib/extract-call-highlights";
 import { extractPlaceholderKeys } from "@/lib/contract";
 import { autoGenerateAndSendContract } from "@/lib/auto-send";
 import { sendAdminAlertEmail } from "@/lib/email";
@@ -36,6 +37,17 @@ export async function POST(req: Request) {
     const transcript = await fetchBotTranscript(botId);
     const placeholderKeys = extractPlaceholderKeys(deal.template.clauses);
     const { hasMissing } = await applyExtractionToDeal(deal.id, transcript, placeholderKeys);
+
+    // Bot-call flow never creates a Call row (no local recording to attach
+    // one to), so this is the only extraction pass this deal ever gets a
+    // chance at highlights from — isolated in its own try/catch so a
+    // highlights failure doesn't trip the extraction_failed status below or
+    // block auto-send.
+    try {
+      await extractCallHighlights(deal.id, transcript);
+    } catch (err) {
+      console.error(`Failed to extract call highlights for deal ${deal.id}`, err);
+    }
 
     // "Require manual approval before sending" off means nobody has to review an
     // unattended (scheduled/live) call's contract before it goes out — only safe

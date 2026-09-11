@@ -5,6 +5,7 @@ import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { extractDealFromTranscript, buildDealFieldRows } from "@/lib/extract-deal";
 import { extractActionItems } from "@/lib/extract-action-items";
+import { extractCallHighlights } from "@/lib/extract-call-highlights";
 import { extractPlaceholderKeys } from "@/lib/contract";
 import { createCallBot, detectPlatformFromUrl } from "@/lib/recall";
 import { requireWorkspace } from "@/lib/workspace";
@@ -140,6 +141,11 @@ export async function createDealFromTranscript(formData: FormData) {
     await extractActionItems(deal.calls[0].id);
   } catch (err) {
     console.error(`Failed to extract action items for deal ${deal.id}`, err);
+  }
+  try {
+    await extractCallHighlights(deal.id, transcript, deal.calls[0].id);
+  } catch (err) {
+    console.error(`Failed to extract call highlights for deal ${deal.id}`, err);
   }
 
   await dispatchWebhookEvent(workspaceId, "deal.created", { dealId: deal.id, clientName: extracted.clientName, service, feeDisplay: fee, status: deal.status });
