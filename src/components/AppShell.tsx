@@ -5,7 +5,7 @@ import { NAV_ITEMS, ADMIN_ITEM } from "@/lib/nav-config";
 import ThemeToggle from "./ThemeToggle";
 import CompanionToggleButton from "./CompanionToggleButton";
 import BrandLogo from "./BrandLogo";
-import MobileNavDrawer from "./MobileNavDrawer";
+import MobileNav from "./MobileNav";
 import AppFooter from "./AppFooter";
 import SidebarNav from "./SidebarNav";
 import UpgradeCard from "./UpgradeCard";
@@ -90,14 +90,6 @@ export default async function AppShell({ children }: { children: React.ReactNode
             style={{ background: "var(--surface-1)", border: "1px solid var(--hairline)", boxShadow: "var(--shadow-card)" }}
           >
             <div className="flex min-w-0 items-center gap-1.5">
-              <MobileNavDrawer>
-                <div className="mb-7 px-1">
-                  <BrandLogo height={20} />
-                </div>
-                {navLinks}
-                <UpgradeCard />
-                {workspaceFooter}
-              </MobileNavDrawer>
               <ScreenLabel />
             </div>
             <div className="flex items-center gap-1">
@@ -109,10 +101,24 @@ export default async function AppShell({ children }: { children: React.ReactNode
           <EmailVerifyBanner />
           <LocalCaptureBanner />
 
-          <main className="mx-auto w-full max-w-[1180px] flex-1 px-3.5 pt-2 md:px-6">{children}</main>
+          <main className="mx-auto w-full max-w-[1180px] flex-1 px-3.5 pb-24 pt-2 md:px-6 md:pb-0">{children}</main>
           <AppFooter />
         </div>
       </div>
+
+      <MobileNav
+        items={navItems}
+        drawerContent={
+          <>
+            <div className="mb-7 px-1">
+              <BrandLogo height={20} />
+            </div>
+            {navLinks}
+            <UpgradeCard />
+            {workspaceFooter}
+          </>
+        }
+      />
     </div>
   );
 }

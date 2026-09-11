@@ -375,6 +375,13 @@ a {
 .mobile-nav-glass { --glass-panel-bg: rgba(255, 255, 255, 0.97); }
 :root[data-theme="dark"] .sm-theme .mobile-nav-glass { --glass-panel-bg: rgba(28, 28, 30, 0.97); }
 
+/* Floating bottom tab bar (phones only, see MobileNav.tsx) — same
+   legibility reasoning as .mobile-nav-glass above: it floats over
+   whatever page content is scrolled beneath it, so it needs a near-
+   opaque tint rather than the desktop sidebar's lighter glass look. */
+.mobile-bottom-nav { --glass-panel-bg: rgba(255, 255, 255, 0.96); box-shadow: 0 10px 34px rgba(0, 0, 0, 0.18); }
+:root[data-theme="dark"] .sm-theme .mobile-bottom-nav { --glass-panel-bg: rgba(28, 28, 30, 0.96); box-shadow: 0 10px 34px rgba(0, 0, 0, 0.45); }
+
 /* ---------- dashboard: card-level liquid-glass ----------
    Same split-layer technique as .glass-nav above (see that comment for
    why) — .glass-card only rounds/clips/borders, .glass-card-blur (a
