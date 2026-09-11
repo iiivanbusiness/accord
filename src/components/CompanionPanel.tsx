@@ -26,6 +26,44 @@ type UpcomingEvent = {
   linkedDealId: string | null;
 };
 
+// A fixed dark-glass palette, independent of the main app's light/dark
+// theme (see the layout's doc comment) — this sits on top of a native
+// macOS vibrancy blur (HudWindow material, always dark), so it needs its
+// own tokens rather than the app's `--ink`/`--canvas` vars, which assume an
+// opaque surface underneath them.
+const glass = {
+  text: "rgba(255,255,255,0.94)",
+  textDim: "rgba(255,255,255,0.58)",
+  textFaint: "rgba(255,255,255,0.38)",
+  divider: "rgba(255,255,255,0.10)",
+  chipBg: "rgba(255,255,255,0.08)",
+  chipBorder: "rgba(255,255,255,0.12)",
+  accent: "#7fb0ff",
+  accentDim: "rgba(127,176,255,0.16)",
+  success: "#5fe3ac",
+  successDim: "rgba(95,227,172,0.14)",
+  danger: "#ff8a8a",
+  dangerDim: "rgba(255,138,138,0.14)",
+};
+
+// Shared button look for this panel — small, glass "chip" style rather than
+// the main app's solid .btn classes (which assume an opaque surface behind
+// them and aren't meant to sit on a blurred, borderless window).
+function glassButtonStyle(tone: "neutral" | "success" | "danger" = "neutral"): React.CSSProperties {
+  const tint = tone === "success" ? glass.successDim : tone === "danger" ? glass.dangerDim : glass.chipBg;
+  const color = tone === "success" ? glass.success : tone === "danger" ? glass.danger : glass.text;
+  return {
+    background: tint,
+    color,
+    border: `1px solid ${tone === "neutral" ? glass.chipBorder : "transparent"}`,
+    borderRadius: 8,
+    padding: "5px 10px",
+    fontSize: 11.5,
+    fontWeight: 600,
+    lineHeight: 1.2,
+  };
+}
+
 function readSession(): Session | null {
   try {
     const raw = localStorage.getItem(LOCAL_CAPTURE_STORAGE_KEY);
@@ -47,7 +85,9 @@ function formatEventTime(iso: string): string {
 // currently being recorded (read-only terms + notes) plus quick stop/
 // discard controls, so ending or checking on a call never requires
 // un-collapsing the main window. When no call is active, falls back to
-// showing what's coming up next instead of an empty panel.
+// showing what's coming up next instead of an empty panel. Sits directly
+// on the native vibrancy blur (see desktop-app's build_companion_window) —
+// nothing here paints a solid background, by design.
 export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: UpcomingEvent[] }) {
   const [isTauri, setIsTauri] = useState<boolean | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -141,7 +181,7 @@ export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: Upc
 
   if (!isTauri) {
     return (
-      <div className="flex h-full items-center justify-center p-5 text-center text-[13px]" style={{ color: "var(--ink-muted)" }}>
+      <div className="flex h-full items-center justify-center p-5 text-center text-[13px]" style={{ color: glass.textDim }}>
         This panel only works inside the SealMe desktop app.
       </div>
     );
@@ -154,83 +194,99 @@ export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: Upc
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div
+      className="flex h-full flex-col"
+      style={{ borderRadius: 16, overflow: "hidden" }}
+    >
       <div
         className="flex flex-none items-center justify-between gap-2 px-4 py-3"
-        style={{ borderBottom: "1px solid var(--hairline)", WebkitAppRegion: "drag" } as React.CSSProperties}
+        style={{ borderBottom: `1px solid ${glass.divider}`, WebkitAppRegion: "drag" } as React.CSSProperties}
       >
-        <span className="truncate text-[13px] font-medium">SealMe</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className="inline-flex h-1.5 w-1.5 flex-none rounded-full"
+            style={{ background: session ? glass.success : glass.textFaint }}
+          />
+          <span className="truncate text-[12.5px] font-semibold" style={{ color: glass.text, letterSpacing: "-0.1px" }}>
+            SealMe
+          </span>
+        </div>
         <button
           type="button"
           onClick={goToMainApp}
-          className="flex-none text-[11.5px] font-medium"
-          style={{ color: "var(--accent-blue)", WebkitAppRegion: "no-drag" } as React.CSSProperties}
+          aria-label="Open main app"
+          title="Open main app"
+          className="flex flex-none items-center justify-center rounded-[7px]"
+          style={{ width: 22, height: 22, color: glass.textDim, WebkitAppRegion: "no-drag" } as React.CSSProperties}
         >
-          Open app ↗
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" width={13} height={13}>
+            <path d="M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-3" />
+            <path d="M12 3h5v5M16.5 3.5 9 11" />
+          </svg>
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-3">
+      <div className="flex-1 overflow-y-auto px-4 py-3.5">
         {error && (
-          <div className="mb-3 rounded-[8px] px-3 py-2 text-[12px]" style={{ background: "var(--surface-2)", color: "#c0392b" }}>
+          <div className="mb-3 rounded-[8px] px-3 py-2 text-[11.5px]" style={{ background: glass.dangerDim, color: glass.danger }}>
             {error}
           </div>
         )}
 
         {session ? (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-5">
             <div
-              className="flex flex-wrap items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-[12.5px]"
-              style={{ background: "var(--success-soft)", color: "var(--success)" }}
+              className="flex flex-col gap-2 rounded-[12px] px-3.5 py-3"
+              style={{ background: glass.successDim, border: `1px solid rgba(95,227,172,0.22)` }}
             >
-              <span className="inline-flex h-2 w-2 flex-none animate-pulse rounded-full" style={{ background: "var(--success)" }} />
-              <span className="min-w-0 flex-1 truncate font-medium">
-                Recording — {dealState?.clientName ?? "…"}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2 w-2 flex-none">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ background: glass.success }} />
+                  <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: glass.success }} />
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold" style={{ color: glass.text }}>
+                  {dealState?.clientName ?? "Recording…"}
+                </span>
+              </div>
               {confirmingDiscard ? (
-                <span className="flex w-full items-center gap-2 pt-1">
-                  <span className="text-[11.5px] font-medium">Discard this recording?</span>
-                  <button type="button" disabled={busy} onClick={handleDiscard} className="btn btn-sm" style={{ background: "var(--warn)", color: "#fff" }}>
-                    Yes
+                <div className="flex items-center gap-2">
+                  <span className="flex-1 text-[11.5px]" style={{ color: glass.textDim }}>Discard this recording?</span>
+                  <button type="button" disabled={busy} onClick={handleDiscard} style={glassButtonStyle("danger")}>
+                    Yes, discard
                   </button>
-                  <button type="button" disabled={busy} onClick={() => setConfirmingDiscard(false)} className="text-[11.5px] font-medium">
+                  <button type="button" disabled={busy} onClick={() => setConfirmingDiscard(false)} style={glassButtonStyle("neutral")}>
                     Cancel
                   </button>
-                </span>
+                </div>
               ) : (
-                <span className="flex w-full items-center gap-2 pt-1">
-                  <button type="button" disabled={busy} onClick={handleStop} className="btn btn-sm" style={{ background: "var(--success)", color: "#fff" }}>
+                <div className="flex items-center gap-2">
+                  <button type="button" disabled={busy} onClick={handleStop} style={glassButtonStyle("success")}>
                     {busy ? "Finishing…" : "Stop & finish"}
                   </button>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => setConfirmingDiscard(true)}
-                    className="text-[11.5px] font-medium underline decoration-dotted underline-offset-2"
-                  >
+                  <button type="button" disabled={busy} onClick={() => setConfirmingDiscard(true)} style={glassButtonStyle("neutral")}>
                     Discard
                   </button>
-                </span>
+                </div>
               )}
             </div>
 
             <div>
-              <h2 className="mb-1.5 text-[11px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
+              <h2 className="mb-2 text-[10.5px] font-semibold uppercase" style={{ color: glass.textFaint, letterSpacing: "0.06em" }}>
                 Deal terms
               </h2>
               {groups.size === 0 ? (
-                <p className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>Nothing captured yet — keep talking.</p>
+                <p className="text-[12px]" style={{ color: glass.textDim }}>Nothing captured yet — keep talking.</p>
               ) : (
                 <div className="flex flex-col">
                   {[...groups.entries()].map(([label, rows]) => (
-                    <div key={label} className="border-b py-2 last:border-b-0" style={{ borderColor: "var(--hairline-soft)" }}>
-                      <div className="pb-1 text-[10.5px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-faint, var(--ink-muted))" }}>
+                    <div key={label} className="py-2 first:pt-0" style={{ borderTop: `1px solid ${glass.divider}` }}>
+                      <div className="pb-1 text-[10px] font-semibold uppercase" style={{ color: glass.textFaint, letterSpacing: "0.05em" }}>
                         {label}
                       </div>
                       {rows.map((row) => (
                         <div key={row.id} className="flex items-center justify-between gap-2 py-1">
-                          <span className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>{row.label}</span>
-                          <span className="truncate text-[12.5px] font-medium">{row.value ?? "—"}</span>
+                          <span className="text-[12px]" style={{ color: glass.textDim }}>{row.label}</span>
+                          <span className="truncate text-[12px] font-medium" style={{ color: glass.text }}>{row.value ?? "—"}</span>
                         </div>
                       ))}
                     </div>
@@ -239,28 +295,39 @@ export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: Upc
               )}
             </div>
 
-            <div>
-              <h2 className="mb-1.5 text-[11px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
+            <div
+              style={
+                {
+                  "--ink-muted": glass.textDim,
+                  "--hairline-soft": glass.divider,
+                  "--surface-2": glass.chipBg,
+                  "--accent-blue": glass.accent,
+                } as React.CSSProperties
+              }
+            >
+              <h2 className="mb-2 text-[10.5px] font-semibold uppercase" style={{ color: glass.textFaint, letterSpacing: "0.06em" }}>
                 Call notes
               </h2>
-              <CallHighlightsList items={dealState?.callHighlights ?? []} />
+              <div style={{ color: glass.text }}>
+                <CallHighlightsList items={dealState?.callHighlights ?? []} />
+              </div>
             </div>
           </div>
         ) : (
           <div>
-            <h2 className="mb-1.5 text-[11px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
+            <h2 className="mb-2 text-[10.5px] font-semibold uppercase" style={{ color: glass.textFaint, letterSpacing: "0.06em" }}>
               Upcoming
             </h2>
             {upcomingEvents.length === 0 ? (
-              <p className="py-6 text-center text-[13px]" style={{ color: "var(--ink-muted)" }}>
+              <p className="py-6 text-center text-[12.5px]" style={{ color: glass.textDim }}>
                 Nothing scheduled — start a call from the main app to see it here.
               </p>
             ) : (
               <div className="flex flex-col">
                 {upcomingEvents.map((event) => (
-                  <div key={event.id} className="border-b py-2.5 last:border-b-0" style={{ borderColor: "var(--hairline-soft)" }}>
-                    <div className="text-[12.5px] font-medium">{event.title}</div>
-                    <div className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
+                  <div key={event.id} className="py-2.5 first:pt-0" style={{ borderTop: `1px solid ${glass.divider}` }}>
+                    <div className="text-[12.5px] font-medium" style={{ color: glass.text }}>{event.title}</div>
+                    <div className="text-[11px]" style={{ color: glass.textDim }}>
                       {formatEventTime(event.startTime)}
                     </div>
                   </div>

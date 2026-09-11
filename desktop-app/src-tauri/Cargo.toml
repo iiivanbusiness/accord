@@ -19,14 +19,29 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 # through the Store, so this feature compiles the updater plugin/check out
 # entirely instead of just leaving it unconfigured. Direct-distribution
 # builds (npm run tauri build) don't pass this, so they keep updating as
-# before.
+# before. Also gates the companion panel's native vibrancy effect out (see
+# `tauri`'s macos-private-api feature below) for the same review-risk
+# reason — the Rust code behind `not(feature = "mas")` simply never calls
+# WebviewWindowBuilder::transparent()/effects() for that build, even though
+# the underlying Cargo feature has to stay unconditionally declared (see
+# comment on the tauri dependency).
 mas = []
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+# macos-private-api unlocks WebviewWindowBuilder::transparent() on macOS,
+# used for the companion panel's frosted-glass look. Declared
+# unconditionally (not feature-gated behind `mas`) because tauri-build's
+# own config/feature consistency check reads this literally off Cargo.toml,
+# not off Cargo's resolved feature graph — it can't see through an
+# indirection like `myfeature = ["tauri/macos-private-api"]`. Actual usage
+# is still gated at the call site (`not(feature = "mas")` in lib.rs) and at
+# the config level (tauri.macos-mas.conf.json sets macOSPrivateApi: false)
+# — MAS builds compile this capability in but never exercise it, which
+# keeps the review-risk surface to "declared, unused" rather than "used".
+tauri = { version = "2", features = ["macos-private-api"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

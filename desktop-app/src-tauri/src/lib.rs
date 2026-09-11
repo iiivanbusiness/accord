@@ -1,6 +1,8 @@
 mod audio;
 
 use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(not(feature = "mas"))]
+use tauri::window::{Effect, EffectState, EffectsBuilder};
 use tauri::Manager;
 
 // The webview is pinned to this origin (see tauri.conf.json) — hardcoded
@@ -15,6 +17,8 @@ const COMPANION_URL: &str = "https://app.sealme.net/companion";
 const COMPANION_WIDTH: f64 = 340.0;
 const COMPANION_HEIGHT: f64 = 520.0;
 const COMPANION_MARGIN: f64 = 16.0;
+#[cfg(not(feature = "mas"))]
+const COMPANION_RADIUS: f64 = 16.0;
 
 // How often to send a live chunk while the call is still going, mirroring
 // the ~1 minute delay the existing Recall bot flow already has.
@@ -85,7 +89,8 @@ fn build_companion_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow
         eprintln!("[companion] bad URL: {e}");
         e.to_string()
     })?;
-    let result = tauri::WebviewWindowBuilder::new(app, "companion", tauri::WebviewUrl::External(url))
+    #[cfg_attr(feature = "mas", allow(unused_mut))]
+    let mut builder = tauri::WebviewWindowBuilder::new(app, "companion", tauri::WebviewUrl::External(url))
         .title("SealMe Companion")
         .inner_size(COMPANION_WIDTH, COMPANION_HEIGHT)
         .position(x, y)
@@ -93,8 +98,34 @@ fn build_companion_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow
         .decorations(false)
         .skip_taskbar(true)
         .resizable(true)
-        .background_color(tauri::webview::Color(245, 245, 247, 255))
-        .build();
+        .shadow(true);
+
+    // transparent() + HudWindow gives it the native macOS "liquid glass"
+    // look — a frosted, blurred-desktop-behind panel, the same material
+    // Spotlight/Notification Center widgets use — with rounded corners from
+    // `radius`. The webview's own CSS paints nothing solid behind its
+    // content (see CompanionPanel.tsx) so the blur actually shows through
+    // instead of sitting behind an opaque backing. Not called for `mas`
+    // builds — see the tauri dependency comment in Cargo.toml for why the
+    // Cargo feature itself still has to stay unconditionally on.
+    #[cfg(not(feature = "mas"))]
+    {
+        builder = builder.transparent(true).effects(
+            EffectsBuilder::new()
+                .effect(Effect::HudWindow)
+                .state(EffectState::Active)
+                .radius(COMPANION_RADIUS)
+                .build(),
+        );
+    }
+    // MAS builds get a plain opaque panel instead — no glass effect, but the
+    // capability is never actually exercised.
+    #[cfg(feature = "mas")]
+    {
+        builder = builder.background_color(tauri::webview::Color(245, 245, 247, 255));
+    }
+
+    let result = builder.build();
     match result {
         Ok(w) => {
             eprintln!("[companion] window created");

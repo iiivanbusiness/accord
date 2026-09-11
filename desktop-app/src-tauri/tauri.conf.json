@@ -6,6 +6,7 @@
   "build": {},
   "app": {
     "withGlobalTauri": false,
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "SealMe",
