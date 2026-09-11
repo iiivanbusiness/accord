@@ -6,17 +6,19 @@
 // still exactly one source of truth for the label/column-order concern.
 export { STATUS_LABEL, BOARD_COLUMNS } from "@/lib/deal-status";
 
-// Each resolves to a CSS custom property defined in globals.css (both the
-// light .sm-theme block and the :root[data-theme="dark"] .sm-theme block),
-// same nesting convention as every other themed token in this app — these
-// are not fixed hex values in JS, they pick up the current theme via CSS.
+// Folder-icon fill colors — used ONLY by FolderIcon/DealStatusFolders.
+// Deliberately fixed hex (not theme-varying CSS vars): the folder grid is
+// the one deliberate spot of saturated color on the Dashboard, so it stays
+// constant across light/dark instead of picking up the theme toggle. Every
+// other Dashboard surface sticks to the two signature accents (green/cyan
+// for success, violet for everything else) — see GlowRingStat/DealValueHeroCard.
 export const STATUS_COLOR: Record<string, string> = {
-  processing: "var(--status-processing)",
-  missing_info: "var(--status-missing-info)",
-  extraction_failed: "var(--status-extraction-failed)",
-  ready: "var(--status-ready)",
-  pending_approval: "var(--status-pending-approval)",
-  changes_requested: "var(--status-changes-requested)",
-  sent: "var(--status-sent)",
-  signed: "var(--status-signed)",
+  processing: "#4a90e2",
+  missing_info: "#e0a72e",
+  extraction_failed: "#e0524a",
+  ready: "#8b6de0",
+  pending_approval: "#e08a3d",
+  changes_requested: "#e0568f",
+  sent: "#2fb6a8",
+  signed: "#4caf6e",
 };

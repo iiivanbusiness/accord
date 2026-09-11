@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { parseFee } from "@/lib/money";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
-import { STATUS_LABEL, STATUS_COLOR, BOARD_COLUMNS } from "@/lib/deal-status-theme";
+import { STATUS_LABEL, BOARD_COLUMNS } from "@/lib/deal-status-theme";
 import GlassStatCard from "@/components/dashboard/GlassStatCard";
 import DealStatusFolders from "@/components/dashboard/DealStatusFolders";
 import DealValueHeroCard from "@/components/dashboard/DealValueHeroCard";
@@ -143,23 +143,21 @@ export default async function DashboardPage() {
     <div className="mx-[calc(50%-50vw)] w-screen px-3.5 md:px-6 xl:px-8">
       <div className="mx-auto max-w-[1600px]">
         <div className="mb-5 grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-6">
-          <GlassStatCard label="Combined deal value" value={`$${combinedValue.toLocaleString()}`} sub="Across all deals" glow="var(--gradient-violet)" />
-          <GlassStatCard label="Active deals" value={String(deals.length)} sub={`${newClientsThisMonth} started this month`} glow="var(--status-processing)" />
-          <GlassStatCard label="Contracts signed" value={String(signedCount)} sub={`of ${deals.length} deals`} glow="var(--status-signed)" />
-          <GlassStatCard label="Clients" value={String(clientCount)} sub="Total on file" glow="var(--gradient-coral)" />
+          <GlassStatCard label="Combined deal value" value={`$${combinedValue.toLocaleString()}`} sub="Across all deals" />
+          <GlassStatCard label="Active deals" value={String(deals.length)} sub={`${newClientsThisMonth} started this month`} />
+          <GlassStatCard label="Contracts signed" value={String(signedCount)} sub={`of ${deals.length} deals`} />
+          <GlassStatCard label="Clients" value={String(clientCount)} sub="Total on file" />
           {/* xl:-only — real data already fetched above, just not surfaced
               as its own tile until there's room for it. */}
           <GlassStatCard
             label="Renewals at risk"
             value={String(renewalsAtRisk.length)}
             sub={renewalsAtRisk.length > 0 ? `$${revenueAtRisk.toLocaleString()} in 90 days` : "None in the next 90 days"}
-            glow="var(--status-pending-approval)"
           />
           <GlassStatCard
             label="Stuck deals"
             value={String(staleDeals.length)}
             sub={staleDeals.length > 0 ? "Untouched 7+ days" : "Nothing sitting idle"}
-            glow="var(--status-changes-requested)"
           />
         </div>
 
@@ -290,7 +288,7 @@ export default async function DashboardPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[13px] font-medium">{deal.client.name}</div>
-                      <div className="text-[11.5px]" style={{ color: STATUS_COLOR[deal.status] ?? "var(--ink-muted)" }}>
+                      <div className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
                         {STATUS_LABEL[deal.status] ?? deal.status}
                       </div>
                     </div>
@@ -310,7 +308,7 @@ export default async function DashboardPage() {
           <div className="hidden flex-col gap-3 xl:flex">
             <h2 className="text-[15px] font-medium">This month</h2>
             <GlowRingStat pct={signedRate} value={`${signedRate}%`} label="Signed rate" tone="green" />
-            <GlowRingStat pct={newClientsPct} value={String(newClientsThisMonth)} label="New clients this month" tone="magenta" />
+            <GlowRingStat pct={newClientsPct} value={String(newClientsThisMonth)} label="New clients this month" tone="violet" />
           </div>
         </div>
 

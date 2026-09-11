@@ -95,15 +95,10 @@
   --on-glow-dark: #ffffff;
   --on-glow-dark-muted: rgba(255, 255, 255, 0.62);
 
-  /* Per-deal-status color — nothing like this existed before the Dashboard
-     redesign (see src/lib/deal-status-theme.ts); the 8 keys match
-     Deal.status exactly (BOARD_COLUMNS in deals/page.tsx). */
-  --status-processing: #0a84ff;
-  --status-missing-info: #b45309;
-  --status-extraction-failed: #d92d20;
-  --status-ready: #7c4dff;
-  --status-pending-approval: #c2410c;
-  --status-changes-requested: #e11d48;
+  /* The Dashboard's one signature accent gradient (success/progress) —
+     used by DealValueHeroCard's progress bar and GlowRingStat's "green"
+     tone. Per-status hues live only in deal-status-theme.ts's
+     STATUS_COLOR, used solely by the folder-icon grid. */
   --status-sent: #0d9488;
   --status-signed: #15803d;
 }
@@ -142,12 +137,6 @@
   --glass-card-highlight: rgba(255, 255, 255, 0.5);
   --glass-card-blur: blur(20px) saturate(180%);
 
-  --status-processing: #409cff;
-  --status-missing-info: #ffb340;
-  --status-extraction-failed: #ff6961;
-  --status-ready: #9d7bff;
-  --status-pending-approval: #ff8a3d;
-  --status-changes-requested: #ff5577;
   --status-sent: #3dd6c4;
   --status-signed: #32d74b;
 }

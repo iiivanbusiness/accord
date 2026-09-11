@@ -1,12 +1,14 @@
 import RingChart from "./RingChart";
 
-// The glowing ring/capsule widget from the reference images (a green ring
-// + percentage, a magenta ring + a dollar figure) — a dark glass capsule
-// with RingChart inside plus a matching glow. `tone` picks the accent;
-// `pct` drives the ring itself (0-100, clamped in RingChart already).
+// The glowing ring/capsule widget from the reference images — a dark
+// glass capsule with RingChart inside plus a matching glow. `tone` picks
+// the accent; `pct` drives the ring itself (0-100, clamped in RingChart
+// already). Only two tones exist app-wide (green = success, violet =
+// everything else) — deliberately not a distinct hue per widget, so this
+// stays part of the page's restrained two-accent palette, not a third.
 const TONE = {
   green: { ring: "var(--status-signed)", glow: "var(--status-signed)" },
-  magenta: { ring: "var(--gradient-magenta)", glow: "var(--gradient-magenta)" },
+  violet: { ring: "var(--gradient-violet)", glow: "var(--gradient-violet)" },
 } as const;
 
 export default function GlowRingStat({

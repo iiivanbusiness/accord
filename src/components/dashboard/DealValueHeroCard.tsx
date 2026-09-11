@@ -28,14 +28,12 @@ export default function DealValueHeroCard({
   return (
     <div className="glass-card card-hover relative p-5" style={{ border: "1px solid transparent" }}>
       <div className="glass-card-blur" aria-hidden="true" style={{ background: "var(--glow-dark-surface)" }} />
+      {/* One orb only — violet, the card's single accent alongside the
+          green/cyan progress bar below. A second competing orb was part
+          of why the first pass read as too colorful. */}
       <div
         className="glass-card-glow"
-        style={{ background: "var(--gradient-violet)", width: 200, height: 200, right: -50, top: -70, opacity: 0.3 }}
-        aria-hidden="true"
-      />
-      <div
-        className="glass-card-glow"
-        style={{ background: "var(--status-signed)", width: 140, height: 140, left: -60, bottom: -70, opacity: 0.2 }}
+        style={{ background: "var(--gradient-violet)", width: 200, height: 200, right: -50, top: -70, opacity: 0.25 }}
         aria-hidden="true"
       />
 
