@@ -80,8 +80,12 @@ fn companion_position(app: &tauri::AppHandle) -> (f64, f64) {
 
 fn build_companion_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow, String> {
     let (x, y) = companion_position(app);
-    let url = tauri::Url::parse(COMPANION_URL).map_err(|e| e.to_string())?;
-    tauri::WebviewWindowBuilder::new(app, "companion", tauri::WebviewUrl::External(url))
+    eprintln!("[companion] creating window at ({x}, {y}), url={COMPANION_URL}");
+    let url = tauri::Url::parse(COMPANION_URL).map_err(|e| {
+        eprintln!("[companion] bad URL: {e}");
+        e.to_string()
+    })?;
+    let result = tauri::WebviewWindowBuilder::new(app, "companion", tauri::WebviewUrl::External(url))
         .title("SealMe Companion")
         .inner_size(COMPANION_WIDTH, COMPANION_HEIGHT)
         .position(x, y)
@@ -90,8 +94,17 @@ fn build_companion_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow
         .skip_taskbar(true)
         .resizable(true)
         .background_color(tauri::webview::Color(245, 245, 247, 255))
-        .build()
-        .map_err(|e| e.to_string())
+        .build();
+    match result {
+        Ok(w) => {
+            eprintln!("[companion] window created");
+            Ok(w)
+        }
+        Err(e) => {
+            eprintln!("[companion] failed to create window: {e}");
+            Err(e.to_string())
+        }
+    }
 }
 
 // Manual toggle only — not tied to call start/stop. Collapses the main app
@@ -99,40 +112,56 @@ fn build_companion_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow
 // once: exactly one of "main" / "companion" is visible after this returns.
 // Called from a button in the main window's AppShell, and symmetrically
 // from a "back to app" control inside the companion panel itself (see
-// src/components/CompanionPanel.tsx) — same command either way.
+// src/components/CompanionPanel.tsx) — same command either way. Logs every
+// step to stderr (visible in the `tauri dev` terminal) since this has no
+// other feedback channel if something in here fails.
 #[tauri::command]
 fn toggle_companion_window(app: tauri::AppHandle) -> Result<(), String> {
+    eprintln!("[companion] toggle invoked");
     let main = app.get_webview_window("main");
+    if main.is_none() {
+        eprintln!("[companion] warning: no window labeled \"main\" found");
+    }
 
     if let Some(companion) = app.get_webview_window("companion") {
-        let visible = companion.is_visible().map_err(|e| e.to_string())?;
+        let visible = companion.is_visible().map_err(|e| {
+            eprintln!("[companion] is_visible failed: {e}");
+            e.to_string()
+        })?;
+        eprintln!("[companion] existing window found, visible={visible}");
         if visible {
-            companion.hide().map_err(|e| e.to_string())?;
+            companion.hide().map_err(|e| { eprintln!("[companion] hide failed: {e}"); e.to_string() })?;
             if let Some(main) = main {
-                main.show().map_err(|e| e.to_string())?;
-                main.set_focus().map_err(|e| e.to_string())?;
+                main.show().map_err(|e| { eprintln!("[companion] main.show failed: {e}"); e.to_string() })?;
+                main.set_focus().map_err(|e| { eprintln!("[companion] main.set_focus failed: {e}"); e.to_string() })?;
             }
+            eprintln!("[companion] hidden, main restored");
             return Ok(());
         }
         // Window exists (created once, then hidden rather than destroyed on
         // every toggle) but isn't currently shown — reposition in case the
         // monitor layout changed since it was last opened, then show it.
         let (x, y) = companion_position(&app);
-        companion.set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y })).map_err(|e| e.to_string())?;
+        companion
+            .set_position(tauri::Position::Logical(tauri::LogicalPosition { x, y }))
+            .map_err(|e| { eprintln!("[companion] set_position failed: {e}"); e.to_string() })?;
         if let Some(main) = main {
-            main.hide().map_err(|e| e.to_string())?;
+            main.hide().map_err(|e| { eprintln!("[companion] main.hide failed: {e}"); e.to_string() })?;
         }
-        companion.show().map_err(|e| e.to_string())?;
-        companion.set_focus().map_err(|e| e.to_string())?;
+        companion.show().map_err(|e| { eprintln!("[companion] show failed: {e}"); e.to_string() })?;
+        companion.set_focus().map_err(|e| { eprintln!("[companion] set_focus failed: {e}"); e.to_string() })?;
+        eprintln!("[companion] shown");
         return Ok(());
     }
 
+    eprintln!("[companion] no existing window, building one");
     let companion = build_companion_window(&app)?;
     if let Some(main) = main {
-        main.hide().map_err(|e| e.to_string())?;
+        main.hide().map_err(|e| { eprintln!("[companion] main.hide failed: {e}"); e.to_string() })?;
     }
-    companion.show().map_err(|e| e.to_string())?;
-    companion.set_focus().map_err(|e| e.to_string())?;
+    companion.show().map_err(|e| { eprintln!("[companion] show failed: {e}"); e.to_string() })?;
+    companion.set_focus().map_err(|e| { eprintln!("[companion] set_focus failed: {e}"); e.to_string() })?;
+    eprintln!("[companion] shown (first time)");
     Ok(())
 }
 

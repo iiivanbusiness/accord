@@ -92,8 +92,13 @@ export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: Upc
   }, [session]);
 
   async function goToMainApp() {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("toggle_companion_window").catch(() => {});
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("toggle_companion_window");
+    } catch (err) {
+      console.error("[companion] toggle_companion_window failed:", err);
+      setError(typeof err === "string" ? err : err instanceof Error ? err.message : "Couldn't open the main app");
+    }
   }
 
   async function handleStop() {

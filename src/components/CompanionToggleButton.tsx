@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 // pattern as ContinueCallButton/LocalCaptureForm.
 export default function CompanionToggleButton() {
   const [isTauri, setIsTauri] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setIsTauri(typeof window !== "undefined" && "__TAURI_INTERNALS__" in window);
@@ -17,23 +18,40 @@ export default function CompanionToggleButton() {
   if (!isTauri) return null;
 
   async function handleClick() {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("toggle_companion_window").catch(() => {});
+    setError(null);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("toggle_companion_window");
+    } catch (err) {
+      // Surfaced two ways: a visible dot + tooltip here (there's no room for
+      // more in the header), and a console.error so it shows up in devtools
+      // even if this button re-renders before it's read.
+      const message = typeof err === "string" ? err : err instanceof Error ? err.message : "Couldn't open the panel";
+      console.error("[companion] toggle_companion_window failed:", err);
+      setError(message);
+    }
   }
 
   return (
     <button
       type="button"
       onClick={handleClick}
-      title="Open floating panel"
+      title={error ? `Couldn't open the panel: ${error}` : "Open floating panel"}
       aria-label="Open floating panel"
-      className="flex h-8 w-8 flex-none items-center justify-center rounded-[9px]"
-      style={{ color: "var(--ink-muted)" }}
+      className="relative flex h-8 w-8 flex-none items-center justify-center rounded-[9px]"
+      style={{ color: error ? "#c0392b" : "var(--ink-muted)" }}
     >
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" width={17} height={17}>
         <rect x="3" y="3.5" width="14" height="13" rx="2" />
         <rect x="10.5" y="9.5" width="5.2" height="5.6" rx="1.2" fill="currentColor" stroke="none" opacity={0.9} />
       </svg>
+      {error && (
+        <span
+          className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full"
+          style={{ background: "#c0392b" }}
+          aria-hidden="true"
+        />
+      )}
     </button>
   );
 }
