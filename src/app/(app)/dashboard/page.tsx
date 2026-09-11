@@ -5,7 +5,7 @@ import { parseFee } from "@/lib/money";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import { STATUS_LABEL, BOARD_COLUMNS } from "@/lib/deal-status";
-import GlassStatCard from "@/components/dashboard/GlassStatCard";
+import GlassStatCard from "@/components/GlassStatCard";
 import DealStatusFolders from "@/components/dashboard/DealStatusFolders";
 import DealValueHeroCard from "@/components/dashboard/DealValueHeroCard";
 import GlowRingStat from "@/components/dashboard/GlowRingStat";

@@ -39,7 +39,7 @@ export default async function TemplatesPage() {
 
     <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
       {templates.map((tpl) => (
-        <Link key={tpl.id} href={`/templates/${tpl.id}`} className="card p-[18px]" style={{ color: "inherit" }}>
+        <Link key={tpl.id} href={`/templates/${tpl.id}`} className="glass-card glass-card-solid card-hover p-[18px]" style={{ color: "inherit" }}>
           <div className="flex items-center gap-1.5">
             <h3 className="text-[15px] font-medium">{tpl.name}</h3>
             {tpl.locked && <span title="Locked — approved wording">🔒</span>}

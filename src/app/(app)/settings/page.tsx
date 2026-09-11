@@ -147,7 +147,7 @@ export default async function SettingsPage({
       </div>
     )}
 
-    <div className="card mb-4 max-w-[600px]">
+    <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
       <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
         <h2 className="text-[15px] font-medium">Call integrations</h2>
       </div>
@@ -191,7 +191,7 @@ export default async function SettingsPage({
       </div>
     </div>
 
-    <div className="card mb-4 max-w-[600px] px-[22px] py-2">
+    <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px] px-[22px] py-2">
       <div className="flex items-center justify-between gap-4 py-[15px]">
         <div className="w-full">
           <div className="text-[13.5px] font-medium">Workspace name</div>
@@ -231,7 +231,7 @@ export default async function SettingsPage({
       </div>
     </div>
 
-    <div className="card mb-4 max-w-[600px]">
+    <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
       <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
         <h2 className="text-[15px] font-medium">Team</h2>
       </div>
@@ -281,7 +281,7 @@ export default async function SettingsPage({
     </div>
 
     {canManageTeam && (
-      <div className="card mb-4 max-w-[600px]">
+      <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Roles &amp; permissions</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
@@ -309,7 +309,7 @@ export default async function SettingsPage({
     )}
 
     {canManageTeam && (
-      <div className="card mb-4 max-w-[600px]">
+      <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Teams</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
@@ -325,7 +325,7 @@ export default async function SettingsPage({
     )}
 
     {canManageWorkspacePerm && (
-      <div className="card mb-4 max-w-[600px]">
+      <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Approval chains</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
@@ -355,7 +355,7 @@ export default async function SettingsPage({
     )}
 
     {currentUser && (
-      <div className="card mb-4 max-w-[600px]">
+      <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Approval backups</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
@@ -374,7 +374,7 @@ export default async function SettingsPage({
     )}
 
     {canManageWorkspacePerm && (
-      <div className="card mb-4 max-w-[600px]">
+      <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Access &amp; provisioning</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
@@ -393,7 +393,7 @@ export default async function SettingsPage({
     )}
 
     {canManageWorkspacePerm && (
-      <div className="card mb-4 max-w-[600px]">
+      <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Single sign-on</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
@@ -417,7 +417,7 @@ export default async function SettingsPage({
     )}
 
     {canManageWorkspacePerm && (
-      <div className="card mb-4 max-w-[600px]">
+      <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Slack</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
@@ -441,7 +441,7 @@ export default async function SettingsPage({
     )}
 
     {canManageWorkspacePerm && (
-      <div className="card mb-4 max-w-[600px]">
+      <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">HubSpot</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
@@ -460,7 +460,7 @@ export default async function SettingsPage({
     )}
 
     {canManageWorkspacePerm && (
-      <div className="card mb-4 max-w-[600px]">
+      <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">DocuSign</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
@@ -479,7 +479,7 @@ export default async function SettingsPage({
     )}
 
     {canManageWorkspacePerm && (
-      <div className="card mb-4 max-w-[600px]">
+      <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Salesforce</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
@@ -498,7 +498,7 @@ export default async function SettingsPage({
     )}
 
     {canManageWorkspacePerm && (
-      <div className="card mb-4 max-w-[600px]">
+      <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
         <Link href="/settings/import" className="flex items-center justify-between gap-3 px-[22px] py-4">
           <div>
             <h2 className="text-[15px] font-medium">Bulk import</h2>
@@ -514,7 +514,7 @@ export default async function SettingsPage({
     {canManageWorkspacePerm && <DeveloperSettingsLink />}
 
     {currentUser?.passwordHash && (
-      <div className="card mb-4 max-w-[600px]">
+      <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Two-factor authentication</h2>
         </div>
@@ -524,7 +524,7 @@ export default async function SettingsPage({
       </div>
     )}
 
-    <div className="card mb-4 max-w-[600px]">
+    <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
       <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
         <h2 className="text-[15px] font-medium">Plan &amp; usage</h2>
       </div>
@@ -562,7 +562,7 @@ export default async function SettingsPage({
       </div>
     </div>
 
-    <div className="card mb-4 max-w-[600px]">
+    <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
       <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
         <h2 className="text-[15px] font-medium">Sending domain</h2>
       </div>
@@ -654,7 +654,7 @@ export default async function SettingsPage({
       </div>
     </div>
 
-    <div className="card max-w-[600px] px-[22px] py-2">
+    <div className="glass-card glass-card-solid card-hover max-w-[600px] px-[22px] py-2">
       <div className="flex items-center justify-between gap-4 border-b py-[15px]" style={{ borderColor: "var(--hairline-soft)" }}>
         <div>
           <div className="text-[13.5px] font-medium">Require manual approval before sending</div>

@@ -138,7 +138,7 @@ export default function DealsBoard({
                       setDraggingId(deal.id);
                     }}
                     onDragEnd={() => setDraggingId(null)}
-                    className="card flex flex-col gap-1 p-3.5"
+                    className="glass-card glass-card-solid card-hover flex flex-col gap-1 p-3.5"
                     style={{ color: "inherit", cursor: droppable ? "grab" : "pointer", opacity: draggingId === deal.id ? 0.4 : 1 }}
                   >
                     <span className="text-[13px] font-medium">{deal.clientName}</span>

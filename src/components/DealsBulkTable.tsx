@@ -101,7 +101,7 @@ export default function DealsBulkTable({
   }
 
   return (
-    <div className="card overflow-hidden">
+    <div className="glass-card glass-card-solid card-hover overflow-hidden">
       {selected.size > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3" style={{ borderColor: "var(--hairline)", background: "var(--surface-2)" }}>
           <span className="text-[13px] font-medium">{selected.size} selected</span>

@@ -17,10 +17,12 @@ export default function DealStatusFolders({ counts }: { counts: StatusCount[] })
           <Link
             key={status}
             href={`/deals?status=${status}`}
-            className="card-hover flex flex-col items-center gap-2.5 rounded-[14px] px-2 py-4 text-center hover:bg-[var(--surface-1)]"
+            className="group card-hover flex flex-col items-center gap-2.5 rounded-[14px] px-2 py-4 text-center hover:bg-[var(--surface-1)]"
             style={{ opacity: empty ? 0.45 : 1 }}
           >
-            <FolderIcon id={status} size={64} />
+            <span className="inline-flex transition-transform duration-150 group-hover:scale-[1.08]">
+              <FolderIcon id={status} size={64} />
+            </span>
             <div>
               <div className="text-[12.5px] font-medium" style={{ color: "var(--ink)" }}>
                 {STATUS_LABEL[status] ?? status}

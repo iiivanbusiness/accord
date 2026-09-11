@@ -12,7 +12,7 @@ export default function GlassStatCard({
   sub?: string;
 }) {
   return (
-    <div className="glass-card p-5">
+    <div className="glass-card card-hover p-5">
       <div className="glass-card-blur" aria-hidden="true" />
       <div className="relative z-10">
         <div className="text-[11px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>

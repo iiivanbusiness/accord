@@ -2,22 +2,7 @@ import { prisma } from "@/lib/db";
 import { parseFee } from "@/lib/money";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
-
-function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="card p-5">
-      <div className="text-[11px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
-        {label}
-      </div>
-      <div className="font-mono-tab mt-2 text-[28px] font-medium">{value}</div>
-      {sub && (
-        <div className="mt-1 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-          {sub}
-        </div>
-      )}
-    </div>
-  );
-}
+import GlassStatCard from "@/components/GlassStatCard";
 
 function BarRow({ label, count, max }: { label: string; count: number; max: number }) {
   const pct = max > 0 ? Math.round((count / max) * 100) : 0;
@@ -82,14 +67,14 @@ export default async function AnalyticsPage() {
     </div>
 
     <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-      <StatCard label="Active deals" value={String(total)} />
-      <StatCard label="Close rate" value={`${closeRate}%`} sub={`${signed} of ${total} signed`} />
-      <StatCard label="Combined deal value" value={`$${pipelineValue.toLocaleString()}`} sub="Across all active deals" />
-      <StatCard label="Avg. time to signature" value={avgSignDays === "—" ? avgSignDays : `${avgSignDays}d`} sub="From send to signed" />
+      <GlassStatCard label="Active deals" value={String(total)} />
+      <GlassStatCard label="Close rate" value={`${closeRate}%`} sub={`${signed} of ${total} signed`} />
+      <GlassStatCard label="Combined deal value" value={`$${pipelineValue.toLocaleString()}`} sub="Across all active deals" />
+      <GlassStatCard label="Avg. time to signature" value={avgSignDays === "—" ? avgSignDays : `${avgSignDays}d`} sub="From send to signed" />
     </div>
 
     <div className="grid grid-cols-1 gap-[18px] md:grid-cols-2">
-      <div className="card">
+      <div className="glass-card glass-card-solid card-hover">
         <div className="border-b px-5 py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Deals by status</h2>
         </div>
@@ -100,7 +85,7 @@ export default async function AnalyticsPage() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="glass-card glass-card-solid card-hover">
         <div className="border-b px-5 py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Template usage</h2>
         </div>

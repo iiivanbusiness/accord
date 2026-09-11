@@ -76,7 +76,7 @@ export default async function CalendarPage({
       </div>
     )}
 
-    <div className="card mb-5 flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+    <div className="glass-card glass-card-solid card-hover mb-5 flex flex-wrap items-center justify-between gap-3 px-5 py-4">
       <div className="flex items-center gap-2.5">
         <span className="h-1.5 w-1.5 rounded-full flex-none" style={{ background: isConnected ? "var(--success)" : "var(--ink-muted)" }} />
         <div className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
@@ -108,7 +108,7 @@ export default async function CalendarPage({
     </div>
 
     {events.length === 0 ? (
-      <div className="card px-6 py-10 text-center text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+      <div className="glass-card glass-card-solid card-hover px-6 py-10 text-center text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
         Nothing on the calendar yet.
       </div>
     ) : (
@@ -118,7 +118,7 @@ export default async function CalendarPage({
             <div className="mb-2.5 text-[11px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
               {day}
             </div>
-            <div className="card overflow-hidden">
+            <div className="glass-card glass-card-solid card-hover overflow-hidden">
               {dayEvents.map((event, i) => (
                 <div
                   key={event.id}

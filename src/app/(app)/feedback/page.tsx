@@ -97,7 +97,7 @@ export default async function FeedbackPage({
         <div className="flex flex-col gap-3">
           {isRoadmap
             ? grouped!.map(({ status, posts: statusPosts }) => (
-                <div key={status} className="card p-5">
+                <div key={status} className="glass-card glass-card-solid card-hover p-5">
                   <h2 className="mb-3 flex items-center gap-2 text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
                     <span className={`chip ${STATUS_CHIP[status]}`}>
                       <span className="chip-dot" />
@@ -118,7 +118,7 @@ export default async function FeedbackPage({
               ))
             : posts.length === 0
               ? (
-                <div className="card p-6 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
+                <div className="glass-card glass-card-solid card-hover p-6 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
                   No feedback yet — be the first to suggest something.
                 </div>
               )
@@ -128,7 +128,7 @@ export default async function FeedbackPage({
         </div>
 
         <div className="flex flex-col gap-4">
-          <form action={submitFeedback} className="card flex flex-col gap-3 p-5">
+          <form action={submitFeedback} className="glass-card glass-card-solid card-hover flex flex-col gap-3 p-5">
             <h2 className="text-[13px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
               Suggest something
             </h2>
@@ -165,7 +165,7 @@ function FeedbackCard({ post, currentUserId, isAdmin }: { post: PostWithVotes; c
   const voteCount = post.votes.length;
 
   return (
-    <div className="card flex gap-4 p-5">
+    <div className="glass-card glass-card-solid card-hover flex gap-4 p-5">
       <form action={toggleVote.bind(null, post.id)}>
         <button
           type="submit"

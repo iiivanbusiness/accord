@@ -58,14 +58,14 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
 
   if (rows.length === 0) {
     return (
-      <div className="card px-5 py-12 text-center text-[13px]" style={{ color: "var(--ink-muted)" }}>
+      <div className="glass-card glass-card-solid card-hover px-5 py-12 text-center text-[13px]" style={{ color: "var(--ink-muted)" }}>
         No clients match that search.
       </div>
     );
   }
 
   return (
-    <div className="card overflow-hidden">
+    <div className="glass-card glass-card-solid card-hover overflow-hidden">
       <div
         className="max-h-[calc(100vh-260px)] overflow-auto"
         style={{

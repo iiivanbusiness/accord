@@ -99,11 +99,12 @@
      status (matches the reference exactly: every folder in the grid is
      the same material, only the label under it differs). Light theme:
      bright white/silver glass. */
-  --folder-back: #c6c6cb;
+  --folder-back: #b9b9c1;
   --folder-front-top: #ffffff;
-  --folder-front-bottom: #e2e2e7;
+  --folder-front-mid: #eeeef1;
+  --folder-front-bottom: #d3d3d9;
   --folder-paper: #ffffff;
-  --folder-shadow: rgba(20, 20, 30, 0.22);
+  --folder-shadow: rgba(20, 20, 30, 0.25);
 }
 :root[data-theme="dark"] .sm-theme {
   --primary: #ffffff;
@@ -143,11 +144,12 @@
   /* Dark chrome folder — matches the reference literally (a dark glossy
      folder with a light diagonal sheen and a white paper corner), not a
      re-themed version of the light folder. */
-  --folder-back: #1c1c1e;
-  --folder-front-top: #6e6e73;
-  --folder-front-bottom: #3a3a3c;
+  --folder-back: #19191b;
+  --folder-front-top: #7d7d82;
+  --folder-front-mid: #525256;
+  --folder-front-bottom: #333335;
   --folder-paper: #f5f5f7;
-  --folder-shadow: rgba(0, 0, 0, 0.55);
+  --folder-shadow: rgba(0, 0, 0, 0.6);
 }
 
 @theme inline {
