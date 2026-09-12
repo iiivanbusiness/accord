@@ -98,7 +98,7 @@ function formatEventTime(iso: string): string {
 // something else. Sits directly on the native vibrancy blur (see
 // desktop-app's build_content_window) — nothing here paints a solid
 // background, by design.
-export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: UpcomingEvent[] }) {
+export default function CompanionPanel({ upcomingEvents, fastPoll = false }: { upcomingEvents: UpcomingEvent[]; fastPoll?: boolean }) {
   const searchParams = useSearchParams();
   const [isTauri, setIsTauri] = useState<boolean | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -145,9 +145,11 @@ export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: Upc
     return () => window.removeEventListener(LOCAL_CAPTURE_EVENT, onChange);
   }, []);
 
-  // Polls while a call is active so terms/notes reflect the same ~60s-
-  // throttled extraction pass the main deal page shows — not truly
-  // real-time, just not stale for more than one poll cycle.
+  // Polls while a call is active so terms/notes reflect the same throttled
+  // extraction pass the main deal page shows — not truly real-time, just
+  // not stale for more than one poll cycle. `fastPoll` (set from
+  // DEMO_FAST_EXTRACTION, see companion/page.tsx) shortens this to match
+  // the realtime webhook's faster extraction cadence when recording a demo.
   useEffect(() => {
     if (!session) {
       setDealState(null);
@@ -165,12 +167,12 @@ export default function CompanionPanel({ upcomingEvents }: { upcomingEvents: Upc
       }
     }
     load();
-    const interval = setInterval(load, 15000);
+    const interval = setInterval(load, fastPoll ? 2000 : 15000);
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [session]);
+  }, [session, fastPoll]);
 
   // Lazy-loaded once, the first time the Notes tab is actually opened —
   // cached afterward so flipping tabs back and forth doesn't re-fetch.

@@ -3,13 +3,17 @@ import { after } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyRecallWebhook, parseRealtimeTranscriptEvent } from "@/lib/recall";
 import { applyExtractionToDeal } from "@/lib/deal-live";
+import { extractCallHighlights } from "@/lib/extract-call-highlights";
 import { extractPlaceholderKeys } from "@/lib/contract";
 
 // Re-running full extraction on every single utterance would be wasteful (a sales
 // call can produce dozens of these per minute) — throttle to one pass per window.
 // Each pass resends the full transcript so far, so cost grows with window count;
 // a minute keeps terms feeling live without re-billing the whole call every 15s.
-const EXTRACTION_THROTTLE_MS = 60000;
+// DEMO_FAST_EXTRACTION drops this to a few seconds for recording a demo/ad where
+// the fill-in needs to visibly track speech — never set this in production, it
+// multiplies extraction-call volume (and cost) for every live call by ~15x.
+const EXTRACTION_THROTTLE_MS = process.env.DEMO_FAST_EXTRACTION ? 4000 : 60000;
 
 export async function POST(req: Request) {
   const payload = await req.text();
@@ -47,7 +51,24 @@ export async function POST(req: Request) {
       try {
         const fresh = await prisma.deal.findUnique({ where: { id: deal.id } });
         if (!fresh) return;
-        await applyExtractionToDeal(deal.id, fresh.liveTranscript ?? "", placeholderKeys);
+        const fullTranscript = fresh.liveTranscript ?? "";
+        // Captured before applyExtractionToDeal overwrites lastExtractedTranscript
+        // with the full transcript — this is what the *previous* pass already saw.
+        const previouslySeen = fresh.lastExtractedTranscript ?? "";
+        await applyExtractionToDeal(deal.id, fullTranscript, placeholderKeys);
+
+        // Notes/highlights only from what's new since the last pass — mirrors the
+        // deal-field extractor's own stable/new split, and avoids re-inserting the
+        // same highlight on every throttle window (extractCallHighlights has no
+        // upsert key, it just inserts whatever it's given).
+        const newSegment = fullTranscript.startsWith(previouslySeen) ? fullTranscript.slice(previouslySeen.length) : fullTranscript;
+        if (newSegment.trim()) {
+          try {
+            await extractCallHighlights(deal.id, newSegment);
+          } catch (err) {
+            console.error("Recall realtime highlights extraction failed", err);
+          }
+        }
       } catch (err) {
         console.error("Recall realtime extraction failed", err);
       }

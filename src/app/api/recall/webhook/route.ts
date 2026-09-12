@@ -38,12 +38,14 @@ export async function POST(req: Request) {
     const placeholderKeys = extractPlaceholderKeys(deal.template.clauses);
     const { hasMissing } = await applyExtractionToDeal(deal.id, transcript, placeholderKeys);
 
-    // Bot-call flow never creates a Call row (no local recording to attach
-    // one to), so this is the only extraction pass this deal ever gets a
-    // chance at highlights from — isolated in its own try/catch so a
-    // highlights failure doesn't trip the extraction_failed status below or
-    // block auto-send.
+    // The realtime webhook already inserts highlights incrementally as the call
+    // happens (see recall/realtime/route.ts) — this final pass re-derives them
+    // from the complete, more-accurate post-call transcript, so it replaces
+    // rather than appends to avoid ending up with duplicates. Isolated in its
+    // own try/catch so a highlights failure doesn't trip the extraction_failed
+    // status below or block auto-send.
     try {
+      await prisma.callHighlight.deleteMany({ where: { dealId: deal.id } });
       await extractCallHighlights(deal.id, transcript);
     } catch (err) {
       console.error(`Failed to extract call highlights for deal ${deal.id}`, err);

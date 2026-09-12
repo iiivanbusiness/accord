@@ -24,6 +24,7 @@ export default async function CompanionPage() {
   return (
     <CompanionPanel
       upcomingEvents={upcomingEvents.map((e) => ({ ...e, startTime: e.startTime.toISOString() }))}
+      fastPoll={Boolean(process.env.DEMO_FAST_EXTRACTION)}
     />
   );
 }
