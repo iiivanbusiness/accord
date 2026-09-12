@@ -60,9 +60,11 @@ export default function PrivacyPage() {
 
           <Section title="4. AI and Third-Party Processing">
             <p>
-              Call audio and transcripts may be processed by third-party AI model providers under contract with SealMe in order to extract deal terms and
-              generate contract language. These providers are bound by confidentiality and data-processing terms and are not permitted to use your data to
-              train their own general-purpose models unless you explicitly opt in.
+              Call audio and transcripts are processed by Anthropic (Claude) under contract with SealMe in order to extract deal terms, generate contract
+              language, and summarize call notes. Where you connect a call via Recall.ai or record one locally, that audio is first transcribed by Recall.ai
+              or Deepgram respectively before reaching Anthropic. If you connect Google Calendar, Google processes your calendar data under its own terms to
+              sync events. These providers are bound by confidentiality and data-processing terms and are not permitted to use your data to train their own
+              general-purpose models unless you explicitly opt in.
             </p>
           </Section>
 

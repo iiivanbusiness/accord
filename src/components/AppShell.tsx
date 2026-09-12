@@ -1,4 +1,5 @@
 import { auth, signOut } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { requireWorkspace } from "@/lib/workspace";
 import { isAdminEmail } from "@/lib/admin";
 import { NAV_ITEMS, ADMIN_ITEM } from "@/lib/nav-config";
@@ -13,6 +14,7 @@ import ScreenLabel from "./ScreenLabel";
 import GlassPanel from "./GlassPanel";
 import EmailVerifyBanner from "./EmailVerifyBanner";
 import LocalCaptureBanner from "./LocalCaptureBanner";
+import AiDisclosureModal from "./AiDisclosureModal";
 
 const NAV_ICONS: Record<string, () => React.ReactNode> = {
   "/dashboard": DashboardIcon,
@@ -36,6 +38,10 @@ export default async function AppShell({ children }: { children: React.ReactNode
   const [workspace, session] = await Promise.all([requireWorkspace(), auth()]);
   const workspaceName = workspace.name;
   const isAdmin = isAdminEmail(session?.user?.email);
+
+  const currentUser = session?.user?.email
+    ? await prisma.user.findUnique({ where: { email: session.user.email }, select: { aiDisclosureAcknowledgedAt: true } })
+    : null;
   const items = isAdmin ? [...NAV_ITEMS, ADMIN_ITEM] : NAV_ITEMS;
 
   const navItems = items.map((item) => {
@@ -105,6 +111,8 @@ export default async function AppShell({ children }: { children: React.ReactNode
           <AppFooter />
         </div>
       </div>
+
+      {currentUser && <AiDisclosureModal show={!currentUser.aiDisclosureAcknowledgedAt} />}
 
       <MobileNav
         items={navItems}

@@ -225,6 +225,13 @@ model User {
   scimExternalId String?
   deactivatedAt  DateTime?
 
+  // Apple Guideline 5.1.2(i) (in force since 13 Nov 2025) requires a consent
+  // notice naming the provider before personal data reaches a third-party
+  // AI — SealMe sends call transcripts to Anthropic for extraction, so this
+  // gates a one-time modal (see AiDisclosureModal.tsx) shown at first login,
+  // not a settings toggle buried where a reviewer won't find it.
+  aiDisclosureAcknowledgedAt DateTime?
+
   // Nullable so nothing breaks for a user created before roles existed —
   // in practice the migration backfills every existing user onto their
   // workspace's auto-created Owner role, so this is really only ever null
