@@ -56,7 +56,7 @@ export default function SidebarNav({ items }: { items: SidebarNavItem[] }) {
               if (el) itemRefs.current.set(item.href, el);
               else itemRefs.current.delete(item.href);
             }}
-            className="group relative z-10 flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-[13.5px] font-medium transition-[color,transform] duration-150 active:scale-[0.97]"
+            className="group relative z-10 flex items-center gap-2.5 rounded-[10px] px-3 py-2 text-[13.5px] font-medium transition-[color,transform] duration-150 active:scale-[0.97]"
             style={{ color: isActive ? "var(--on-primary)" : "var(--ink-muted)" }}
           >
             <span className="inline-flex flex-none transition-transform duration-150 group-hover:scale-[1.12]">

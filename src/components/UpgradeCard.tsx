@@ -4,7 +4,7 @@ export default function UpgradeCard() {
   return (
     <Link
       href="/settings"
-      className="card-hover group relative mt-3 flex flex-col gap-3 overflow-hidden rounded-[16px] p-4"
+      className="card-hover group relative mt-3 flex flex-col gap-2.5 overflow-hidden rounded-[16px] p-3.5"
       style={{ background: "var(--surface-inverted)", color: "var(--on-surface-inverted)" }}
     >
       <div

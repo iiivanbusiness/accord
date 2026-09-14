@@ -15,7 +15,10 @@ export default function GlassStatCard({
     <div className="glass-card card-hover p-5">
       <div className="glass-card-blur" aria-hidden="true" />
       <div className="relative z-10">
-        <div className="text-[11px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
+        <div
+          className="flex min-h-[30px] items-start text-[11px] font-medium uppercase leading-[15px] tracking-wide"
+          style={{ color: "var(--ink-muted)" }}
+        >
           {label}
         </div>
         <div className="font-mono-tab mt-2 text-[26px] font-medium">{value}</div>

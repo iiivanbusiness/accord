@@ -52,7 +52,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
   const navLinks = <SidebarNav items={navItems} />;
 
   const workspaceFooter = (
-    <div className="mt-4 flex flex-col gap-3 border-t pt-4" style={{ borderColor: "var(--hairline-soft)" }}>
+    <div className="mt-3 flex flex-col gap-2.5 border-t pt-3" style={{ borderColor: "var(--hairline-soft)" }}>
       <div className="flex items-center gap-2.5 px-2">
         <div
           className="flex h-[29px] w-[29px] flex-none items-center justify-center rounded-full font-display text-[12px] font-semibold"
@@ -82,7 +82,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
           as="nav"
           className="m-3.5 hidden rounded-[28px] px-3.5 py-[22px] md:flex md:sticky md:top-3.5 md:h-[calc(100dvh-28px)] md:self-start"
         >
-          <div className="mb-7 px-2">
+          <div className="mb-5 px-2">
             <BrandLogo height={20} />
           </div>
           {navLinks}
