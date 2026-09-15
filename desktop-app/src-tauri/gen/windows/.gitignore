@@ -1,0 +1,10 @@
+# Generated files
+# Keep bundle.config.json, templates, and Assets/ in git
+AppxManifest.xml
+*.msix
+*.msixbundle
+*.appx
+# Never commit signing material
+*.pfx
+*.cer
+*.p12
