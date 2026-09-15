@@ -2,7 +2,9 @@ mod audio;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(not(feature = "mas"))]
-use tauri::window::{Effect, EffectState, EffectsBuilder};
+use tauri::window::{Effect, EffectsBuilder};
+#[cfg(all(not(feature = "mas"), target_os = "macos"))]
+use tauri::window::EffectState;
 use tauri::Manager;
 
 // The webview is pinned to this origin (see tauri.conf.json) — hardcoded
@@ -22,7 +24,7 @@ const RAIL_WIDTH: f64 = 44.0;
 const RAIL_HEIGHT: f64 = 172.0;
 const COMPANION_MARGIN: f64 = 16.0;
 const COMPANION_GAP: f64 = 8.0;
-#[cfg(not(feature = "mas"))]
+#[cfg(all(not(feature = "mas"), target_os = "macos"))]
 const COMPANION_RADIUS: f64 = 16.0;
 
 // How often to send a live chunk while the call is still going, mirroring
@@ -96,18 +98,25 @@ fn content_position(app: &tauri::AppHandle) -> (f64, f64) {
     (rail_x - COMPANION_GAP - COMPANION_WIDTH, rail_y)
 }
 
-// transparent() + HudWindow gives a window the native macOS "liquid glass"
-// look — a frosted, blurred-desktop-behind panel, the same material
-// Spotlight/Notification Center widgets use — with rounded corners from
-// `radius`. The webview's own CSS paints nothing solid behind its content
-// (see CompanionPanel.tsx / CompanionRail.tsx) so the blur actually shows
-// through instead of sitting behind an opaque backing. Not applied for
-// `mas` builds — see the tauri dependency comment in Cargo.toml for why the
-// Cargo feature itself still has to stay unconditionally on regardless.
+// transparent() + a native blur effect gives the window a frosted,
+// blurred-desktop-behind panel look, with rounded corners from `radius` on
+// macOS. The webview's own CSS paints nothing solid behind its content (see
+// CompanionPanel.tsx / CompanionRail.tsx) so the blur actually shows through
+// instead of sitting behind an opaque backing. Not applied for `mas` builds
+// — see the tauri dependency comment in Cargo.toml for why the Cargo feature
+// itself still has to stay unconditionally on regardless.
+//
+// macOS and Windows need different `Effect` variants — Tauri's Windows
+// vibrancy backend (tauri::vibrancy::windows::apply_effects) only recognizes
+// Mica/Acrylic/Blur/Tabbed and silently no-ops on anything else (including
+// HudWindow), which combined with transparent(true) left the window with no
+// backdrop at all. Anything that isn't macOS or Windows (Linux) falls back
+// to the same opaque plain background the `mas` build uses, since this repo
+// has no Linux vibrancy story.
 fn apply_glass_or_plain<'a>(
     builder: tauri::WebviewWindowBuilder<'a, tauri::Wry, tauri::AppHandle>,
 ) -> tauri::WebviewWindowBuilder<'a, tauri::Wry, tauri::AppHandle> {
-    #[cfg(not(feature = "mas"))]
+    #[cfg(all(not(feature = "mas"), target_os = "macos"))]
     {
         builder.transparent(true).effects(
             EffectsBuilder::new()
@@ -117,7 +126,13 @@ fn apply_glass_or_plain<'a>(
                 .build(),
         )
     }
-    #[cfg(feature = "mas")]
+    #[cfg(all(not(feature = "mas"), target_os = "windows"))]
+    {
+        builder
+            .transparent(true)
+            .effects(EffectsBuilder::new().effect(Effect::Acrylic).build())
+    }
+    #[cfg(any(feature = "mas", not(any(target_os = "macos", target_os = "windows"))))]
     {
         builder.background_color(tauri::webview::Color(245, 245, 247, 255))
     }
