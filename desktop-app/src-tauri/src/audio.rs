@@ -1,5 +1,9 @@
-//! Safe Rust wrapper around the ScreenCaptureKit bridge in
-//! `native/audio_capture.swift`. macOS-only.
+//! Local call capture. On macOS, a safe Rust wrapper around the
+//! ScreenCaptureKit bridge in `native/audio_capture.swift`; on Windows, a
+//! thin re-export of the pure-Rust WASAPI implementation in
+//! `audio_windows.rs`. Both produce the same stereo-WAV contract (left =
+//! system audio, right = microphone) that the backend's Deepgram
+//! multichannel transcription expects.
 
 #[cfg(target_os = "macos")]
 extern "C" {
@@ -65,22 +69,25 @@ pub fn snapshot_delta_wav() -> Result<Option<Vec<u8>>, String> {
     Ok(Some(wav))
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
+pub use crate::audio_windows::{is_capturing, snapshot_delta_wav, start_capture, stop_capture_wav};
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn start_capture() -> Result<(), String> {
-    Err("Local call capture is only supported on macOS right now".to_string())
+    Err("Local call capture is only supported on macOS and Windows right now".to_string())
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn is_capturing() -> bool {
     false
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn stop_capture_wav() -> Result<Option<Vec<u8>>, String> {
-    Err("Local call capture is only supported on macOS right now".to_string())
+    Err("Local call capture is only supported on macOS and Windows right now".to_string())
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn snapshot_delta_wav() -> Result<Option<Vec<u8>>, String> {
-    Err("Local call capture is only supported on macOS right now".to_string())
+    Err("Local call capture is only supported on macOS and Windows right now".to_string())
 }

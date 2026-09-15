@@ -1,4 +1,6 @@
 mod audio;
+#[cfg(target_os = "windows")]
+mod audio_windows;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(not(feature = "mas"))]
