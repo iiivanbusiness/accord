@@ -14,6 +14,18 @@ export type FaqCategory = {
   questions: FaqQuestion[];
 };
 
+// Flattened into plain text and used as the grounding facts for the
+// freeform AI support chat's system prompt (see support-chat/route.ts) —
+// one source of truth for what the product actually does, instead of
+// letting the model guess at features.
+export function faqKnowledgeText(): string {
+  return FAQ_CATEGORIES.map(
+    (category) =>
+      `## ${category.label}\n` +
+      category.questions.map((q) => `Q: ${q.question}\nA: ${q.answer}`).join("\n\n")
+  ).join("\n\n");
+}
+
 export const FAQ_CATEGORIES: FaqCategory[] = [
   {
     id: "recording",
