@@ -1,19 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { FAQ_CATEGORIES } from "@/lib/faq-content";
 
 type FaqMessage = { role: "assistant" | "user"; text: string };
 type AiMessage = { role: "assistant" | "user"; text: string };
 type Mode = "faq" | "ai";
+type VoiceStatus = "idle" | "recording" | "transcribing";
 
 const FAQ_GREETING = "Hi! What do you need help with?";
 const AI_GREETING = "Ask me anything about SealMe. I can't see your account or deals, just how the product works.";
 
 // Two independent chat modes sharing one floating widget: a canned FAQ
-// (zero cost, no AI call) and a freeform AI chat backed by /api/support-chat.
-// Rendered globally from AppShell so it's available on every authenticated
-// page. Neither mode has access to the caller's account data by design.
+// (zero cost, no AI call) and a freeform AI chat backed by /api/support-chat,
+// plus a mic button that transcribes a short clip via /api/support-chat/transcribe
+// (Deepgram) instead of typing. Rendered globally from AppShell so it's
+// available on every authenticated page. Neither mode has access to the
+// caller's account data by design.
+//
+// overscroll-contain on every internally-scrollable region stops scroll
+// chaining — without it, scrolling the message list or the question list to
+// its own top/bottom edge continues scrolling the dashboard underneath.
 export default function FaqChatWidget() {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("faq");
@@ -26,14 +33,18 @@ export default function FaqChatWidget() {
   const [aiSending, setAiSending] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
   const category = categoryId ? FAQ_CATEGORIES.find((c) => c.id === categoryId) ?? null : null;
 
   function pickQuestion(question: string, answer: string) {
     setFaqMessages((prev) => [...prev, { role: "user", text: question }, { role: "assistant", text: answer }]);
   }
 
-  async function sendAiMessage() {
-    const text = aiInput.trim();
+  async function sendAiMessage(overrideText?: string) {
+    const text = (overrideText ?? aiInput).trim();
     if (!text || aiSending) return;
 
     const nextMessages = [...aiMessages, { role: "user" as const, text }];
@@ -55,6 +66,54 @@ export default function FaqChatWidget() {
       setAiError(err instanceof Error ? err.message : "Something went wrong answering that");
     } finally {
       setAiSending(false);
+    }
+  }
+
+  async function startVoiceInput() {
+    setAiError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      chunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        void handleVoiceClipReady(new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" }));
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setVoiceStatus("recording");
+    } catch {
+      setAiError("Couldn't access the microphone, check your browser or system permission");
+    }
+  }
+
+  function stopVoiceInput() {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop();
+      setVoiceStatus("transcribing");
+    }
+  }
+
+  async function handleVoiceClipReady(blob: Blob) {
+    try {
+      const res = await fetch("/api/support-chat/transcribe", {
+        method: "POST",
+        headers: { "Content-Type": blob.type || "audio/webm" },
+        body: blob,
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setAiError(data?.error ?? "Couldn't transcribe that clip");
+        return;
+      }
+      if (data.transcript) await sendAiMessage(data.transcript);
+    } catch {
+      setAiError("Couldn't reach the server, try again");
+    } finally {
+      setVoiceStatus("idle");
     }
   }
 
@@ -113,14 +172,14 @@ export default function FaqChatWidget() {
 
           {mode === "faq" ? (
             <>
-              <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-4 py-3.5">
+              <div className="overscroll-contain flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-4 py-3.5">
                 {faqMessages.map((m, i) => (
                   <ChatBubble key={i} role={m.role} text={m.text} />
                 ))}
               </div>
 
               <div className="flex-none border-t px-3.5 py-3" style={{ borderColor: "var(--hairline)" }}>
-                <div className="flex max-h-[168px] flex-col gap-1 overflow-y-auto">
+                <div className="overscroll-contain flex max-h-[168px] flex-col gap-1 overflow-y-auto">
                   {!category
                     ? FAQ_CATEGORIES.map((c) => (
                         <OptionButton key={c.id} onClick={() => setCategoryId(c.id)}>
@@ -137,11 +196,16 @@ export default function FaqChatWidget() {
             </>
           ) : (
             <>
-              <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-4 py-3.5">
+              <div className="overscroll-contain flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-4 py-3.5">
                 {aiMessages.map((m, i) => (
                   <ChatBubble key={i} role={m.role} text={m.text} />
                 ))}
                 {aiSending && <ChatBubble role="assistant" text="…" />}
+                {voiceStatus !== "idle" && (
+                  <div className="self-start text-[12px]" style={{ color: "var(--ink-muted)" }}>
+                    {voiceStatus === "recording" ? "Listening… tap the mic again to send" : "Transcribing…"}
+                  </div>
+                )}
                 {aiError && (
                   <div className="max-w-[85%] rounded-[14px] px-3 py-2 text-[13px]" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>
                     {aiError}
@@ -154,26 +218,52 @@ export default function FaqChatWidget() {
                   e.preventDefault();
                   void sendAiMessage();
                 }}
-                className="flex flex-none items-center gap-2 border-t px-3.5 py-3"
-                style={{ borderColor: "var(--hairline)" }}
+                className="flex-none px-3.5 py-3"
               >
-                <input
-                  type="text"
-                  value={aiInput}
-                  onChange={(e) => setAiInput(e.target.value)}
-                  placeholder="Type a question…"
-                  disabled={aiSending}
-                  maxLength={2000}
-                  className="min-w-0 flex-1 rounded-[10px] px-3 py-2 text-[13px]"
-                  style={{ background: "var(--surface-2)", color: "var(--ink)" }}
-                />
-                <button
-                  type="submit"
-                  disabled={aiSending || !aiInput.trim()}
-                  className="btn btn-primary btn-sm flex-none"
+                <div
+                  className="flex items-center gap-1.5 rounded-[24px] px-2 py-1.5"
+                  style={{ background: "var(--surface-2)" }}
                 >
-                  Send
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => (voiceStatus === "recording" ? stopVoiceInput() : startVoiceInput())}
+                    disabled={aiSending || voiceStatus === "transcribing"}
+                    aria-label={voiceStatus === "recording" ? "Stop recording" : "Record a voice message"}
+                    className="flex h-8 w-8 flex-none items-center justify-center rounded-full"
+                    style={
+                      voiceStatus === "recording"
+                        ? { background: "#e0455c", color: "#fff" }
+                        : { background: "var(--surface-1)", color: "var(--ink-muted)" }
+                    }
+                  >
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" width={15} height={15}>
+                      <rect x="7.5" y="2.5" width="5" height="9" rx="2.5" />
+                      <path d="M4.5 9.5a5.5 5.5 0 0 0 11 0" />
+                      <path d="M10 15v2.5" />
+                    </svg>
+                  </button>
+                  <input
+                    type="text"
+                    value={aiInput}
+                    onChange={(e) => setAiInput(e.target.value)}
+                    placeholder="Type a question…"
+                    disabled={aiSending || voiceStatus !== "idle"}
+                    maxLength={2000}
+                    className="min-w-0 flex-1 bg-transparent px-1 text-[13px] outline-none"
+                    style={{ color: "var(--ink)" }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={aiSending || !aiInput.trim()}
+                    aria-label="Send"
+                    className="flex h-8 w-8 flex-none items-center justify-center rounded-full disabled:opacity-40"
+                    style={{ background: "var(--ink)", color: "var(--canvas)" }}
+                  >
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" width={14} height={14}>
+                      <path d="M10 16V4M4.5 9.5 10 4l5.5 5.5" />
+                    </svg>
+                  </button>
+                </div>
               </form>
             </>
           )}
@@ -184,16 +274,22 @@ export default function FaqChatWidget() {
 }
 
 function ChatBubble({ role, text }: { role: "assistant" | "user"; text: string }) {
+  if (role === "user") {
+    return (
+      <div
+        className="max-w-[85%] self-end rounded-[14px] px-3 py-2 text-[13px] leading-relaxed"
+        style={{ background: "var(--primary)", color: "var(--on-primary)" }}
+      >
+        {text}
+      </div>
+    );
+  }
   return (
-    <div
-      className="max-w-[85%] rounded-[14px] px-3 py-2 text-[13px] leading-relaxed"
-      style={
-        role === "user"
-          ? { alignSelf: "flex-end", background: "var(--primary)", color: "var(--on-primary)" }
-          : { alignSelf: "flex-start", background: "var(--surface-2)", color: "var(--ink)" }
-      }
-    >
-      {text}
+    <div className="flex max-w-[90%] items-start gap-2 self-start">
+      <span className="faq-orb mt-0.5 h-6 w-6 flex-none rounded-full" />
+      <div className="rounded-[14px] px-3 py-2 text-[13px] leading-relaxed" style={{ background: "var(--surface-2)", color: "var(--ink)" }}>
+        {text}
+      </div>
     </div>
   );
 }
