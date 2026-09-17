@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FAQ_CATEGORIES } from "@/lib/faq-content";
 
 type FaqMessage = { role: "assistant" | "user"; text: string };
@@ -18,12 +18,20 @@ const AI_GREETING = "Ask me anything about SealMe. I can't see your account or d
 // available on every authenticated page. Neither mode has access to the
 // caller's account data by design.
 //
-// overscroll-contain on every internally-scrollable region stops scroll
-// chaining — without it, scrolling the message list or the question list to
-// its own top/bottom edge continues scrolling the dashboard underneath.
+// overscroll-contain on the internally-scrollable regions isn't enough on
+// its own — it only stops chaining once a region actually has overflow and
+// the browser correctly honors the property. Hovering over any non-
+// scrolling part of the panel (header, input bar, a message list too short
+// to scroll) still lets the wheel event fall straight through to the
+// dashboard behind it. panelWheelGuard below intercepts every wheel event
+// over the whole panel via a native (non-passive) listener — React's own
+// onWheel is attached passively and can't call preventDefault — and only
+// lets it through to native scrolling when the pointer is genuinely over a
+// scrollable region that isn't already at the boundary in that direction.
 export default function FaqChatWidget() {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("faq");
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [faqMessages, setFaqMessages] = useState<FaqMessage[]>([{ role: "assistant", text: FAQ_GREETING }]);
@@ -38,6 +46,27 @@ export default function FaqChatWidget() {
   const chunksRef = useRef<Blob[]>([]);
 
   const category = categoryId ? FAQ_CATEGORIES.find((c) => c.id === categoryId) ?? null : null;
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!open || !panel) return;
+
+    function handleWheel(e: WheelEvent) {
+      const target = e.target as HTMLElement;
+      const scrollable = target.closest(".overscroll-contain") as HTMLElement | null;
+      if (scrollable && scrollable.scrollHeight > scrollable.clientHeight) {
+        const atTop = scrollable.scrollTop <= 0;
+        const atBottom = scrollable.scrollTop + scrollable.clientHeight >= scrollable.scrollHeight - 1;
+        const leavingTop = e.deltaY < 0 && atTop;
+        const leavingBottom = e.deltaY > 0 && atBottom;
+        if (!leavingTop && !leavingBottom) return; // let the region scroll itself
+      }
+      e.preventDefault();
+    }
+
+    panel.addEventListener("wheel", handleWheel, { passive: false });
+    return () => panel.removeEventListener("wheel", handleWheel);
+  }, [open]);
 
   function pickQuestion(question: string, answer: string) {
     setFaqMessages((prev) => [...prev, { role: "user", text: question }, { role: "assistant", text: answer }]);
@@ -138,7 +167,7 @@ export default function FaqChatWidget() {
       </button>
 
       {open && (
-        <div className="card fixed bottom-40 right-5 z-50 flex max-h-[min(560px,70vh)] w-[min(380px,calc(100vw-2.5rem))] flex-col overflow-hidden md:bottom-24 md:right-6">
+        <div ref={panelRef} className="card fixed bottom-40 right-5 z-50 flex max-h-[min(560px,70vh)] w-[min(380px,calc(100vw-2.5rem))] flex-col overflow-hidden md:bottom-24 md:right-6">
           <div className="flex flex-none items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--hairline)" }}>
             <div className="flex items-center gap-1 rounded-[10px] p-0.5" style={{ background: "var(--surface-2)" }}>
               <button
