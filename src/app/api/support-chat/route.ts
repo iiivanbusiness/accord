@@ -1,14 +1,19 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { faqKnowledgeText } from "@/lib/faq-content";
 
 // Freeform AI support chat — deliberately separate from the FAQ chat's
-// canned answers. Auth-gated purely to keep this off the open internet and
-// bound the cost, not because it reads anything account-specific: this
-// route never touches Prisma or the caller's workspace. The model only
-// gets product knowledge (faqKnowledgeText) and the caller's own chat
-// history, nothing about their deals, clients, or contracts.
+// canned answers. Auth-gated to keep this off the open internet, and
+// per-workspace limited because every message is a real Anthropic cost
+// billed to SealMe's own account, not the workspace's (see
+// aiChatMessagesLimit on Workspace). The model itself never sees anything
+// account-specific — only product knowledge (faqKnowledgeText) and the
+// caller's own chat history, nothing about their deals, clients, or
+// contracts. Manual session/workspace lookup here instead of
+// requireWorkspace(), which redirects on failure — fine in a page, not in a
+// JSON API route (same pattern as companion/state/route.ts).
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_MESSAGE_LENGTH = 2000;
 
@@ -33,7 +38,8 @@ function isValidHistory(value: unknown): value is ChatMessage[] {
 
 export async function POST(req: Request) {
   const session = await auth();
-  if (!session?.user?.email) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  const workspaceId = session?.user?.workspaceId;
+  if (!workspaceId) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   const body = await req.json().catch(() => null);
   const messages = body?.messages;
@@ -42,6 +48,18 @@ export async function POST(req: Request) {
   }
   if (messages[messages.length - 1].role !== "user") {
     return NextResponse.json({ error: "Last message must be from the user" }, { status: 400 });
+  }
+
+  const workspace = await prisma.workspace.findUnique({
+    where: { id: workspaceId },
+    select: { aiChatMessagesUsedThisMonth: true, aiChatMessagesLimit: true },
+  });
+  if (!workspace) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  if (workspace.aiChatMessagesUsedThisMonth >= workspace.aiChatMessagesLimit) {
+    return NextResponse.json(
+      { error: "This workspace has used all its AI chat messages for this billing period." },
+      { status: 429 }
+    );
   }
 
   const client = new Anthropic();
@@ -66,6 +84,12 @@ export async function POST(req: Request) {
     });
 
     const text = response.content.find((block) => block.type === "text")?.text ?? "";
+
+    await prisma.workspace.update({
+      where: { id: workspaceId },
+      data: { aiChatMessagesUsedThisMonth: { increment: 1 } },
+    });
+
     return NextResponse.json({ reply: text });
   } catch (err) {
     console.error("Support chat request failed", err);

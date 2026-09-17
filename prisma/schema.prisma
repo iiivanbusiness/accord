@@ -16,6 +16,12 @@ model Workspace {
   plan               String   @default("Growth")
   callsUsedThisMonth Int      @default(0)
   callsLimit         Int      @default(15)
+  // Separate cap for the freeform AI support chat (see support-chat/route.ts)
+  // — each message is its own Anthropic call billed to SealMe's own account,
+  // not the workspace's, so this exists to bound that cost per workspace
+  // rather than to meter a customer-facing quota like callsLimit.
+  aiChatMessagesUsedThisMonth Int @default(0)
+  aiChatMessagesLimit         Int @default(50)
   requireApproval    Boolean  @default(true)
   notifyOnSigned     Boolean  @default(true)
   autoRemind         Boolean  @default(false)

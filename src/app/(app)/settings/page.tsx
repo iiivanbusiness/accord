@@ -84,6 +84,7 @@ export default async function SettingsPage({
     }),
   ]);
   const usagePct = workspace ? Math.round((workspace.callsUsedThisMonth / workspace.callsLimit) * 100) : 0;
+  const aiChatUsagePct = workspace ? Math.round((workspace.aiChatMessagesUsedThisMonth / workspace.aiChatMessagesLimit) * 100) : 0;
   if (!workspace) return null;
   const currentUser = workspace.users.find((u) => u.email === session?.user?.email);
   const canManageTeam = Boolean(currentUser?.role?.canManageTeam);
@@ -509,6 +510,16 @@ export default async function SettingsPage({
         </div>
         <div className="mt-3 h-2 w-full overflow-hidden rounded-full" style={{ background: "var(--surface-2)" }}>
           <div className="h-full rounded-full" style={{ width: `${Math.min(100, usagePct)}%`, background: usagePct >= 100 ? "#ff6b57" : "var(--primary)" }} />
+        </div>
+
+        <div className="mt-4 flex items-center justify-between gap-4">
+          <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
+            {workspace.aiChatMessagesUsedThisMonth} of {workspace.aiChatMessagesLimit} AI chat messages used this month
+          </div>
+          <span className="chip chip-neutral">{aiChatUsagePct}%</span>
+        </div>
+        <div className="mt-2 h-2 w-full overflow-hidden rounded-full" style={{ background: "var(--surface-2)" }}>
+          <div className="h-full rounded-full" style={{ width: `${Math.min(100, aiChatUsagePct)}%`, background: aiChatUsagePct >= 100 ? "#ff6b57" : "var(--primary)" }} />
         </div>
 
         <div className="mt-4 border-t pt-4" style={{ borderColor: "var(--hairline-soft)" }}>
