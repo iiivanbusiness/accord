@@ -7,7 +7,6 @@ import { extractDealFromTranscript, buildDealFieldRows } from "@/lib/extract-dea
 import { extractActionItems } from "@/lib/extract-action-items";
 import { extractCallHighlights } from "@/lib/extract-call-highlights";
 import { extractPlaceholderKeys } from "@/lib/contract";
-import { createCallBot, detectPlatformFromUrl } from "@/lib/recall";
 import { requireWorkspace } from "@/lib/workspace";
 import { currentUserWithRole } from "@/lib/permissions";
 import { dispatchWebhookEvent } from "@/lib/webhooks";
@@ -16,10 +15,10 @@ import { syncDealToHubspot } from "@/lib/hubspot";
 import { syncDealToSalesforce } from "@/lib/salesforce";
 
 // Every path here costs real money one way or another (Anthropic tokens for
-// extraction, a live Recall bot-minute for calls) — callsLimit was tracked
+// extraction, Deepgram minutes for local recordings) — callsLimit was tracked
 // and shown in the UI but never actually enforced, so a workspace could run
-// past its plan indefinitely. This is the one place all four entry points
-// funnel through before doing anything billable.
+// past its plan indefinitely. This is the one place all entry points funnel
+// through before doing anything billable.
 function assertUnderCallLimit(workspace: { callsUsedThisMonth: number; callsLimit: number }) {
   if (workspace.callsUsedThisMonth >= workspace.callsLimit) {
     redirect(`/deals/new?error=${encodeURIComponent("You've used all your calls for this billing period — upgrade your plan to start more.")}`);
@@ -156,68 +155,6 @@ export async function createDealFromTranscript(formData: FormData) {
   redirect(`/deals/${deal.id}`);
 }
 
-export async function startCallFromEvent(formData: FormData) {
-  const eventId = String(formData.get("eventId") ?? "").trim();
-  const templateId = String(formData.get("templateId") ?? "").trim();
-
-  if (!eventId) throw new Error("Choose a calendar event");
-  if (!templateId) throw new Error("Choose a template");
-
-  const [workspace, user] = await Promise.all([requireWorkspace(), currentUserWithRole()]);
-  assertUnderCallLimit(workspace);
-  const workspaceId = workspace.id;
-
-  const event = await prisma.calendarEvent.findFirst({ where: { id: eventId, workspaceId } });
-  if (!event || !event.meetingUrl) throw new Error("That event doesn't have a meeting link");
-
-  // Recall only guarantees an on-time join for bots scheduled >10 min ahead —
-  // anything closer (or already started) falls back to joining right away.
-  const tenMinFromNow = Date.now() + 10 * 60 * 1000;
-  const joinAt = event.startTime.getTime() > tenMinFromNow ? event.startTime : undefined;
-
-  let bot;
-  try {
-    bot = await createCallBot(event.meetingUrl, joinAt);
-  } catch (err) {
-    console.error("Failed to schedule call bot for calendar event", eventId, err);
-    redirect(`/deals/new?mode=live&error=${encodeURIComponent("Couldn't schedule the call bot — check the event's meeting link and try again.")}`);
-  }
-
-  const clientName = event.clientName || event.title;
-  const client = await prisma.client.create({
-    data: { workspaceId, name: clientName, company: clientName },
-  });
-
-  const deal = await prisma.deal.create({
-    data: {
-      workspaceId,
-      clientId: client.id,
-      templateId,
-      ownerId: user.id,
-      teamId: user.teamId,
-      service: "",
-      feeDisplay: "",
-      status: "processing",
-      source: detectPlatformFromUrl(event.meetingUrl),
-      recallBotId: bot.id,
-    },
-  });
-
-  await prisma.calendarEvent.update({ where: { id: eventId }, data: { linkedDealId: deal.id } });
-
-  await prisma.workspace.update({
-    where: { id: workspaceId },
-    data: { callsUsedThisMonth: { increment: 1 } },
-  });
-
-  await dispatchWebhookEvent(workspaceId, "deal.created", { dealId: deal.id, clientName, status: deal.status });
-  await notifySlack(workspaceId, { type: "deal.created", dealId: deal.id, clientName, service: "" });
-  await syncDealToHubspot(workspaceId, deal.id);
-  await syncDealToSalesforce(workspaceId, deal.id);
-
-  redirect(`/deals/${deal.id}`);
-}
-
 // Desktop-app-only: starts a deal backed by a locally-recorded call instead
 // of a Recall bot. Unlike the other actions here, this one returns a value
 // instead of redirecting — the caller is a client component that still needs
@@ -314,55 +251,3 @@ export async function continueLocalCapture(dealId: string): Promise<{ dealId: st
   return { dealId, token: rawToken };
 }
 
-export async function startCallBot(formData: FormData) {
-  const meetingUrl = String(formData.get("meetingUrl") ?? "").trim();
-  const clientName = String(formData.get("clientName") ?? "").trim();
-  const templateId = String(formData.get("templateId") ?? "").trim();
-
-  if (!meetingUrl) throw new Error("Paste the meeting link first");
-  if (!clientName) throw new Error("Enter who you're meeting with");
-  if (!templateId) throw new Error("Choose a template");
-
-  const [workspace, user] = await Promise.all([requireWorkspace(), currentUserWithRole()]);
-  assertUnderCallLimit(workspace);
-  const workspaceId = workspace.id;
-
-  let bot;
-  try {
-    bot = await createCallBot(meetingUrl);
-  } catch (err) {
-    console.error("Failed to start call bot", err);
-    redirect(`/deals/new?mode=live&error=${encodeURIComponent("Couldn't start the call bot — check the meeting link and try again.")}`);
-  }
-
-  const client = await prisma.client.create({
-    data: { workspaceId, name: clientName, company: clientName },
-  });
-
-  const deal = await prisma.deal.create({
-    data: {
-      workspaceId,
-      clientId: client.id,
-      templateId,
-      ownerId: user.id,
-      teamId: user.teamId,
-      service: "",
-      feeDisplay: "",
-      status: "processing",
-      source: detectPlatformFromUrl(meetingUrl),
-      recallBotId: bot.id,
-    },
-  });
-
-  await prisma.workspace.update({
-    where: { id: workspaceId },
-    data: { callsUsedThisMonth: { increment: 1 } },
-  });
-
-  await dispatchWebhookEvent(workspaceId, "deal.created", { dealId: deal.id, clientName, status: deal.status });
-  await notifySlack(workspaceId, { type: "deal.created", dealId: deal.id, clientName, service: "" });
-  await syncDealToHubspot(workspaceId, deal.id);
-  await syncDealToSalesforce(workspaceId, deal.id);
-
-  redirect(`/deals/${deal.id}`);
-}
