@@ -11,8 +11,13 @@ export async function GET(req: Request) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const error = url.searchParams.get("error");
+  const errorDescription = url.searchParams.get("error_description");
 
-  if (error) return NextResponse.redirect(new URL(`/settings?error=salesforce_${error}`, req.url));
+  if (error) {
+    const redirectUrl = new URL(`/settings?error=salesforce_${error}`, req.url);
+    if (errorDescription) redirectUrl.searchParams.set("error_detail", errorDescription);
+    return NextResponse.redirect(redirectUrl);
+  }
   if (!code || !state) return NextResponse.redirect(new URL("/settings?error=salesforce_no_code", req.url));
 
   try {

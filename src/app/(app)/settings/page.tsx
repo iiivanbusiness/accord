@@ -68,9 +68,9 @@ function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notify
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; slack_connected?: string }>;
+  searchParams: Promise<{ error?: string; error_detail?: string; slack_connected?: string }>;
 }) {
-  const { error: connectError, slack_connected } = await searchParams;
+  const { error: connectError, error_detail: connectErrorDetail, slack_connected } = await searchParams;
   const workspaceId = await requireWorkspaceId();
   const [workspace, session, roles, teams, approvalChains] = await Promise.all([
     prisma.workspace.findUnique({ where: { id: workspaceId }, include: { users: { include: { role: true, team: true } } } }),
@@ -138,8 +138,9 @@ export default async function SettingsPage({
     </div>
 
     {connectError && (
-      <div className="chip chip-warn mb-4 max-w-[600px] justify-start px-3.5 py-2.5 text-[12.5px]">
-        {connectError.replace(/_/g, " ")}
+      <div className="chip chip-warn mb-4 max-w-[600px] flex-col items-start justify-start gap-1 whitespace-normal px-3.5 py-2.5 text-[12.5px]">
+        <span>{connectError.replace(/_/g, " ")}</span>
+        {connectErrorDetail && <span style={{ color: "var(--ink-muted)" }}>{connectErrorDetail}</span>}
       </div>
     )}
     {slack_connected && (
