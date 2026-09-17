@@ -84,6 +84,72 @@ export async function bulkRemind(dealIds: string[]): Promise<{ sent: number; ski
   return { sent, skipped };
 }
 
+// Soft-delete — just stamps trashedAt so the deal drops out of the normal
+// list/board. Nothing about the deal or its contract is touched otherwise,
+// so restoring it (bulkRestore) puts it back exactly as it was.
+export async function bulkTrash(dealIds: string[]): Promise<{ trashed: number }> {
+  const { where } = await dealVisibilityFilter();
+  const workspaceId = await requireWorkspaceId();
+
+  const result = await prisma.deal.updateMany({
+    where: { id: { in: dealIds }, workspaceId, ...where, trashedAt: null },
+    data: { trashedAt: new Date() },
+  });
+
+  const session = await auth();
+  await logAudit({ workspaceId, actorEmail: session?.user?.email, action: "deals.bulk_trashed", metadata: { count: result.count } });
+
+  revalidatePath("/deals");
+  revalidatePath("/deals/trash");
+  return { trashed: result.count };
+}
+
+export async function restoreDeal(dealId: string): Promise<void> {
+  const { where } = await dealVisibilityFilter();
+  const workspaceId = await requireWorkspaceId();
+
+  const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId, ...where, trashedAt: { not: null } } });
+  if (!deal) throw new Error("Deal not found in trash");
+
+  await prisma.deal.update({ where: { id: dealId }, data: { trashedAt: null } });
+
+  const session = await auth();
+  await logAudit({ workspaceId, actorEmail: session?.user?.email, action: "deal.restored", targetType: "Deal", targetId: dealId });
+
+  revalidatePath("/deals");
+  revalidatePath("/deals/trash");
+}
+
+// The real, irreversible delete — everything currently in the trash, gone
+// for good. Contract has no cascade off Deal (a live deal's contract
+// should never disappear just because the deal row does), so it has to be
+// deleted explicitly first; Contract's own children (signers, clause
+// comments, approvals) and Deal's own children (fields, calls, notes,
+// etc.) already cascade in the schema.
+export async function emptyTrash(): Promise<{ deleted: number }> {
+  const { where } = await dealVisibilityFilter();
+  const workspaceId = await requireWorkspaceId();
+
+  const trashed = await prisma.deal.findMany({
+    where: { workspaceId, ...where, trashedAt: { not: null } },
+    select: { id: true },
+  });
+  const ids = trashed.map((d) => d.id);
+  if (ids.length === 0) return { deleted: 0 };
+
+  await prisma.$transaction([
+    prisma.contract.deleteMany({ where: { dealId: { in: ids } } }),
+    prisma.deal.deleteMany({ where: { id: { in: ids } } }),
+  ]);
+
+  const session = await auth();
+  await logAudit({ workspaceId, actorEmail: session?.user?.email, action: "deals.trash_emptied", metadata: { count: ids.length } });
+
+  revalidatePath("/deals");
+  revalidatePath("/deals/trash");
+  return { deleted: ids.length };
+}
+
 // Sends every selected draft contract with the same default subject/message
 // the individual Send page would pre-fill — only for deals that already
 // have a reviewed contract sitting in draft with somewhere to send it.

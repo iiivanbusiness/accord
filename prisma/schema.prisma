@@ -398,6 +398,12 @@ model Deal {
   // a second time instead of going quiet forever after one email.
   staleReminderSentAt DateTime?
 
+  // Soft-delete: set when a deal is moved to trash from the deals table.
+  // Trashed deals are filtered out of the normal deals list/board but stay
+  // in the database until the trash is emptied (a real, irreversible
+  // delete) — the undo window the trash view exists for.
+  trashedAt DateTime?
+
   // Set once this deal has been pushed to HubSpot as a Deal object — lets
   // a later status change (sent, signed) update that same record.
   hubspotDealId String?

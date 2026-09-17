@@ -37,11 +37,13 @@ export default function DealsBulkTable({
   rows,
   remindAction,
   sendAction,
+  trashAction,
   showOwnerColumn = false,
 }: {
   rows: Row[];
   remindAction: (dealIds: string[]) => Promise<{ sent: number; skipped: number }>;
   sendAction: (dealIds: string[]) => Promise<{ sent: number; skipped: number }>;
+  trashAction: (dealIds: string[]) => Promise<{ trashed: number }>;
   showOwnerColumn?: boolean;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -100,6 +102,20 @@ export default function DealsBulkTable({
     });
   }
 
+  function runTrash() {
+    setMessage(null);
+    const ids = [...selected];
+    startTransition(async () => {
+      try {
+        const result = await trashAction(ids);
+        setMessage(`Moved ${result.trashed} to trash — restore them anytime from the trash icon above.`);
+        setSelected(new Set());
+      } catch (err) {
+        setMessage(err instanceof Error ? err.message : "Something went wrong");
+      }
+    });
+  }
+
   return (
     <div className="glass-card glass-card-solid card-hover overflow-hidden">
       {selected.size > 0 && (
@@ -123,6 +139,9 @@ export default function DealsBulkTable({
               title={eligibleForSend === 0 ? "None of the selected deals have a draft contract ready to send" : undefined}
             >
               Send to client ({eligibleForSend})
+            </button>
+            <button type="button" disabled={isPending} onClick={runTrash} className="btn btn-secondary btn-sm">
+              Move to trash ({selected.size})
             </button>
             <button type="button" onClick={() => setSelected(new Set())} className="text-[12.5px] font-medium" style={{ color: "var(--ink-muted)" }}>
               Clear
