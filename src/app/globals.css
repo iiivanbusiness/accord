@@ -498,7 +498,7 @@ a {
 
 /* ---------- FAQ chat widget: animated assistant avatar orb ---------- */
 .faq-orb {
-  background: radial-gradient(circle at 30% 30%, #ffcf8a, #ff7a59 45%, #e0455c 75%);
+  background: radial-gradient(circle at 30% 30%, #d6ecff, #6ea8ff 45%, #3b5bdb 75%);
   background-size: 180% 180%;
   transition: transform .18s ease;
 }
@@ -510,6 +510,15 @@ a {
   0%, 100% { background-position: 20% 20%; }
   50% { background-position: 80% 80%; }
 }
+
+/* Larger, glowing variant for the AI tab's empty-state hero (before the
+   first real exchange) — same gradient/animation, just bigger and blurred
+   at the edges so it reads as a soft glowing sphere like the reference. */
+.faq-orb-hero {
+  filter: blur(1px);
+  box-shadow: 0 0 32px 6px rgba(59, 91, 219, 0.35);
+}
+.faq-orb-hero:hover { transform: none; }
 
 /* ---------- inputs ---------- */
 .input {

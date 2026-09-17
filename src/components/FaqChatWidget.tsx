@@ -196,22 +196,34 @@ export default function FaqChatWidget() {
             </>
           ) : (
             <>
-              <div className="overscroll-contain flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-4 py-3.5">
-                {aiMessages.map((m, i) => (
-                  <ChatBubble key={i} role={m.role} text={m.text} />
-                ))}
-                {aiSending && <ChatBubble role="assistant" text="…" />}
-                {voiceStatus !== "idle" && (
-                  <div className="self-start text-[12px]" style={{ color: "var(--ink-muted)" }}>
-                    {voiceStatus === "recording" ? "Listening… tap the mic again to send" : "Transcribing…"}
-                  </div>
-                )}
-                {aiError && (
-                  <div className="max-w-[85%] rounded-[14px] px-3 py-2 text-[13px]" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>
-                    {aiError}
-                  </div>
-                )}
-              </div>
+              {aiMessages.length === 1 ? (
+                <div className="overscroll-contain flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-y-auto px-6 py-6 text-center">
+                  <span className="faq-orb faq-orb-hero h-20 w-20 flex-none rounded-full" />
+                  <p className="text-[13px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>{aiMessages[0].text}</p>
+                  {aiError && (
+                    <div className="max-w-full rounded-[14px] px-3 py-2 text-[13px]" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>
+                      {aiError}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="overscroll-contain flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-4 py-3.5">
+                  {aiMessages.map((m, i) => (
+                    <ChatBubble key={i} role={m.role} text={m.text} />
+                  ))}
+                  {aiSending && <ChatBubble role="assistant" text="…" />}
+                  {voiceStatus !== "idle" && (
+                    <div className="self-start text-[12px]" style={{ color: "var(--ink-muted)" }}>
+                      {voiceStatus === "recording" ? "Listening… tap the mic again to send" : "Transcribing…"}
+                    </div>
+                  )}
+                  {aiError && (
+                    <div className="max-w-[85%] rounded-[14px] px-3 py-2 text-[13px]" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>
+                      {aiError}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <form
                 onSubmit={(e) => {
