@@ -136,8 +136,7 @@ export default async function DealsPage({
 
     <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-1.5 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-        <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--success)" }} />
-        Connected to Zoom — new calls are picked up and analyzed automatically
+        Record any call locally, then let SealMe draft the contract
         {workspace && (
           <span className="ml-2" style={{ color: "var(--ink-muted)" }}>
             · {workspace.callsUsedThisMonth} of {workspace.callsLimit} calls used this month

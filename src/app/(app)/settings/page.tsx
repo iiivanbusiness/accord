@@ -149,50 +149,6 @@ export default async function SettingsPage({
       </div>
     )}
 
-    <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
-      <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
-        <h2 className="text-[15px] font-medium">Call integrations</h2>
-      </div>
-      <div className="px-[22px] py-2">
-        <div className="flex items-center justify-between gap-3.5 border-b py-3.5" style={{ borderColor: "var(--hairline-soft)" }}>
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-[10px] font-display text-[14px] font-semibold" style={{ background: "var(--surface-2)", color: "var(--ink)" }}>Z</div>
-            <div>
-              <div className="text-[13.5px] font-medium">Zoom</div>
-              <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>Real-time call analysis via Zoom RTMS</div>
-            </div>
-          </div>
-          <form action={toggleWorkspaceFlag.bind(null, "zoomConnected")}>
-            <button
-              type="submit"
-              className="btn btn-secondary btn-sm"
-              style={workspace.zoomConnected ? { background: "var(--success-soft)", color: "var(--success)", borderColor: "transparent" } : undefined}
-            >
-              {workspace.zoomConnected ? "Connected ✓" : "Connect"}
-            </button>
-          </form>
-        </div>
-        <div className="flex items-center justify-between gap-3.5 py-3.5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-[10px] font-display text-[14px] font-semibold" style={{ background: "var(--surface-2)", color: "var(--ink)" }}>G</div>
-            <div>
-              <div className="text-[13.5px] font-medium">Google Meet</div>
-              <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>Not prioritized yet — upload calls manually for now</div>
-            </div>
-          </div>
-          <form action={toggleWorkspaceFlag.bind(null, "meetConnected")}>
-            <button
-              type="submit"
-              className="btn btn-secondary btn-sm"
-              style={workspace.meetConnected ? { background: "var(--success-soft)", color: "var(--success)", borderColor: "transparent" } : undefined}
-            >
-              {workspace.meetConnected ? "Connected ✓" : "Connect"}
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
-
     <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px] px-[22px] py-2">
       <div className="flex items-center justify-between gap-4 py-[15px]">
         <div className="w-full">
