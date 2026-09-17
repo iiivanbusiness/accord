@@ -1,3 +1,5 @@
+import { NAV_ITEMS } from "@/lib/nav-config";
+
 // Canned Q&A for the FAQ chat widget (see FaqChatWidget.tsx). No AI call,
 // no cost — this is a static lookup the user clicks through. Answers are
 // grounded in what the app actually does; keep this file in sync with real
@@ -18,6 +20,35 @@ export type FaqCategory = {
 // freeform AI support chat's system prompt (see support-chat/route.ts) —
 // one source of truth for what the product actually does, instead of
 // letting the model guess at features.
+// Where things actually are in the app, so the AI chat can answer
+// navigation questions ("where do I connect Salesforce", "where are my
+// deals") without needing any account data. This is app structure, not
+// account content, so it stays fine under the no-account-access rule.
+export function appNavigationText(): string {
+  const sidebar = NAV_ITEMS.map((item) => `${item.label} (${item.href})`).join(", ");
+  return (
+    `Left sidebar, top to bottom: ${sidebar}.\n\n` +
+    "Deals: click Deals in the sidebar, or go to /deals. Table and Board views, filterable by status and owner. " +
+    "Click + Start a call to begin a new deal, either recording locally, pasting a transcript, or entering details by hand.\n\n" +
+    "Clients: Clients in the sidebar lists every client across all deals.\n\n" +
+    "Contract templates: Templates in the sidebar, where you create and edit the templates deals are built from.\n\n" +
+    "Everything below lives on the Settings page (Settings in the sidebar), as separate sections you scroll through:\n" +
+    "- Workspace name and logo\n" +
+    "- Team: invite teammates, assign roles, set up teams and approval chains, assign approval backups\n" +
+    "- Access & provisioning: restrict sign-ups to an email domain, SCIM provisioning, single sign-on (OIDC)\n" +
+    "- Integrations, each its own row with a Connect button: Slack, HubSpot, DocuSign, Salesforce\n" +
+    "- Bulk import: bring clients and deals in from a CSV\n" +
+    "- API & webhooks: generate API keys, set up webhook endpoints\n" +
+    "- Two-factor authentication\n" +
+    "- Plan & usage: calls used this month, AI chat messages used this month, request an upgrade\n" +
+    "- Sending domain: verify your own domain so contracts go out as you\n" +
+    "- Notification toggles: require manual approval before sending, email me when signed, auto-remind clients, signing/reminder timing\n" +
+    "- Delete account\n\n" +
+    "To connect or check a CRM/integration (Salesforce, HubSpot, Slack, DocuSign): go to Settings and find that " +
+    "integration's row, it shows Connect if not linked yet, or who it's connected as if it already is."
+  );
+}
+
 export function faqKnowledgeText(): string {
   return FAQ_CATEGORIES.map(
     (category) =>

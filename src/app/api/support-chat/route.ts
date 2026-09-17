@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { faqKnowledgeText } from "@/lib/faq-content";
+import { appNavigationText, faqKnowledgeText } from "@/lib/faq-content";
 
 // Freeform AI support chat — deliberately separate from the FAQ chat's
 // canned answers. Auth-gated to keep this off the open internet, and
@@ -77,8 +77,12 @@ export async function POST(req: Request) {
         "If a question needs account-specific info, or the facts below don't cover it, say you don't have that " +
         "detail and suggest contacting support instead of guessing.\n\n" +
         "Keep answers short, two to four sentences, plain language, no markdown headers. " +
-        "Never use em dashes or other long dashes, write plain sentences with commas or periods instead.\n\n" +
-        "Product facts:\n" +
+        "Never use em dashes or other long dashes, write plain sentences with commas or periods instead. " +
+        "For navigation questions (where something is, how to get to a setting), give the exact page and section " +
+        "from the navigation facts below, don't hedge with 'usually' or 'typically' when you already know the answer.\n\n" +
+        "Navigation facts:\n" +
+        appNavigationText() +
+        "\n\nProduct facts:\n" +
         faqKnowledgeText(),
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
     });
