@@ -15,6 +15,7 @@ import GlassPanel from "./GlassPanel";
 import EmailVerifyBanner from "./EmailVerifyBanner";
 import LocalCaptureBanner from "./LocalCaptureBanner";
 import AiDisclosureModal from "./AiDisclosureModal";
+import FaqChatWidget from "./FaqChatWidget";
 
 const NAV_ICONS: Record<string, () => React.ReactNode> = {
   "/dashboard": DashboardIcon,
@@ -113,6 +114,8 @@ export default async function AppShell({ children }: { children: React.ReactNode
       </div>
 
       {currentUser && <AiDisclosureModal show={!currentUser.aiDisclosureAcknowledgedAt} />}
+
+      <FaqChatWidget />
 
       <MobileNav
         items={navItems}
