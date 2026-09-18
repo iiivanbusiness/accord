@@ -70,7 +70,7 @@ export async function GET(req: Request) {
       });
       let overdueSent = 0;
       for (const step of overdueSteps) {
-        const dealUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/deals/${step.contract.deal.id}/contract`;
+        const dealUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/deals/${step.contract.deal.id}`;
         try {
           await sendReviewOverdueEmail({
             to: step.assignee.email,

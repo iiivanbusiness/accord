@@ -7,15 +7,15 @@ import CallHighlightsOverlay from "@/components/CallHighlightsOverlay";
 import SendToDocusignButton from "@/components/SendToDocusignButton";
 import VoiceCorrectionButton from "@/components/VoiceCorrectionButton";
 import DealNotes from "@/components/DealNotes";
+import ReviewPanel from "@/components/ReviewPanel";
 import { prisma } from "@/lib/db";
-import { auth } from "@/lib/auth";
 import { requireWorkspaceId, requireWorkspace } from "@/lib/workspace";
+import { currentUserWithRole } from "@/lib/permissions";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import {
   addDealNote,
   applyVoiceFieldCorrection,
   deleteDealNote,
-  requestTeammateReview,
   fillMissingFields,
   generateContract,
   retryExtraction,
@@ -23,6 +23,16 @@ import {
   toggleActionItem,
   updateFieldValues,
 } from "./actions";
+import {
+  sendForReviewTo,
+  decideReviewStep,
+  addChecklistItem,
+  toggleChecklistItem,
+  removeChecklistItem,
+  addReviewComment,
+  deleteReviewComment,
+  updateReviewStepMeta,
+} from "./review-actions";
 
 const CALL_SOURCE_LABEL: Record<string, string> = {
   local: "Recorded locally",
@@ -70,15 +80,29 @@ const STATUS_CHIP: Record<string, string> = {
 export default async function DealDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const workspaceId = await requireWorkspaceId();
-  const { where: visibility } = await dealVisibilityFilter();
-  const [deal, workspace, session] = await Promise.all([
+  const currentUser = await currentUserWithRole();
+  const { where: visibility } = await dealVisibilityFilter(currentUser);
+  const [deal, workspace, teammates, activeDelegationsToMe] = await Promise.all([
     prisma.deal.findFirst({
       where: { id, workspaceId, ...visibility },
       include: {
         client: true,
         fields: { orderBy: { orderIndex: "asc" } },
         template: true,
-        contract: true,
+        contract: {
+          include: {
+            reviewSteps: {
+              include: {
+                assignee: true,
+                decidedByUser: true,
+                decidedOnBehalfOfUser: true,
+                checklistItems: { orderBy: { createdAt: "asc" } },
+                comments: { orderBy: { createdAt: "asc" } },
+              },
+              orderBy: { order: "asc" },
+            },
+          },
+        },
         calls: { orderBy: { startedAt: "asc" } },
         fieldChanges: { orderBy: { changedAt: "asc" } },
         actionItems: { orderBy: { createdAt: "asc" } },
@@ -87,9 +111,14 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
       },
     }),
     requireWorkspace(),
-    auth(),
+    prisma.user.findMany({ where: { workspaceId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.approvalDelegate.findMany({
+      where: { toUserId: currentUser.id, startsAt: { lte: new Date() }, OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }] },
+    }),
   ]);
   if (!deal) notFound();
+
+  const delegatedAssigneeIds = [...new Set(activeDelegationsToMe.map((d) => d.fromUserId))];
 
   const canSendToDocusignNow =
     Boolean(workspace?.docusignEnabled) && deal.status === "ready" && deal.contract?.status === "draft" && Boolean(deal.client.email);
@@ -182,7 +211,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         <DealNotes
           dealId={deal.id}
           notes={deal.notes.map((n) => ({ id: n.id, authorName: n.authorName, authorEmail: n.authorEmail, body: n.body, createdAt: n.createdAt.toISOString() }))}
-          currentUserEmail={session?.user?.email ?? ""}
+          currentUserEmail={currentUser.email}
           addAction={addDealNote}
           deleteAction={deleteDealNote}
         />
@@ -192,7 +221,43 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         {deal.status !== "signed" && <ContinueCallButton dealId={deal.id} />}
 
         {deal.status !== "signed" && deal.status !== "sent" && deal.fields.some((f) => f.status !== "missing") && (
-          <VoiceCorrectionButton dealId={deal.id} applyAction={applyVoiceFieldCorrection} reviewAction={requestTeammateReview} />
+          <VoiceCorrectionButton dealId={deal.id} applyAction={applyVoiceFieldCorrection} reviewAction={sendForReviewTo} />
+        )}
+
+        {deal.contract && (
+          <ReviewPanel
+            dealId={deal.id}
+            contractStatus={deal.contract.status}
+            dealStatus={deal.status}
+            steps={deal.contract.reviewSteps.map((s) => ({
+              id: s.id,
+              order: s.order,
+              status: s.status,
+              assigneeId: s.assigneeId,
+              assigneeName: s.assignee.name,
+              decidedByName: s.decidedByUser?.name ?? null,
+              decidedOnBehalfOfName: s.decidedOnBehalfOfUser?.name ?? null,
+              decidedAt: s.decidedAt,
+              note: s.note,
+              priority: s.priority,
+              dueAt: s.dueAt,
+              checklistItems: s.checklistItems.map((i) => ({ id: i.id, label: i.label, done: i.done })),
+              comments: s.comments.map((c) => ({ id: c.id, authorName: c.authorName, authorEmail: c.authorEmail, body: c.body, createdAt: c.createdAt.toISOString() })),
+            }))}
+            teammates={teammates}
+            currentUserId={currentUser.id}
+            currentUserEmail={currentUser.email}
+            delegatedAssigneeIds={delegatedAssigneeIds}
+            currentUserCanManageWorkspace={Boolean(currentUser.role?.canManageWorkspace)}
+            sendToAction={sendForReviewTo}
+            decideAction={decideReviewStep}
+            addChecklistItemAction={addChecklistItem}
+            toggleChecklistItemAction={toggleChecklistItem}
+            removeChecklistItemAction={removeChecklistItem}
+            addCommentAction={addReviewComment}
+            deleteCommentAction={deleteReviewComment}
+            updateStepMetaAction={updateReviewStepMeta}
+          />
         )}
 
         {deal.status === "processing" ? (

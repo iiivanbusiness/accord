@@ -7,16 +7,6 @@ import { currentUserWithRole } from "@/lib/permissions";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import DownloadContractButton from "@/components/DownloadContractButton";
 import AuditTrailButton from "@/components/AuditTrailButton";
-import ReviewStepper from "@/components/ReviewStepper";
-import {
-  decideReviewStep,
-  addChecklistItem,
-  toggleChecklistItem,
-  removeChecklistItem,
-  addReviewComment,
-  deleteReviewComment,
-  updateReviewStepMeta,
-} from "../review-actions";
 import { startRenewal } from "../actions";
 
 function daysUntil(date: Date): number {
@@ -39,41 +29,23 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
   const workspaceId = await requireWorkspaceId();
   const currentUser = await currentUserWithRole();
   const { where: visibility } = await dealVisibilityFilter(currentUser);
-  const [deal, activeDelegationsToMe] = await Promise.all([
-    prisma.deal.findFirst({
-      where: { id, workspaceId, ...visibility },
-      include: {
-        client: true,
-        template: true,
-        fields: true,
-        contract: {
-          include: {
-            reviewSteps: {
-              include: {
-                assignee: true,
-                decidedByUser: true,
-                decidedOnBehalfOfUser: true,
-                checklistItems: { orderBy: { createdAt: "asc" } },
-                comments: { orderBy: { createdAt: "asc" } },
-              },
-              orderBy: { order: "asc" },
-            },
-            clauseComments: { where: { resolved: false }, orderBy: { createdAt: "asc" } },
-          },
+  const deal = await prisma.deal.findFirst({
+    where: { id, workspaceId, ...visibility },
+    include: {
+      client: true,
+      template: true,
+      fields: true,
+      contract: {
+        include: {
+          clauseComments: { where: { resolved: false }, orderBy: { createdAt: "asc" } },
         },
-        workspace: true,
       },
-    }),
-    prisma.approvalDelegate.findMany({
-      where: { toUserId: currentUser.id, startsAt: { lte: new Date() }, OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }] },
-    }),
-  ]);
+      workspace: true,
+    },
+  });
   if (!deal || !deal.contract || !deal.template) notFound();
 
-  const delegatedAssigneeIds = [...new Set(activeDelegationsToMe.map((d) => d.fromUserId))];
-
   const clauses = fillClauses(deal.template.clauses, deal.fields);
-  const showReviewStepper = deal.contract.reviewSteps.length > 0 && (deal.contract.status === "pending_approval" || deal.contract.status === "changes_requested");
   const canResend = deal.contract.status === "draft" || deal.contract.status === "changes_requested";
   const commentsByClause = new Map<string, typeof deal.contract.clauseComments>();
   for (const comment of deal.contract.clauseComments) {
@@ -110,8 +82,11 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
     {deal.contract.status === "pending_approval" && (
       <div className="mb-[18px] flex flex-wrap items-center gap-3">
         <div className="chip chip-neutral px-4 py-3 text-[13.5px]">
-          Waiting on approval before this goes to {deal.client.name}
+          Waiting on review before this goes to {deal.client.name}
         </div>
+        <Link href={`/deals/${deal.id}`} className="text-[12.5px] font-medium" style={{ color: "var(--accent-blue)" }}>
+          See who has it →
+        </Link>
       </div>
     )}
     {deal.contract.status === "changes_requested" && (
@@ -218,39 +193,6 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
       </div>
     )}
 
-    {showReviewStepper && (
-      <div className="mt-[18px] max-w-[600px]">
-        <ReviewStepper
-          dealId={deal.id}
-          steps={deal.contract.reviewSteps.map((s) => ({
-            id: s.id,
-            order: s.order,
-            status: s.status,
-            assigneeId: s.assigneeId,
-            assigneeName: s.assignee.name,
-            decidedByName: s.decidedByUser?.name ?? null,
-            decidedOnBehalfOfName: s.decidedOnBehalfOfUser?.name ?? null,
-            decidedAt: s.decidedAt,
-            note: s.note,
-            priority: s.priority,
-            dueAt: s.dueAt,
-            checklistItems: s.checklistItems.map((i) => ({ id: i.id, label: i.label, done: i.done })),
-            comments: s.comments.map((c) => ({ id: c.id, authorName: c.authorName, authorEmail: c.authorEmail, body: c.body, createdAt: c.createdAt.toISOString() })),
-          }))}
-          currentUserId={currentUser.id}
-          currentUserEmail={currentUser.email}
-          delegatedAssigneeIds={delegatedAssigneeIds}
-          currentUserCanManageWorkspace={Boolean(currentUser.role?.canManageWorkspace)}
-          decideAction={decideReviewStep}
-          addChecklistItemAction={addChecklistItem}
-          toggleChecklistItemAction={toggleChecklistItem}
-          removeChecklistItemAction={removeChecklistItem}
-          addCommentAction={addReviewComment}
-          deleteCommentAction={deleteReviewComment}
-          updateStepMetaAction={updateReviewStepMeta}
-        />
-      </div>
-    )}
     </>
   );
 }

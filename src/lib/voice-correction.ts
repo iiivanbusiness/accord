@@ -22,7 +22,7 @@ export type ProposedCorrection =
 // either a field change or sending the deal to a named teammate for
 // review — and never applies it. The rep hears confirmationText read back
 // and has to explicitly confirm (applyVoiceFieldCorrection or
-// requestTeammateReview in deals/[id]/actions.ts, both only called from a
+// sendForReviewTo in deals/[id]/review-actions.ts, both only called from a
 // tap on "Yes, apply") before anything is written or sent; a misheard word
 // this way surfaces as a wrong-sounding confirmation instead of a silently
 // wrong contract or an email to the wrong person.

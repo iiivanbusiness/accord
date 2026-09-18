@@ -11,8 +11,8 @@ import { checkRateLimit } from "@/lib/rate-limit";
 // action (a field change, or sending the deal to a named teammate for
 // review) -> synthesize a spoken confirmation question. Never writes or
 // sends anything — applying the action is a separate step
-// (applyVoiceFieldCorrection or requestTeammateReview in
-// deals/[id]/actions.ts) the rep triggers explicitly after hearing the
+// (applyVoiceFieldCorrection in deals/[id]/actions.ts, or sendForReviewTo
+// in deals/[id]/review-actions.ts) the rep triggers explicitly after hearing the
 // confirmation back, so a misheard word surfaces as an odd-sounding
 // confirmation instead of a silently wrong contract or an email to the
 // wrong person.

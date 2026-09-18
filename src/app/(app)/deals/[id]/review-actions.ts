@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { currentUserWithRole } from "@/lib/permissions";
+import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import { performActualSend, notifyStepAssignee, notifyChangesRequested } from "@/lib/review";
 import { logAudit } from "@/lib/audit";
 
@@ -31,7 +32,78 @@ async function checkReviewStepEligibility(reviewStep: ReviewStepWithAssignee, us
   return { eligible: true, onBehalfOfUserId: delegation.fromUserId };
 }
 
-// Invoked from a client component (ReviewStepper) that wraps this in its
+// Manual "Send to X" — the informal override sitting alongside the
+// automatic ReviewChain: pick anyone, at any time, and the review routes
+// to them right now. If a step is already active, this REASSIGNS it
+// (keeps order/priority/checklist/comments/history, just changes who's
+// responsible) rather than adding a new one — that's what lets it
+// redirect mid-chain instead of only working when nothing is in flight.
+// If nothing is active (never sent for review, or the chain already
+// finished), it starts a fresh step. Open to any workspace member who can
+// see the deal, same visibility gate as a deal note/comment — this is
+// deliberately informal, not an admin-only action.
+export async function sendForReviewTo(dealId: string, assigneeId: string) {
+  const { where } = await dealVisibilityFilter();
+  const workspaceId = await requireWorkspaceId();
+
+  const deal = await prisma.deal.findFirst({
+    where: { id: dealId, workspaceId, ...where },
+    include: { contract: true, client: true, template: true, workspace: true },
+  });
+  if (!deal || !deal.contract) throw new Error("Generate a contract for this deal first");
+
+  const assignee = await prisma.user.findFirst({ where: { id: assigneeId, workspaceId } });
+  if (!assignee) throw new Error("Teammate not found");
+
+  const activeStep = await prisma.reviewStep.findFirst({ where: { contractId: deal.contract.id, status: "pending" }, orderBy: { order: "asc" } });
+  const startingFreshChain = !activeStep && deal.contract.status !== "sent" && deal.contract.status !== "signed";
+
+  // A chain kicked off from the contract page's compose form already has
+  // pendingTo/Subject/Message stored (requestOrSendReview), but this manual
+  // "Send to" button skips that form entirely — without a fallback here,
+  // the LAST step's approval would have nothing to actually email the
+  // client with. Generate the same defaults sendViaDocusignNow uses, and
+  // validate BEFORE writing anything so a missing client email fails clean
+  // instead of leaving an orphaned review step behind.
+  const needsPendingEmail = startingFreshChain && !deal.contract.pendingTo && !deal.contract.pendingSubject && !deal.contract.pendingMessage;
+  if (needsPendingEmail && !deal.client.email) {
+    throw new Error("This client has no email on file yet. Add one before sending for review");
+  }
+
+  let stepId: string;
+  if (activeStep) {
+    await prisma.reviewStep.update({ where: { id: activeStep.id }, data: { assigneeId } });
+    stepId = activeStep.id;
+  } else {
+    const maxOrder = await prisma.reviewStep.aggregate({ where: { contractId: deal.contract.id }, _max: { order: true } });
+    const order = (maxOrder._max.order ?? 0) + 1;
+    const created = await prisma.reviewStep.create({ data: { contractId: deal.contract.id, assigneeId, order, status: "pending" } });
+    stepId = created.id;
+
+    if (startingFreshChain) {
+      const contractUpdate: { status: string; pendingTo?: string; pendingSubject?: string; pendingMessage?: string } = {
+        status: "pending_approval",
+      };
+      if (needsPendingEmail) {
+        contractUpdate.pendingTo = deal.client.email!;
+        contractUpdate.pendingSubject = `${deal.template?.name ?? "Contract"} from ${deal.workspace.name}`;
+        contractUpdate.pendingMessage = `Hi ${deal.client.name.split(" ")[0]},\n\nHere's the ${(deal.template?.name ?? "contract").toLowerCase()} we just discussed. Take a look and sign whenever you're ready.`;
+      }
+      await prisma.contract.update({ where: { id: deal.contract.id }, data: contractUpdate });
+      await prisma.deal.update({ where: { id: dealId }, data: { status: "pending_approval" } });
+    }
+  }
+
+  const session = await currentUserWithRole();
+  await logAudit({ workspaceId, actorEmail: session.email, action: "contract.sent_for_review", targetType: "Deal", targetId: dealId, metadata: { assignee: assignee.name } });
+
+  await notifyStepAssignee(dealId, stepId);
+
+  revalidatePath(`/deals/${dealId}`);
+  revalidatePath(`/deals/${dealId}/contract`);
+}
+
+// Invoked from a client component (ReviewPanel) that wraps this in its
 // own try/catch to show inline errors, so this never calls redirect() —
 // redirect() throws to signal Next.js, and a client-side catch would treat
 // that throw as a failure instead of letting it navigate. revalidatePath
@@ -69,6 +141,7 @@ export async function decideReviewStep(dealId: string, reviewStepId: string, dec
     await logAudit({ workspaceId, actorEmail: user.email, action: "contract.approval_rejected", targetType: "Deal", targetId: dealId, metadata: { note } });
     await notifyChangesRequested(dealId, user.name, note);
 
+    revalidatePath(`/deals/${dealId}`);
     revalidatePath(`/deals/${dealId}/contract`);
     return;
   }
@@ -98,6 +171,7 @@ export async function decideReviewStep(dealId: string, reviewStepId: string, dec
     await notifyStepAssignee(dealId, nextStep.id);
   }
 
+  revalidatePath(`/deals/${dealId}`);
   revalidatePath(`/deals/${dealId}/contract`);
 }
 
@@ -114,6 +188,7 @@ export async function addChecklistItem(dealId: string, reviewStepId: string, for
   if (!eligible) throw new Error("You're not eligible to edit this review step");
 
   await prisma.reviewChecklistItem.create({ data: { reviewStepId, label } });
+  revalidatePath(`/deals/${dealId}`);
   revalidatePath(`/deals/${dealId}/contract`);
 }
 
@@ -130,6 +205,7 @@ export async function toggleChecklistItem(dealId: string, itemId: string, done: 
   if (!eligible) throw new Error("You're not eligible to edit this review step");
 
   await prisma.reviewChecklistItem.update({ where: { id: itemId }, data: { done, doneAt: done ? new Date() : null } });
+  revalidatePath(`/deals/${dealId}`);
   revalidatePath(`/deals/${dealId}/contract`);
 }
 
@@ -146,6 +222,7 @@ export async function removeChecklistItem(dealId: string, itemId: string) {
   if (!eligible) throw new Error("You're not eligible to edit this review step");
 
   await prisma.reviewChecklistItem.delete({ where: { id: itemId } });
+  revalidatePath(`/deals/${dealId}`);
   revalidatePath(`/deals/${dealId}/contract`);
 }
 
@@ -162,6 +239,7 @@ export async function addReviewComment(dealId: string, reviewStepId: string, bod
 
   const user = await currentUserWithRole();
   await prisma.reviewComment.create({ data: { reviewStepId, authorEmail: user.email, authorName: user.name, body: trimmed } });
+  revalidatePath(`/deals/${dealId}`);
   revalidatePath(`/deals/${dealId}/contract`);
 }
 
@@ -174,6 +252,7 @@ export async function deleteReviewComment(dealId: string, commentId: string) {
   if (comment.authorEmail !== user.email) throw new Error("You can only delete your own comments");
 
   await prisma.reviewComment.delete({ where: { id: commentId } });
+  revalidatePath(`/deals/${dealId}`);
   revalidatePath(`/deals/${dealId}/contract`);
 }
 
@@ -198,5 +277,6 @@ export async function updateReviewStepMeta(dealId: string, reviewStepId: string,
   if (rawDueAt && Number.isNaN(dueAt?.getTime())) throw new Error("Invalid due date");
 
   await prisma.reviewStep.update({ where: { id: reviewStepId }, data: { priority, dueAt, dueReminderSentAt: null } });
+  revalidatePath(`/deals/${dealId}`);
   revalidatePath(`/deals/${dealId}/contract`);
 }

@@ -193,7 +193,7 @@ export async function notifyStepAssignee(dealId: string, reviewStepId: string): 
     prisma.reviewStep.findUnique({ where: { id: reviewStepId }, include: { assignee: true } }),
   ]);
   if (!deal || !reviewStep) return;
-  const dealUrl = `${appUrl()}/deals/${dealId}/contract`;
+  const dealUrl = `${appUrl()}/deals/${dealId}`;
 
   try {
     await sendReviewAssignedEmail({
@@ -241,7 +241,7 @@ export async function notifyChangesRequested(dealId: string, decidedByName: stri
       to: deal.workspace.users.map((u) => u.email),
       clientName: deal.client.name,
       templateName: deal.template?.name ?? "contract",
-      dealUrl: `${appUrl()}/deals/${dealId}/contract`,
+      dealUrl: `${appUrl()}/deals/${dealId}`,
       decidedByName,
       note,
     });
