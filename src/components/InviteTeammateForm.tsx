@@ -2,14 +2,18 @@
 
 import { useState, useTransition } from "react";
 
-// A plain `<form action={inviteTeammate}>` lets a thrown Error (e.g. "That
-// email is already tied to another SealMe workspace") crash the whole page
-// with Next.js's generic digest-only error screen, since a native form
-// submission can't be caught client-side. Calling the action from an
-// explicit submit handler instead, inside startTransition, can be —
-// same pattern already used in RolesManager/TwoFactorSettings for the
-// same reason.
-export default function InviteTeammateForm({ inviteAction }: { inviteAction: (formData: FormData) => Promise<void> }) {
+// inviteAction returns { error } as data instead of throwing — a thrown
+// Error's message gets replaced with a generic "#441" digest by Next.js in
+// production (it won't leak arbitrary server exception text to the client),
+// so a real validation message like "already tied to another workspace"
+// would never reach the user if it were thrown. A plain
+// `<form action={inviteTeammate}>` also can't read a return value at all,
+// so this calls the action from an explicit submit handler instead.
+export default function InviteTeammateForm({
+  inviteAction,
+}: {
+  inviteAction: (formData: FormData) => Promise<{ error: string } | undefined>;
+}) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -20,8 +24,12 @@ export default function InviteTeammateForm({ inviteAction }: { inviteAction: (fo
     setError(null);
     startTransition(async () => {
       try {
-        await inviteAction(formData);
-        form.reset();
+        const result = await inviteAction(formData);
+        if (result?.error) {
+          setError(result.error);
+        } else {
+          form.reset();
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");
       }
@@ -36,15 +44,18 @@ export default function InviteTeammateForm({ inviteAction }: { inviteAction: (fo
           type="email"
           required
           placeholder="teammate@company.com"
-          className="input flex-1"
+          className="input min-w-0 flex-1"
           style={{ fontSize: "13px", padding: "8px 11px" }}
         />
-        <button type="submit" disabled={isPending} className="btn btn-secondary btn-sm">
+        <button type="submit" disabled={isPending} className="btn btn-secondary btn-sm flex-none">
           {isPending ? "Inviting…" : "Invite"}
         </button>
       </form>
       {error && (
-        <div className="chip chip-warn mb-2 w-full justify-start px-3.5 py-2 text-[12px]">
+        <div
+          className="chip chip-warn mb-2 w-full max-w-full justify-start break-words px-3.5 py-2 text-left text-[12px] leading-relaxed"
+          style={{ whiteSpace: "normal" }}
+        >
           {error}
         </div>
       )}
