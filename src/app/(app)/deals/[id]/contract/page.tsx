@@ -7,8 +7,16 @@ import { currentUserWithRole } from "@/lib/permissions";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import DownloadContractButton from "@/components/DownloadContractButton";
 import AuditTrailButton from "@/components/AuditTrailButton";
-import ApprovalStepper from "@/components/ApprovalStepper";
-import { decideApproval } from "../approval-actions";
+import ReviewStepper from "@/components/ReviewStepper";
+import {
+  decideReviewStep,
+  addChecklistItem,
+  toggleChecklistItem,
+  removeChecklistItem,
+  addReviewComment,
+  deleteReviewComment,
+  updateReviewStepMeta,
+} from "../review-actions";
 import { startRenewal } from "../actions";
 
 function daysUntil(date: Date): number {
@@ -40,7 +48,16 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
         fields: true,
         contract: {
           include: {
-            approvals: { include: { role: true, decidedByUser: true, decidedOnBehalfOfUser: true }, orderBy: { order: "asc" } },
+            reviewSteps: {
+              include: {
+                assignee: true,
+                decidedByUser: true,
+                decidedOnBehalfOfUser: true,
+                checklistItems: { orderBy: { createdAt: "asc" } },
+                comments: { orderBy: { createdAt: "asc" } },
+              },
+              orderBy: { order: "asc" },
+            },
             clauseComments: { where: { resolved: false }, orderBy: { createdAt: "asc" } },
           },
         },
@@ -49,15 +66,14 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
     }),
     prisma.approvalDelegate.findMany({
       where: { toUserId: currentUser.id, startsAt: { lte: new Date() }, OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }] },
-      include: { fromUser: { select: { roleId: true } } },
     }),
   ]);
   if (!deal || !deal.contract || !deal.template) notFound();
 
-  const delegatedRoleIds = [...new Set(activeDelegationsToMe.map((d) => d.fromUser.roleId).filter((id): id is string => Boolean(id)))];
+  const delegatedAssigneeIds = [...new Set(activeDelegationsToMe.map((d) => d.fromUserId))];
 
   const clauses = fillClauses(deal.template.clauses, deal.fields);
-  const showApprovalStepper = deal.contract.approvals.length > 0 && (deal.contract.status === "pending_approval" || deal.contract.status === "changes_requested");
+  const showReviewStepper = deal.contract.reviewSteps.length > 0 && (deal.contract.status === "pending_approval" || deal.contract.status === "changes_requested");
   const canResend = deal.contract.status === "draft" || deal.contract.status === "changes_requested";
   const commentsByClause = new Map<string, typeof deal.contract.clauseComments>();
   for (const comment of deal.contract.clauseComments) {
@@ -202,25 +218,36 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
       </div>
     )}
 
-    {showApprovalStepper && (
+    {showReviewStepper && (
       <div className="mt-[18px] max-w-[600px]">
-        <ApprovalStepper
+        <ReviewStepper
           dealId={deal.id}
-          approvals={deal.contract.approvals.map((a) => ({
-            id: a.id,
-            order: a.order,
-            status: a.status,
-            roleId: a.roleId,
-            roleName: a.role.name,
-            decidedByName: a.decidedByUser?.name ?? null,
-            decidedOnBehalfOfName: a.decidedOnBehalfOfUser?.name ?? null,
-            decidedAt: a.decidedAt,
-            note: a.note,
+          steps={deal.contract.reviewSteps.map((s) => ({
+            id: s.id,
+            order: s.order,
+            status: s.status,
+            assigneeId: s.assigneeId,
+            assigneeName: s.assignee.name,
+            decidedByName: s.decidedByUser?.name ?? null,
+            decidedOnBehalfOfName: s.decidedOnBehalfOfUser?.name ?? null,
+            decidedAt: s.decidedAt,
+            note: s.note,
+            priority: s.priority,
+            dueAt: s.dueAt,
+            checklistItems: s.checklistItems.map((i) => ({ id: i.id, label: i.label, done: i.done })),
+            comments: s.comments.map((c) => ({ id: c.id, authorName: c.authorName, authorEmail: c.authorEmail, body: c.body, createdAt: c.createdAt.toISOString() })),
           }))}
-          currentUserRoleId={currentUser.roleId}
-          currentUserCanApprove={Boolean(currentUser.role?.canApproveContracts)}
-          delegatedRoleIds={delegatedRoleIds}
-          decideAction={decideApproval}
+          currentUserId={currentUser.id}
+          currentUserEmail={currentUser.email}
+          delegatedAssigneeIds={delegatedAssigneeIds}
+          currentUserCanManageWorkspace={Boolean(currentUser.role?.canManageWorkspace)}
+          decideAction={decideReviewStep}
+          addChecklistItemAction={addChecklistItem}
+          toggleChecklistItemAction={toggleChecklistItem}
+          removeChecklistItemAction={removeChecklistItem}
+          addCommentAction={addReviewComment}
+          deleteCommentAction={deleteReviewComment}
+          updateStepMetaAction={updateReviewStepMeta}
         />
       </div>
     )}

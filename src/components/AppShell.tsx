@@ -16,6 +16,8 @@ import EmailVerifyBanner from "./EmailVerifyBanner";
 import LocalCaptureBanner from "./LocalCaptureBanner";
 import AiDisclosureModal from "./AiDisclosureModal";
 import FaqChatWidget from "./FaqChatWidget";
+import NotificationBell from "./NotificationBell";
+import { getUnreadNotifications } from "@/app/(app)/notifications/actions";
 
 const NAV_ICONS: Record<string, () => React.ReactNode> = {
   "/dashboard": DashboardIcon,
@@ -43,6 +45,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
   const currentUser = session?.user?.email
     ? await prisma.user.findUnique({ where: { email: session.user.email }, select: { aiDisclosureAcknowledgedAt: true } })
     : null;
+  const { unreadCount, items: notificationItems } = await getUnreadNotifications();
   const items = isAdmin ? [...NAV_ITEMS, ADMIN_ITEM] : NAV_ITEMS;
 
   const navItems = items.map((item) => {
@@ -100,6 +103,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
               <ScreenLabel />
             </div>
             <div className="flex items-center gap-1">
+              <NotificationBell initialUnreadCount={unreadCount} initialItems={notificationItems} />
               <CompanionToggleButton />
               <ThemeToggle />
             </div>

@@ -7,7 +7,7 @@ import { requireWorkspaceId } from "@/lib/workspace";
 import { applyExtractionToDeal, syncCoreDealFields } from "@/lib/deal-live";
 import { extractPlaceholderKeys } from "@/lib/contract";
 import { auth } from "@/lib/auth";
-import { requestOrSendContract } from "@/lib/approval";
+import { requestOrSendReview } from "@/lib/review";
 import { logAudit } from "@/lib/audit";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import { currentUserWithRole } from "@/lib/permissions";
@@ -34,8 +34,8 @@ export async function retryExtraction(dealId: string) {
 // "ready" mid-call: instead of the full Send page (to/cc/subject/message,
 // extra signers), this fires immediately with sane defaults, routed
 // through DocuSign so the client's own DocuSign email is what reaches
-// them. Still goes through requestOrSendContract, so a configured
-// approval chain still gates it exactly like any other send — this is a
+// them. Still goes through requestOrSendReview, so a configured
+// review chain still gates it exactly like any other send — this is a
 // shortcut to the same pipeline, not a way around it. A confirmation
 // click (not a fully silent auto-send) on purpose: the rep glances at the
 // terms and decides, rather than the system sending without anyone looking.
@@ -56,7 +56,7 @@ export async function sendViaDocusignNow(dealId: string) {
   const message = `Hi ${deal.client.name.split(" ")[0]},\n\nHere's the ${deal.template.name.toLowerCase()} we just discussed. Take a look and sign whenever you're ready.`;
 
   const session = await auth();
-  await requestOrSendContract(dealId, { to: deal.client.email, subject, message }, session?.user?.email);
+  await requestOrSendReview(dealId, { to: deal.client.email, subject, message }, session?.user?.email);
 
   revalidatePath(`/deals/${dealId}`);
 }
@@ -180,7 +180,7 @@ export async function applyVoiceFieldCorrection(dealId: string, fieldKey: string
 // Notifies one named teammate to take a look at the deal before it goes
 // out — triggered from the voice-correction UI only after the rep taps
 // "Yes, apply" on the spoken confirmation (see /api/deals/[id]/voice-correction).
-// Ad-hoc and informational, not a gate: unlike an ApprovalChain step, this
+// Ad-hoc and informational, not a gate: unlike a ReviewChain step, this
 // doesn't hold the contract or require a decision — it's the "hey can you
 // glance at this" equivalent of a Slack ping, just voice-triggered.
 export async function requestTeammateReview(dealId: string, recipientUserId: string) {
@@ -266,9 +266,9 @@ export async function sendContractEmail(dealId: string, formData: FormData) {
   }
 
   const session = await auth();
-  let result: Awaited<ReturnType<typeof requestOrSendContract>>;
+  let result: Awaited<ReturnType<typeof requestOrSendReview>>;
   try {
-    result = await requestOrSendContract(dealId, { to, subject, message }, session?.user?.email);
+    result = await requestOrSendReview(dealId, { to, subject, message }, session?.user?.email);
   } catch {
     throw new Error("Couldn't send the email. Check your Resend setup and try again.");
   }

@@ -480,6 +480,7 @@ a {
 .chip-active { background: var(--surface-2); color: var(--ink); }
 .chip-warn { background: var(--warn-soft); color: var(--warn); }
 .chip-success { background: var(--success-soft); color: var(--success); }
+.chip-danger { background: rgba(192, 57, 43, 0.10); color: #c0392b; }
 @media (prefers-reduced-motion: no-preference) {
   .chip-live .chip-dot { animation: pulse 1.4s ease-in-out infinite; }
 }

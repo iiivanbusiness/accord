@@ -2,16 +2,22 @@
 
 import { useState, useTransition } from "react";
 
-type Step = { id: string; order: number; roleId: string; roleName: string };
+type Step = { id: string; order: number; assigneeId: string; assigneeName: string };
 type Chain = { id: string; name: string; order: number; teamId: string | null; teamName: string | null; minDealValue: number | null; steps: Step[] };
-type RoleOption = { id: string; name: string };
+type TeammateOption = { id: string; name: string };
 type TeamOption = { id: string; name: string };
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
+}
 
 function ChainCard({
   chain,
   index,
   isLast,
-  eligibleRoles,
+  teammates,
   addStepAction,
   removeStepAction,
   moveStepAction,
@@ -21,7 +27,7 @@ function ChainCard({
   chain: Chain;
   index: number;
   isLast: boolean;
-  eligibleRoles: RoleOption[];
+  teammates: TeammateOption[];
   addStepAction: (chainId: string, formData: FormData) => Promise<void>;
   removeStepAction: (stepId: string) => Promise<void>;
   moveStepAction: (stepId: string, direction: "up" | "down") => Promise<void>;
@@ -31,8 +37,8 @@ function ChainCard({
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const usedRoleIds = new Set(chain.steps.map((s) => s.roleId));
-  const availableRoles = eligibleRoles.filter((r) => !usedRoleIds.has(r.id));
+  const usedAssigneeIds = new Set(chain.steps.map((s) => s.assigneeId));
+  const availableTeammates = teammates.filter((t) => !usedAssigneeIds.has(t.id));
 
   function run(fn: () => Promise<void>) {
     setError(null);
@@ -77,15 +83,15 @@ function ChainCard({
 
         {chain.steps.length === 0 && (
           <div className="py-3 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-            No steps yet. Contracts matching this chain send immediately.
+            No reviewers yet. Contracts matching this chain send immediately.
           </div>
         )}
 
         {chain.steps.map((step, i) => (
           <div key={step.id} className="flex items-center justify-between gap-3.5 border-b py-2.5 last:border-b-0" style={{ borderColor: "var(--hairline-soft)" }}>
             <div className="flex items-center gap-2.5">
-              <span className="flex h-5 w-5 flex-none items-center justify-center rounded-full text-[11px] font-medium" style={{ background: "var(--surface-2)" }}>{i + 1}</span>
-              <span className="text-[13px] font-medium">{step.roleName}</span>
+              <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full text-[10.5px] font-semibold" style={{ background: "var(--surface-2)", color: "var(--ink)" }}>{initials(step.assigneeName)}</span>
+              <span className="text-[13px] font-medium">{step.assigneeName}</span>
             </div>
             <div className="flex items-center gap-3">
               <button type="button" disabled={i === 0 || isPending} onClick={() => run(() => moveStepAction(step.id, "up"))} className="text-[12.5px]" style={{ color: i === 0 ? "var(--ink-muted)" : "var(--accent-blue)", opacity: i === 0 ? 0.4 : 1 }}>↑</button>
@@ -95,16 +101,16 @@ function ChainCard({
           </div>
         ))}
 
-        {availableRoles.length > 0 ? (
+        {availableTeammates.length > 0 ? (
           <form action={(formData) => run(() => addStepAction(chain.id, formData))} className="flex items-center gap-2 py-3">
-            <select name="roleId" className="input flex-1" style={{ fontSize: "12.5px", padding: "7px 10px" }}>
-              {availableRoles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            <select name="assigneeId" className="input flex-1" style={{ fontSize: "12.5px", padding: "7px 10px" }}>
+              {availableTeammates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
-            <button type="submit" disabled={isPending} className="btn btn-secondary btn-sm">Add step</button>
+            <button type="submit" disabled={isPending} className="btn btn-secondary btn-sm">Add reviewer</button>
           </form>
         ) : (
           <div className="py-3 text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
-            {eligibleRoles.length === 0 ? "No roles can approve contracts yet." : "Every eligible role is already in this chain."}
+            {teammates.length === 0 ? "No teammates in this workspace yet." : "Every teammate is already in this chain."}
           </div>
         )}
       </div>
@@ -112,9 +118,9 @@ function ChainCard({
   );
 }
 
-export default function ApprovalChainManager({
+export default function ReviewChainManager({
   chains,
-  eligibleRoles,
+  teammates,
   teams,
   createChainAction,
   deleteChainAction,
@@ -124,7 +130,7 @@ export default function ApprovalChainManager({
   moveStepAction,
 }: {
   chains: Chain[];
-  eligibleRoles: RoleOption[];
+  teammates: TeammateOption[];
   teams: TeamOption[];
   createChainAction: (formData: FormData) => Promise<void>;
   deleteChainAction: (chainId: string) => Promise<void>;
@@ -155,7 +161,7 @@ export default function ApprovalChainManager({
 
       {chains.length === 0 && (
         <div className="py-3 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-          No approval chains configured. Contracts send as soon as someone clicks &ldquo;Send to client&rdquo;.
+          No review chains configured. Contracts send as soon as someone clicks &ldquo;Send to client&rdquo;.
         </div>
       )}
 
@@ -166,7 +172,7 @@ export default function ApprovalChainManager({
             chain={chain}
             index={i}
             isLast={i === chains.length - 1}
-            eligibleRoles={eligibleRoles}
+            teammates={teammates}
             addStepAction={addStepAction}
             removeStepAction={removeStepAction}
             moveStepAction={moveStepAction}

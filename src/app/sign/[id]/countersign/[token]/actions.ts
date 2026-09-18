@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
-import { notifyChangesRequested } from "@/lib/approval";
+import { notifyChangesRequested } from "@/lib/review";
 import { advanceSigningOrFinalize } from "@/lib/signing";
 
 export async function signAsCountersigner(contractId: string, token: string, formData: FormData) {

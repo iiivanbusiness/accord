@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { sendReminderEmail } from "@/lib/email";
-import { requestOrSendContract } from "@/lib/approval";
+import { requestOrSendReview } from "@/lib/review";
 import { logAudit } from "@/lib/audit";
 import { auth } from "@/lib/auth";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
@@ -173,7 +173,7 @@ export async function bulkSend(dealIds: string[]): Promise<{ sent: number; skipp
     try {
       const subject = `${deal.template.name} from ${workspace.name}`;
       const message = `Hi ${deal.client.name.split(" ")[0]},\n\nThanks again for the call. Here's the ${deal.template.name.toLowerCase()} we discussed. Take a look and sign whenever you're ready.\n\nLet me know if anything needs adjusting.`;
-      await requestOrSendContract(deal.id, { to: deal.client.email, subject, message }, session?.user?.email);
+      await requestOrSendReview(deal.id, { to: deal.client.email, subject, message }, session?.user?.email);
       sent++;
     } catch (err) {
       console.error(`Bulk send failed for deal ${deal.id}`, err);

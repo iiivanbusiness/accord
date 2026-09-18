@@ -10,7 +10,6 @@ const PERMISSION_FIELDS = [
   "canManageWorkspace",
   "canManageTeam",
   "canManageTemplates",
-  "canApproveContracts",
   "canApproveTemplates",
   "canViewAllDeals",
 ] as const;
@@ -20,7 +19,6 @@ function readPermissions(formData: FormData) {
     canManageWorkspace: false,
     canManageTeam: false,
     canManageTemplates: false,
-    canApproveContracts: false,
     canApproveTemplates: false,
     canViewAllDeals: false,
   };

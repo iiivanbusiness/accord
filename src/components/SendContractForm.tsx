@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import CountersignerFields from "./CountersignerFields";
 import SentConfirmationCard from "./SentConfirmationCard";
 
-type SendResult = { status: "sent" } | { status: "pending_approval"; approverRoleName: string };
+type SendResult = { status: "sent" } | { status: "pending_approval"; assigneeName: string };
 
 // Wraps the manual Send form: submits via the sendContractEmail action
 // directly (not a native <form action> redirect) so a successful send can
 // show an animated confirmation — naming who it actually went to (the
-// client, or the first approver if an approval chain caught it) — before
+// client, or the first reviewer if a review chain caught it) — before
 // moving on to the contract page, instead of the page just changing out
 // from under the rep with no acknowledgment.
 export default function SendContractForm({
@@ -58,7 +58,7 @@ export default function SendContractForm({
         <SentConfirmationCard
           title={
             result.status === "pending_approval"
-              ? `Sent to ${result.approverRoleName} for approval`
+              ? `Sent to ${result.assigneeName} for review`
               : `Sent to ${clientName}`
           }
         />

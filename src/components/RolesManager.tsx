@@ -9,7 +9,6 @@ type Role = {
   canManageWorkspace: boolean;
   canManageTeam: boolean;
   canManageTemplates: boolean;
-  canApproveContracts: boolean;
   canApproveTemplates: boolean;
   canViewAllDeals: boolean;
   memberCount: number;
@@ -19,7 +18,6 @@ const PERMISSIONS: { field: keyof Role; label: string; hint: string }[] = [
   { field: "canManageWorkspace", label: "Manage workspace settings", hint: "Workspace name, logo, sending domain, integrations" },
   { field: "canManageTeam", label: "Manage team & roles", hint: "Invite/remove teammates, create/edit/delete roles, assign roles" },
   { field: "canManageTemplates", label: "Manage contract templates", hint: "Create, edit, and delete unlocked templates" },
-  { field: "canApproveContracts", label: "Approve contracts", hint: "Eligible to be a step in the approval chain" },
   { field: "canApproveTemplates", label: "Approve & lock templates", hint: "Lock templates as approved wording, and edit/delete a locked one" },
   { field: "canViewAllDeals", label: "View all deals", hint: "See every deal and client in the workspace. Without it, only deals this person started" },
 ];

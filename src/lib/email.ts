@@ -209,18 +209,35 @@ export async function sendStaleDealsEmail(options: {
   });
 }
 
-export async function sendApprovalRequestedEmail(options: {
-  to: string[];
+export async function sendReviewAssignedEmail(options: {
+  to: string;
   clientName: string;
   templateName: string;
   dealUrl: string;
-  roleName: string;
 }): Promise<void> {
   await sendSystemEmail({
-    to: options.to,
-    subject: `Approval needed: ${options.clientName} - ${options.templateName}`,
+    to: [options.to],
+    subject: `Review needed: ${options.clientName} - ${options.templateName}`,
     bodyHtml: `
-      <p style="margin:0 0 14px;">A contract for <strong>${escapeHtml(options.clientName)}</strong> (${escapeHtml(options.templateName)}) is waiting on the <strong>${escapeHtml(options.roleName)}</strong> step before it can go out.</p>
+      <p style="margin:0 0 14px;">A contract for <strong>${escapeHtml(options.clientName)}</strong> (${escapeHtml(options.templateName)}) is waiting on your review before it can go out.</p>
+      <a href="${options.dealUrl}" style="display:inline-block;margin:0 0 20px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
+        Review &amp; decide
+      </a>
+    `,
+  });
+}
+
+export async function sendReviewOverdueEmail(options: {
+  to: string;
+  clientName: string;
+  templateName: string;
+  dealUrl: string;
+}): Promise<void> {
+  await sendSystemEmail({
+    to: [options.to],
+    subject: `Overdue: ${options.clientName} - ${options.templateName}`,
+    bodyHtml: `
+      <p style="margin:0 0 14px;">Your review of the contract for <strong>${escapeHtml(options.clientName)}</strong> (${escapeHtml(options.templateName)}) is past its due date.</p>
       <a href="${options.dealUrl}" style="display:inline-block;margin:0 0 20px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
         Review &amp; decide
       </a>

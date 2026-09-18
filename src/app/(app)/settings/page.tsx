@@ -9,7 +9,7 @@ import RolesManager from "@/components/RolesManager";
 import RoleSelect from "@/components/RoleSelect";
 import TeamSelect from "@/components/TeamSelect";
 import TeamsManager from "@/components/TeamsManager";
-import ApprovalChainManager from "@/components/ApprovalChainManager";
+import ReviewChainManager from "@/components/ReviewChainManager";
 import ApprovalDelegatesPanel from "@/components/ApprovalDelegatesPanel";
 import InviteTeammateForm from "@/components/InviteTeammateForm";
 import ScimSettingsPanel from "@/components/ScimSettingsPanel";
@@ -42,7 +42,7 @@ import {
 } from "./actions";
 import { assignUserRole, createRole, deleteRole, updateRole } from "./roles-actions";
 import { createTeam, deleteTeam, assignUserTeam } from "./team-actions";
-import { createApprovalChain, deleteApprovalChain, moveApprovalChain, addApprovalStep, moveApprovalStep, removeApprovalStep } from "./approval-actions";
+import { createReviewChain, deleteReviewChain, moveReviewChain, addReviewChainStep, moveReviewChainStep, removeReviewChainStep } from "./review-chain-actions";
 import { createDelegation, revokeDelegation } from "./delegation-actions";
 import { setSlackChannel, toggleSlack, disconnectSlack } from "./slack-actions";
 import { connectHubspot, toggleHubspot, disconnectHubspot } from "./hubspot-actions";
@@ -73,14 +73,14 @@ export default async function SettingsPage({
 }) {
   const { error: connectError, error_detail: connectErrorDetail, slack_connected } = await searchParams;
   const workspaceId = await requireWorkspaceId();
-  const [workspace, session, roles, teams, approvalChains] = await Promise.all([
+  const [workspace, session, roles, teams, reviewChains] = await Promise.all([
     prisma.workspace.findUnique({ where: { id: workspaceId }, include: { users: { include: { role: true, team: true } } } }),
     auth(),
     prisma.role.findMany({ where: { workspaceId }, include: { _count: { select: { users: true } } }, orderBy: [{ isOwner: "desc" }, { createdAt: "asc" }] }),
     prisma.team.findMany({ where: { workspaceId }, include: { _count: { select: { users: true } } }, orderBy: { createdAt: "asc" } }),
-    prisma.approvalChain.findMany({
+    prisma.reviewChain.findMany({
       where: { workspaceId },
-      include: { team: true, steps: { include: { role: true }, orderBy: { order: "asc" } } },
+      include: { team: true, steps: { include: { assignee: true }, orderBy: { order: "asc" } } },
       orderBy: { order: "asc" },
     }),
   ]);
@@ -93,7 +93,7 @@ export default async function SettingsPage({
   const notifyEmail = workspace.users.map((u) => u.email).join(", ") || "your account email";
   const pendingUpgrade = await prisma.upgradeRequest.findFirst({ where: { workspaceId, status: "pending" } });
   const roleOptions = roles.map((r) => ({ id: r.id, name: r.name }));
-  const eligibleApproverRoles = roles.filter((r) => r.canApproveContracts).map((r) => ({ id: r.id, name: r.name }));
+  const teammateOptions = workspace.users.map((u) => ({ id: u.id, name: u.name }));
   const teamOptions = teams.map((t) => ({ id: t.id, name: t.name }));
 
   const delegationsRaw = await prisma.approvalDelegate.findMany({
@@ -235,7 +235,7 @@ export default async function SettingsPage({
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Roles &amp; permissions</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            Owner always has every permission. Custom roles control what teammates can do, and can later gate steps in a contract approval chain.
+            Owner always has every permission. Custom roles control what teammates can do elsewhere in the workspace.
           </div>
         </div>
         <RolesManager
@@ -246,7 +246,6 @@ export default async function SettingsPage({
             canManageWorkspace: r.canManageWorkspace,
             canManageTeam: r.canManageTeam,
             canManageTemplates: r.canManageTemplates,
-            canApproveContracts: r.canApproveContracts,
             canApproveTemplates: r.canApproveTemplates,
             canViewAllDeals: r.canViewAllDeals,
             memberCount: r._count.users,
@@ -263,7 +262,7 @@ export default async function SettingsPage({
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Teams</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            Organizational segments (e.g. &ldquo;Sales EMEA&rdquo;, &ldquo;Sales US&rdquo;). Assign teammates to one above, then give a team its own approval chain below.
+            Organizational segments (e.g. &ldquo;Sales EMEA&rdquo;, &ldquo;Sales US&rdquo;). Assign teammates to one above, then give a team its own review chain below.
           </div>
         </div>
         <TeamsManager
@@ -277,29 +276,29 @@ export default async function SettingsPage({
     {canManageWorkspacePerm && (
       <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
-          <h2 className="text-[15px] font-medium">Approval chains</h2>
+          <h2 className="text-[15px] font-medium">Review chains</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            Contracts wait for every role in the matching chain to approve, in order, before they go out to the client. Small deals can move fast, while big or team-specific ones pick up extra steps.
+            Contracts wait for every named reviewer in the matching chain to mark their step done, in order, before they go out to the client. Small deals can move fast, while big or team-specific ones pick up extra steps.
           </div>
         </div>
-        <ApprovalChainManager
-          chains={approvalChains.map((c) => ({
+        <ReviewChainManager
+          chains={reviewChains.map((c) => ({
             id: c.id,
             name: c.name,
             order: c.order,
             teamId: c.teamId,
             teamName: c.team?.name ?? null,
             minDealValue: c.minDealValue,
-            steps: c.steps.map((s) => ({ id: s.id, order: s.order, roleId: s.roleId, roleName: s.role.name })),
+            steps: c.steps.map((s) => ({ id: s.id, order: s.order, assigneeId: s.assigneeId, assigneeName: s.assignee.name })),
           }))}
-          eligibleRoles={eligibleApproverRoles}
+          teammates={teammateOptions}
           teams={teamOptions}
-          createChainAction={createApprovalChain}
-          deleteChainAction={deleteApprovalChain}
-          moveChainAction={moveApprovalChain}
-          addStepAction={addApprovalStep}
-          removeStepAction={removeApprovalStep}
-          moveStepAction={moveApprovalStep}
+          createChainAction={createReviewChain}
+          deleteChainAction={deleteReviewChain}
+          moveChainAction={moveReviewChain}
+          addStepAction={addReviewChainStep}
+          removeStepAction={removeReviewChainStep}
+          moveStepAction={moveReviewChainStep}
         />
       </div>
     )}

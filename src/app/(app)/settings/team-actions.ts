@@ -26,10 +26,10 @@ export async function deleteTeam(teamId: string) {
   const user = await requirePermission("canManageTeam");
   const team = await prisma.team.findFirst({
     where: { id: teamId, workspaceId: user.workspaceId },
-    include: { _count: { select: { users: true, deals: true, approvalChains: true } } },
+    include: { _count: { select: { users: true, deals: true, reviewChains: true } } },
   });
   if (!team) throw new Error("Team not found");
-  if (team._count.approvalChains > 0) throw new Error("An approval chain still targets this team. Remove or reassign it first");
+  if (team._count.reviewChains > 0) throw new Error("A review chain still targets this team. Remove or reassign it first");
 
   await prisma.team.delete({ where: { id: teamId } });
 
