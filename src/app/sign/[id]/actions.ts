@@ -21,7 +21,7 @@ export async function signContract(contractId: string, formData: FormData) {
     checkRateLimit(`sign:contract:${contractId}`, 10, 60 * 60 * 1000),
     checkRateLimit(`sign:ip:${ip}`, 20, 60 * 60 * 1000),
   ]);
-  if (!contractOk || !ipOk) throw new Error("Too many attempts — try again later.");
+  if (!contractOk || !ipOk) throw new Error("Too many attempts. Try again later.");
 
   // updateMany with a status filter makes this atomic: a contract that's
   // already been signed, or has moved on to waiting for a counter-signer,
@@ -68,7 +68,7 @@ export async function requestClauseChange(contractId: string, clauseTitle: strin
   const hdrs = await headers();
   const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ?? hdrs.get("x-real-ip") ?? "unknown";
   const allowed = await checkRateLimit(`clause-comment:contract:${contractId}`, 10, 60 * 60 * 1000);
-  if (!allowed) throw new Error("Too many requests — try again later.");
+  if (!allowed) throw new Error("Too many requests. Try again later.");
 
   const contract = await prisma.contract.findUnique({ where: { id: contractId }, include: { deal: true } });
   if (!contract) throw new Error("Not found");

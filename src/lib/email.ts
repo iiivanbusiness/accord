@@ -91,7 +91,7 @@ export async function sendCountersignRequestEmail(options: {
   const { error } = await resend.emails.send({
     from: fromAddress(options.workspaceName, options.verifiedSenderEmail),
     to: options.to,
-    subject: `Your signature is needed: ${options.clientName} — ${options.templateName}`,
+    subject: `Your signature is needed: ${options.clientName} - ${options.templateName}`,
     html,
     ...(!options.verifiedSenderEmail && options.replyTo ? { replyTo: options.replyTo } : {}),
   });
@@ -151,7 +151,7 @@ export async function sendReminderEmail(options: {
   const resend = new Resend(process.env.RESEND_API_KEY);
   const html = `
     <div style="font-family:-apple-system,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;color:#1d1d1f;">
-      <p style="margin:0 0 14px;">Hi ${escapeHtml(options.clientName.split(" ")[0])}, just a friendly nudge — your agreement with ${escapeHtml(options.workspaceName)} is still waiting for a signature.</p>
+      <p style="margin:0 0 14px;">Hi ${escapeHtml(options.clientName.split(" ")[0])}, just a friendly nudge. Your agreement with ${escapeHtml(options.workspaceName)} is still waiting for a signature.</p>
       <a href="${options.signLink}" style="display:inline-block;margin:12px 0 20px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
         Review &amp; sign
       </a>
@@ -195,7 +195,7 @@ export async function sendStaleDealsEmail(options: {
       (d) => `
       <p style="margin:0 0 10px;">
         <a href="${d.dealUrl}" style="color:#1d1d1f;font-weight:600;text-decoration:none;">${escapeHtml(d.clientName)}</a>
-        — ${escapeHtml(d.service)} <span style="color:#6e6e73;">(untouched ${d.daysSinceUpdate} days)</span>
+        - ${escapeHtml(d.service)} <span style="color:#6e6e73;">(untouched ${d.daysSinceUpdate} days)</span>
       </p>`
     )
     .join("");
@@ -203,7 +203,7 @@ export async function sendStaleDealsEmail(options: {
     to: options.to,
     subject: `${options.deals.length} deal${options.deals.length === 1 ? "" : "s"} sitting untouched`,
     bodyHtml: `
-      <p style="margin:0 0 14px;">These deals have been waiting on a review or a send for a while — worth a quick look before they go cold:</p>
+      <p style="margin:0 0 14px;">These deals have been waiting on a review or a send for a while. Worth a quick look before they go cold:</p>
       ${rows}
     `,
   });
@@ -218,7 +218,7 @@ export async function sendApprovalRequestedEmail(options: {
 }): Promise<void> {
   await sendSystemEmail({
     to: options.to,
-    subject: `Approval needed: ${options.clientName} — ${options.templateName}`,
+    subject: `Approval needed: ${options.clientName} - ${options.templateName}`,
     bodyHtml: `
       <p style="margin:0 0 14px;">A contract for <strong>${escapeHtml(options.clientName)}</strong> (${escapeHtml(options.templateName)}) is waiting on the <strong>${escapeHtml(options.roleName)}</strong> step before it can go out.</p>
       <a href="${options.dealUrl}" style="display:inline-block;margin:0 0 20px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
@@ -237,7 +237,7 @@ export async function sendReviewRequestedEmail(options: {
 }): Promise<void> {
   await sendSystemEmail({
     to: [options.to],
-    subject: `${options.requesterName} asked you to review: ${options.clientName} — ${options.templateName}`,
+    subject: `${options.requesterName} asked you to review: ${options.clientName} - ${options.templateName}`,
     bodyHtml: `
       <p style="margin:0 0 14px;"><strong>${escapeHtml(options.requesterName)}</strong> asked you to take a look at the contract for <strong>${escapeHtml(options.clientName)}</strong> (${escapeHtml(options.templateName)}) before it goes out.</p>
       <a href="${options.dealUrl}" style="display:inline-block;margin:0 0 20px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
@@ -257,7 +257,7 @@ export async function sendChangesRequestedEmail(options: {
 }): Promise<void> {
   await sendSystemEmail({
     to: options.to,
-    subject: `Changes requested: ${options.clientName} — ${options.templateName}`,
+    subject: `Changes requested: ${options.clientName} - ${options.templateName}`,
     bodyHtml: `
       <p style="margin:0 0 14px;">${escapeHtml(options.decidedByName)} requested changes on the contract for <strong>${escapeHtml(options.clientName)}</strong> before it can be sent.</p>
       ${options.note ? `<p style="margin:0 0 14px;font-style:italic;">&ldquo;${escapeHtml(options.note)}&rdquo;</p>` : ""}
@@ -282,7 +282,7 @@ export async function sendRenewalReminderEmail(options: {
     to: options.to,
     subject: `${options.clientName}'s contract ${options.autoRenews ? "renews" : "ends"} on ${dateLabel}`,
     bodyHtml: `
-      <p style="margin:0 0 14px;">The ${escapeHtml(options.templateName)} with <strong>${escapeHtml(options.clientName)}</strong> ${options.autoRenews ? "auto-renews" : "ends"} on <strong>${dateLabel}</strong> — coming up in the next 30 days.</p>
+      <p style="margin:0 0 14px;">The ${escapeHtml(options.templateName)} with <strong>${escapeHtml(options.clientName)}</strong> ${options.autoRenews ? "auto-renews" : "ends"} on <strong>${dateLabel}</strong>. Coming up in the next 30 days.</p>
       ${options.renewalNote ? `<p style="margin:0 0 14px;font-style:italic;">${escapeHtml(options.renewalNote)}</p>` : ""}
       <a href="${options.dealUrl}" style="display:inline-block;margin:0 0 20px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
         Review &amp; start renewal
@@ -296,7 +296,7 @@ export async function sendVerificationEmail(options: { to: string; verifyUrl: st
     to: [options.to],
     subject: "Verify your email for SealMe",
     bodyHtml: `
-      <p style="margin:0 0 14px;">One quick step — confirm this is your email address to finish setting up SealMe.</p>
+      <p style="margin:0 0 14px;">One quick step. Confirm this is your email address to finish setting up SealMe.</p>
       <a href="${options.verifyUrl}" style="display:inline-block;margin:0 0 20px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
         Verify email
       </a>
@@ -310,7 +310,7 @@ export async function sendPasswordResetEmail(options: { to: string; resetUrl: st
     to: [options.to],
     subject: "Reset your SealMe password",
     bodyHtml: `
-      <p style="margin:0 0 14px;">Someone requested a password reset for this email address. If that was you, set a new password below — this link expires in 1 hour.</p>
+      <p style="margin:0 0 14px;">Someone requested a password reset for this email address. If that was you, set a new password below. This link expires in 1 hour.</p>
       <a href="${options.resetUrl}" style="display:inline-block;margin:0 0 20px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
         Reset password
       </a>

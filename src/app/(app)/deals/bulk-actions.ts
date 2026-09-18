@@ -30,7 +30,7 @@ export async function updateDealStatus(dealId: string, newStatus: string): Promi
   const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId, ...where } });
   if (!deal) throw new Error("Deal not found");
   if (!DRAGGABLE_STATUSES.includes(deal.status as (typeof DRAGGABLE_STATUSES)[number])) {
-    throw new Error("This deal has already moved past manual review — its status can't be dragged anymore.");
+    throw new Error("This deal has already moved past manual review. Its status can't be dragged anymore.");
   }
 
   await prisma.deal.update({ where: { id: dealId }, data: { status: newStatus } });
@@ -172,7 +172,7 @@ export async function bulkSend(dealIds: string[]): Promise<{ sent: number; skipp
     }
     try {
       const subject = `${deal.template.name} from ${workspace.name}`;
-      const message = `Hi ${deal.client.name.split(" ")[0]},\n\nThanks again for the call — here's the ${deal.template.name.toLowerCase()} we discussed. Take a look and sign whenever you're ready.\n\nLet me know if anything needs adjusting.`;
+      const message = `Hi ${deal.client.name.split(" ")[0]},\n\nThanks again for the call. Here's the ${deal.template.name.toLowerCase()} we discussed. Take a look and sign whenever you're ready.\n\nLet me know if anything needs adjusting.`;
       await requestOrSendContract(deal.id, { to: deal.client.email, subject, message }, session?.user?.email);
       sent++;
     } catch (err) {

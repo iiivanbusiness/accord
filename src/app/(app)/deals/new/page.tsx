@@ -50,7 +50,7 @@ export default async function NewDealPage({
       <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Start a call</h1>
       <div className="mt-1 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
         {isLocal
-          ? "SealMe records your system audio for the call — nothing joins as a visible participant."
+          ? "SealMe records your system audio for the call. Nothing joins as a visible participant."
           : isManual
             ? "Enter what the call covered and it'll drop straight into the review flow."
             : "Paste the call transcript and Claude will pull out the deal terms for you to review."}
@@ -71,7 +71,7 @@ export default async function NewDealPage({
 
     {isManual ? (
       <form action={createDeal} className="card flex max-w-[520px] flex-col gap-4 p-6">
-        <Field label="Client name" name="clientName" placeholder="Acme Fitness" required />
+        <Field label="Client name" name="clientName" placeholder="Northgate Fitness" required />
         <Field label="Company" name="company" placeholder="Same as client name if blank" />
         <Field label="Client email" name="email" placeholder="hello@client.com" />
         <Field label="Service" name="service" placeholder="Social Media Management" required />
@@ -95,7 +95,7 @@ export default async function NewDealPage({
     ) : isLocal ? (
       !extractionConfigured ? (
         <div className="card max-w-[560px] p-6 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-          Local recording isn&apos;t fully set up yet — it needs an <span className="font-mono-tab">ANTHROPIC_API_KEY</span> in{" "}
+          Local recording isn&apos;t fully set up yet. It needs an <span className="font-mono-tab">ANTHROPIC_API_KEY</span> in{" "}
           <span className="font-mono-tab">.env</span>. Use{" "}
           <Link href="/deals/new?mode=manual" className="font-medium" style={{ color: "var(--accent-blue)" }}>
             manual entry
@@ -107,7 +107,7 @@ export default async function NewDealPage({
       )
     ) : !extractionConfigured ? (
       <div className="card max-w-[560px] p-6 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-        Transcript extraction isn&apos;t set up yet — it needs an <span className="font-mono-tab">ANTHROPIC_API_KEY</span> in <span className="font-mono-tab">.env</span>. Use{" "}
+        Transcript extraction isn&apos;t set up yet. It needs an <span className="font-mono-tab">ANTHROPIC_API_KEY</span> in <span className="font-mono-tab">.env</span>. Use{" "}
         <Link href="/deals/new?mode=manual" className="font-medium" style={{ color: "var(--accent-blue)" }}>
           manual entry
         </Link>{" "}

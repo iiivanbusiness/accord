@@ -74,7 +74,7 @@ export async function updateRole(roleId: string, formData: FormData) {
       where: { workspaceId: user.workspaceId, canManageTeam: true, id: { not: roleId } },
     });
     if (otherTeamManagers === 0) {
-      throw new Error("At least one role must be able to manage the team — edit another role first");
+      throw new Error("At least one role must be able to manage the team. Edit another role first");
     }
   }
 
@@ -120,7 +120,7 @@ export async function assignUserRole(userId: string, formData: FormData) {
       where: { workspaceId: user.workspaceId, id: { not: userId }, role: { canManageTeam: true } },
     });
     if (otherTeamManagers === 0) {
-      throw new Error("This is the only teammate who can manage the team — assign someone else first");
+      throw new Error("This is the only teammate who can manage the team. Assign someone else first");
     }
   }
 

@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   if (!isDeepgramConfigured()) return NextResponse.json({ error: "Voice input isn't configured" }, { status: 503 });
 
   const allowed = await checkRateLimit(`support-chat-voice:${workspaceId}`, 30, 60 * 60 * 1000);
-  if (!allowed) return NextResponse.json({ error: "Too many voice clips — try again later" }, { status: 429 });
+  if (!allowed) return NextResponse.json({ error: "Too many voice clips. Try again later" }, { status: 429 });
 
   const contentType = req.headers.get("content-type") || "audio/webm";
   const audioBytes = Buffer.from(await req.arrayBuffer());

@@ -29,7 +29,7 @@ export async function deleteTeam(teamId: string) {
     include: { _count: { select: { users: true, deals: true, approvalChains: true } } },
   });
   if (!team) throw new Error("Team not found");
-  if (team._count.approvalChains > 0) throw new Error("An approval chain still targets this team — remove or reassign it first");
+  if (team._count.approvalChains > 0) throw new Error("An approval chain still targets this team. Remove or reassign it first");
 
   await prisma.team.delete({ where: { id: teamId } });
 

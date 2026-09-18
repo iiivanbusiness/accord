@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   // rejecting here too — this just closes the same gap on the receiving end.
   const hmacKey = process.env.DOCUSIGN_CONNECT_HMAC_KEY;
   if (!hmacKey) {
-    console.error("DocuSign webhook received but DOCUSIGN_CONNECT_HMAC_KEY isn't set — rejecting (see createConnectSubscription).");
+    console.error("DocuSign webhook received but DOCUSIGN_CONNECT_HMAC_KEY isn't set. Rejecting (see createConnectSubscription).");
     return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
   }
   const signature = req.headers.get("x-docusign-signature-1");

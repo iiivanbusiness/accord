@@ -65,7 +65,7 @@ export default function ApiKeysPanel({
           <div className="rounded-[8px] px-3 py-2.5 font-mono-tab text-[12px]" style={{ background: "var(--surface-2)", wordBreak: "break-all" }}>
             {freshKey}
           </div>
-          <div className="text-[11.5px]" style={{ color: "var(--warn)" }}>⚠ Copy this now — it won&apos;t be shown again.</div>
+          <div className="text-[11.5px]" style={{ color: "var(--warn)" }}>⚠ Copy this now. It won&apos;t be shown again.</div>
         </div>
       )}
 

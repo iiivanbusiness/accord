@@ -33,7 +33,7 @@ export default function LocalCaptureForm({ templates }: { templates: Template[] 
     try {
       await invoke("start_local_capture");
     } catch (err) {
-      setError(typeof err === "string" ? err : "Couldn't start capture — check Screen Recording permission in System Settings");
+      setError(typeof err === "string" ? err : "Couldn't start capture. Check Screen Recording permission in System Settings");
       setBusy(false);
       return;
     }
@@ -82,7 +82,7 @@ export default function LocalCaptureForm({ templates }: { templates: Template[] 
     <form action={handleSubmit} className="card flex max-w-[560px] flex-col gap-4 p-6">
       <label className="flex flex-col gap-1.5">
         <span className="text-[13px] font-medium">Who are you meeting with?</span>
-        <input name="clientName" placeholder="Acme Fitness" required className="input" />
+        <input name="clientName" placeholder="Northgate Fitness" required className="input" />
       </label>
 
       <label className="flex flex-col gap-1.5">
@@ -110,7 +110,7 @@ export default function LocalCaptureForm({ templates }: { templates: Template[] 
         {busy ? "Starting…" : "Start recording"}
       </button>
       <span className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
-        SealMe records your system audio for this call — nothing joins the meeting. Stop the recording from the banner
+        SealMe records your system audio for this call. Nothing joins the meeting. Stop the recording from the banner
         at the top once the call ends.
       </span>
     </form>

@@ -42,7 +42,7 @@ export default async function TemplatesPage() {
         <Link key={tpl.id} href={`/templates/${tpl.id}`} className="glass-card glass-card-solid card-hover p-[18px]" style={{ color: "inherit" }}>
           <div className="flex items-center gap-1.5">
             <h3 className="text-[15px] font-medium">{tpl.name}</h3>
-            {tpl.locked && <span title="Locked — approved wording">🔒</span>}
+            {tpl.locked && <span title="Locked - approved wording">🔒</span>}
           </div>
           <div className="mb-2.5 mt-1 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>{tpl.description}</div>
           <span className="chip chip-neutral">{tpl.requiredFieldCount} required fields</span>

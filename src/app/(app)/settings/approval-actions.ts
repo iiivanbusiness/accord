@@ -79,7 +79,7 @@ export async function addApprovalStep(chainId: string, formData: FormData) {
 
   const role = await prisma.role.findFirst({ where: { id: roleId, workspaceId: user.workspaceId } });
   if (!role) throw new Error("Role not found");
-  if (!role.canApproveContracts) throw new Error("That role isn't eligible to approve contracts — enable it in Roles & permissions first");
+  if (!role.canApproveContracts) throw new Error("That role isn't eligible to approve contracts. Enable it in Roles & permissions first");
 
   const existing = await prisma.approvalStep.findFirst({ where: { chainId, roleId } });
   if (existing) throw new Error("That role is already a step in this chain");

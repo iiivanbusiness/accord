@@ -14,7 +14,7 @@ const STATUS_LABEL: Record<string, string> = {
   ready: "Ready for review",
   pending_approval: "Awaiting approval",
   changes_requested: "Changes requested",
-  sent: "Sent — awaiting signature",
+  sent: "Sent - awaiting signature",
   signed: "Signed",
 };
 
@@ -147,7 +147,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         <div className="card p-5">
           {allNotes.length === 0 ? (
             <p className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-              No internal notes yet — notes left on any deal with this client show up here.
+              No internal notes yet. Notes left on any deal with this client show up here.
             </p>
           ) : (
             <div className="flex flex-col gap-3">

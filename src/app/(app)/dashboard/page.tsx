@@ -135,7 +135,7 @@ export default async function DashboardPage() {
     </div>
 
     {/* Stays within AppShell's normal max-w-[1180px] content column, same
-        as every other page — an earlier full-bleed breakout here ignored
+        as every other page. An earlier full-bleed breakout here ignored
         the sidebar's width and produced a horizontal scrollbar. */}
         <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           <GlassStatCard label="Combined deal value" value={`$${combinedValue.toLocaleString()}`} sub="Across all deals" />
@@ -262,7 +262,7 @@ export default async function DashboardPage() {
             </div>
             {staleDeals.length === 0 ? (
               <div className="py-6 text-center text-[13px]" style={{ color: "var(--ink-muted)" }}>
-                Nothing sitting idle — nice.
+                Nothing sitting idle. Nice.
               </div>
             ) : (
               <div className="flex flex-col gap-1">

@@ -48,12 +48,12 @@ export async function sendViaDocusignNow(dealId: string) {
   });
   if (!deal || !deal.contract || !deal.template) throw new Error("Deal not found");
   if (!deal.workspace.docusignEnabled) throw new Error("DocuSign isn't connected for this workspace");
-  if (!deal.client.email) throw new Error("This client has no email on file yet — add one first");
+  if (!deal.client.email) throw new Error("This client has no email on file yet. Add one first");
 
   await prisma.contract.update({ where: { id: deal.contract.id }, data: { deliveryMethod: "docusign" } });
 
   const subject = `${deal.template.name} from ${deal.workspace.name}`;
-  const message = `Hi ${deal.client.name.split(" ")[0]},\n\nHere's the ${deal.template.name.toLowerCase()} we just discussed — take a look and sign whenever you're ready.`;
+  const message = `Hi ${deal.client.name.split(" ")[0]},\n\nHere's the ${deal.template.name.toLowerCase()} we just discussed. Take a look and sign whenever you're ready.`;
 
   const session = await auth();
   await requestOrSendContract(dealId, { to: deal.client.email, subject, message }, session?.user?.email);
@@ -206,7 +206,7 @@ export async function requestTeammateReview(dealId: string, recipientUserId: str
     });
   } catch (err) {
     console.error(`Failed to send review-requested email for deal ${dealId}`, err);
-    throw new Error("Couldn't send the email — check your Resend setup and try again");
+    throw new Error("Couldn't send the email. Check your Resend setup and try again");
   }
 
   await logAudit({
@@ -270,7 +270,7 @@ export async function sendContractEmail(dealId: string, formData: FormData) {
   try {
     result = await requestOrSendContract(dealId, { to, subject, message }, session?.user?.email);
   } catch {
-    throw new Error("Couldn't send the email — check your Resend setup and try again.");
+    throw new Error("Couldn't send the email. Check your Resend setup and try again.");
   }
 
   return result;

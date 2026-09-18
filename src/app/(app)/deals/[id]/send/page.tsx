@@ -33,7 +33,7 @@ export default async function SendContractPage({
   const configured = isEmailConfigured();
 
   const defaultSubject = `${deal.template.name} from ${workspaceName}`;
-  const defaultMessage = `Hi ${deal.client.name.split(" ")[0]},\n\nThanks again for the call — here's the ${deal.template.name.toLowerCase()} we discussed. Take a look and sign whenever you're ready.\n\nLet me know if anything needs adjusting.`;
+  const defaultMessage = `Hi ${deal.client.name.split(" ")[0]},\n\nThanks again for the call. Here's the ${deal.template.name.toLowerCase()} we discussed. Take a look and sign whenever you're ready.\n\nLet me know if anything needs adjusting.`;
 
   return (
     <>
@@ -44,7 +44,7 @@ export default async function SendContractPage({
     <div className="mb-6 max-w-[560px]">
       <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Send to {deal.client.name}</h1>
       <div className="mt-1 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-        Review and edit before it goes out — the sign link is added automatically.
+        Review and edit before it goes out. The sign link is added automatically.
       </div>
     </div>
 
@@ -56,7 +56,7 @@ export default async function SendContractPage({
 
     {!configured && (
       <div className="chip chip-warn mb-4 max-w-[560px] w-full justify-start px-4 py-2.5 text-[12.5px]">
-        Email sending isn&apos;t set up yet — add a <span className="font-mono-tab">RESEND_API_KEY</span> to <span className="font-mono-tab">.env</span> first.
+        Email sending isn&apos;t set up yet. Add a <span className="font-mono-tab">RESEND_API_KEY</span> to <span className="font-mono-tab">.env</span> first.
       </div>
     )}
 

@@ -28,7 +28,7 @@ export default function ContinueCallButton({ dealId }: { dealId: string }) {
     try {
       await invoke("start_local_capture");
     } catch (err) {
-      setError(typeof err === "string" ? err : "Couldn't start capture — check Screen Recording permission in System Settings");
+      setError(typeof err === "string" ? err : "Couldn't start capture. Check Screen Recording permission in System Settings");
       setBusy(false);
       return;
     }

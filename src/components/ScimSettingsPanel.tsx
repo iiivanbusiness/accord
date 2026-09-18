@@ -61,7 +61,7 @@ export default function ScimSettingsPanel({
           Only @this-domain email addresses can be invited or provisioned once set.
         </div>
         <form action={updateDomainAction} className="flex gap-2">
-          <input name="domain" defaultValue={currentDomain ?? ""} placeholder="acme.com" className="input flex-1" style={{ fontSize: "13px", padding: "8px 11px" }} />
+          <input name="domain" defaultValue={currentDomain ?? ""} placeholder="yourcompany.com" className="input flex-1" style={{ fontSize: "13px", padding: "8px 11px" }} />
           <button type="submit" className="btn btn-secondary btn-sm">Save</button>
         </form>
       </div>
@@ -82,7 +82,7 @@ export default function ScimSettingsPanel({
               {freshToken}
             </div>
             <div className="text-[11.5px]" style={{ color: "var(--warn)" }}>
-              ⚠ Copy this now — it won&apos;t be shown again.
+              ⚠ Copy this now. It won&apos;t be shown again.
             </div>
           </div>
         ) : (

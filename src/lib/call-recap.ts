@@ -39,13 +39,13 @@ export async function generateCallRecapScript(dealId: string): Promise<string | 
     max_tokens: 120,
     system:
       "You just finished listening in on a sales call and filled in what you could of a contract. Write a " +
-      "SHORT spoken update for the rep — at most 2 sentences, under 35 words total, no exceptions. Do NOT " +
-      "restate or summarize the call summary below — it's context only, never read it back. Just briefly name " +
-      "what got filled in (e.g. \"Filled in the contract for Acme — fee, dates, and deliverables are set.\"). " +
+      "SHORT spoken update for the rep. At most 2 sentences, under 35 words total, no exceptions. Do NOT " +
+      "restate or summarize the call summary below. It's context only, never read it back. Just briefly name " +
+      "what got filled in (e.g. \"Filled in the contract for Northgate Fitness. Fee, dates, and deliverables are set.\"). " +
       "If anything is listed as missing, name it specifically and ask what to put there (e.g. \"I didn't catch " +
-      "payment terms — what should I put?\"). If nothing is missing, invite them to fix anything that's off. " +
+      "payment terms. What should I put?\"). If nothing is missing, invite them to fix anything that's off. " +
       "Always respond in English regardless of what language the call was in. Output only the spoken text " +
-      "itself — no headers, no bullet points, no quotation marks.",
+      "itself. No headers, no bullet points, no quotation marks.",
     messages: [
       {
         role: "user",

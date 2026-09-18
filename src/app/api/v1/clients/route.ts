@@ -20,7 +20,7 @@ export async function GET(req: Request) {
   if (!auth) return apiError(401, "Invalid or missing API key");
 
   const allowed = await checkRateLimit(`api:${auth.apiKeyId}`, 120, 60_000);
-  if (!allowed) return apiError(429, "Rate limit exceeded — try again shortly");
+  if (!allowed) return apiError(429, "Rate limit exceeded. Try again shortly");
 
   const url = new URL(req.url);
   const cursor = url.searchParams.get("cursor");
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
   if (!auth) return apiError(401, "Invalid or missing API key");
 
   const allowed = await checkRateLimit(`api:${auth.apiKeyId}`, 120, 60_000);
-  if (!allowed) return apiError(429, "Rate limit exceeded — try again shortly");
+  if (!allowed) return apiError(429, "Rate limit exceeded. Try again shortly");
 
   let body: unknown;
   try {

@@ -21,7 +21,7 @@ import { syncDealToSalesforce } from "@/lib/salesforce";
 // through before doing anything billable.
 function assertUnderCallLimit(workspace: { callsUsedThisMonth: number; callsLimit: number }) {
   if (workspace.callsUsedThisMonth >= workspace.callsLimit) {
-    redirect(`/deals/new?error=${encodeURIComponent("You've used all your calls for this billing period — upgrade your plan to start more.")}`);
+    redirect(`/deals/new?error=${encodeURIComponent("You've used all your calls for this billing period. Upgrade your plan to start more.")}`);
   }
 }
 
@@ -99,7 +99,7 @@ export async function createDealFromTranscript(formData: FormData) {
   try {
     extracted = await extractDealFromTranscript(transcript, placeholderKeys);
   } catch {
-    redirect(`/deals/new?error=${encodeURIComponent("Couldn't extract deal terms from that transcript — try again or enter it manually.")}`);
+    redirect(`/deals/new?error=${encodeURIComponent("Couldn't extract deal terms from that transcript. Try again or enter it manually.")}`);
   }
 
   const { fieldRows, hasMissing, service, fee } = buildDealFieldRows(extracted, placeholderKeys);
@@ -170,7 +170,7 @@ export async function startLocalCapture(formData: FormData): Promise<{ dealId: s
 
   const [workspace, user] = await Promise.all([requireWorkspace(), currentUserWithRole()]);
   if (workspace.callsUsedThisMonth >= workspace.callsLimit) {
-    return { error: "You've used all your calls for this billing period — upgrade your plan to start more." };
+    return { error: "You've used all your calls for this billing period. Upgrade your plan to start more." };
   }
   const workspaceId = workspace.id;
 
@@ -233,12 +233,12 @@ async function mintLocalCaptureToken(workspaceId: string, dealId: string, callId
 export async function continueLocalCapture(dealId: string): Promise<{ dealId: string; token: string } | { error: string }> {
   const workspace = await requireWorkspace();
   if (workspace.callsUsedThisMonth >= workspace.callsLimit) {
-    return { error: "You've used all your calls for this billing period — upgrade your plan to start more." };
+    return { error: "You've used all your calls for this billing period. Upgrade your plan to start more." };
   }
 
   const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId: workspace.id } });
   if (!deal) return { error: "Deal not found" };
-  if (deal.status === "signed") return { error: "This deal is already signed — start a new deal instead" };
+  if (deal.status === "signed") return { error: "This deal is already signed. Start a new deal instead" };
 
   const call = await prisma.call.create({ data: { dealId, source: "local" } });
   const rawToken = await mintLocalCaptureToken(workspace.id, dealId, call.id);

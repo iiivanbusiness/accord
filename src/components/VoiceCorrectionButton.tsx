@@ -149,7 +149,7 @@ export default function VoiceCorrectionButton({
       recorder.start();
       setStatus("recording");
     } catch {
-      setError("Couldn't access the microphone — check your browser/system permission");
+      setError("Couldn't access the microphone. Check your browser/system permission");
     }
   }
 
@@ -177,7 +177,7 @@ export default function VoiceCorrectionButton({
         setStatus("idle");
       }
     } catch {
-      setError("Couldn't reach the server — try again");
+      setError("Couldn't reach the server. Try again");
       setStatus("idle");
     }
   }
@@ -198,8 +198,8 @@ export default function VoiceCorrectionButton({
       } catch {
         setError(
           proposal.intent === "send_for_review"
-            ? "Couldn't send that email — check your Resend setup and try again"
-            : "Couldn't save that change — try editing the field directly"
+            ? "Couldn't send that email. Check your Resend setup and try again"
+            : "Couldn't save that change. Try editing the field directly"
         );
       } finally {
         setProposal(null);
@@ -254,7 +254,7 @@ export default function VoiceCorrectionButton({
           />
           {(status === "recording" || status === "processing") && (
             <span className="text-center text-[12px]" style={{ color: "var(--ink-muted)" }}>
-              {status === "recording" ? "Listening — release to send" : "Thinking…"}
+              {status === "recording" ? "Listening. Release to send" : "Thinking…"}
             </span>
           )}
         </>

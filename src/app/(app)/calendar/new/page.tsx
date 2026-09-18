@@ -11,18 +11,18 @@ export default function NewEventPage() {
     <div className="mb-6 max-w-[480px]">
       <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>New event</h1>
       <div className="mt-1 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-        Once Google Calendar is connected, these show up automatically — for now, add them manually.
+        Once Google Calendar is connected, these show up automatically. For now, add them manually.
       </div>
     </div>
 
     <form action={createEvent} className="card flex max-w-[480px] flex-col gap-4 p-6">
       <label className="flex flex-col gap-1.5">
         <span className="text-[13px] font-medium">Title</span>
-        <input name="title" required placeholder="Discovery call — Acme Fitness" className="input" />
+        <input name="title" required placeholder="Discovery call with Northgate Fitness" className="input" />
       </label>
       <label className="flex flex-col gap-1.5">
         <span className="text-[13px] font-medium">Client (optional)</span>
-        <input name="clientName" placeholder="Acme Fitness" className="input" />
+        <input name="clientName" placeholder="Northgate Fitness" className="input" />
       </label>
       <label className="flex flex-col gap-1.5">
         <span className="text-[13px] font-medium">Date &amp; time</span>

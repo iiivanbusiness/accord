@@ -40,7 +40,7 @@ export default function RecentNotesList({ items }: { items: RecentNoteItem[] }) 
   if (items.length === 0) {
     return (
       <p className="py-6 text-center text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-        No notes yet — they show up here after a call ends.
+        No notes yet. They show up here after a call ends.
       </p>
     );
   }

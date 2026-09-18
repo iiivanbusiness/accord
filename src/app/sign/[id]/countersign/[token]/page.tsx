@@ -45,7 +45,7 @@ export default async function CountersignPage({ params }: { params: Promise<{ id
 
       <main className="mx-auto max-w-[720px] px-6 py-10">
         <div className="chip chip-neutral mb-6 px-4 py-3 text-[13.5px]">
-          Signing as <strong>{signer.name}</strong> ({signer.role}) — after <strong>{contract.deal.client.name}</strong>
+          Signing as <strong>{signer.name}</strong> ({signer.role}). After <strong>{contract.deal.client.name}</strong>
         </div>
 
         {signer.status === "signed" && (

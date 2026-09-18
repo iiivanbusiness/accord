@@ -353,7 +353,7 @@ export default function CompanionPanel({ upcomingEvents, fastPoll = false }: { u
                     Deal terms
                   </h2>
                   {groups.size === 0 ? (
-                    <p className="text-[12px]" style={{ color: glass.textDim }}>Nothing captured yet — keep talking.</p>
+                    <p className="text-[12px]" style={{ color: glass.textDim }}>Nothing captured yet. Keep talking.</p>
                   ) : (
                     <div className="flex flex-col">
                       {[...groups.entries()].map(([label, rows]) => (
@@ -404,7 +404,7 @@ export default function CompanionPanel({ upcomingEvents, fastPoll = false }: { u
               </h2>
               {upcomingEvents.length === 0 ? (
                 <p className="py-6 text-center text-[12.5px]" style={{ color: glass.textDim }}>
-                  Nothing scheduled — start a call from the main app to see it here.
+                  Nothing scheduled. Start a call from the main app to see it here.
                 </p>
               ) : (
                 <div className="flex flex-col">

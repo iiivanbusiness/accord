@@ -77,7 +77,7 @@ export default function DealNotes({
       <div className="flex flex-col gap-3">
         {notes.length === 0 && (
           <p className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-            No notes yet — leave context here for the team, not visible to the client.
+            No notes yet. Leave context here for the team, not visible to the client.
           </p>
         )}
         {notes.map((note) => (

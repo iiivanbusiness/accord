@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "Terms of Service — SealMe",
+  title: "Terms of Service - SealMe",
 };
 
 const LAST_UPDATED = "August 19, 2026";
@@ -20,7 +20,7 @@ export default function TermsPage() {
 
       <main className="mx-auto max-w-[820px] px-6 py-16">
         <div className="chip chip-warn mb-6 w-fit uppercase tracking-wide" style={{ fontSize: "10.5px", fontWeight: 600 }}>
-          Draft — pending legal review
+          Draft. Pending legal review
         </div>
         <h1 className="mb-2 text-[36px] font-medium" style={{ letterSpacing: "-0.8px", color: "var(--primary)" }}>Terms of Service</h1>
         <p className="mb-12 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>Last updated: {LAST_UPDATED}</p>
@@ -46,7 +46,7 @@ export default function TermsPage() {
           <Section title="3. Call Recording and Consent">
             <p>
               SealMe processes live audio from sales calls in order to capture deal terms. <strong style={{ color: "var(--ink)" }}>You are solely responsible for
-              obtaining any consent required by law before recording or processing a call</strong> — including two-party/all-party consent requirements in
+              obtaining any consent required by law before recording or processing a call</strong>. Including two-party/all-party consent requirements in
               certain jurisdictions (e.g., several U.S. states) and equivalent requirements under EU, UK, or other applicable law. We recommend notifying every
               participant at the start of a call that it is being processed by SealMe. SealMe is not liable for your failure to obtain required consent.
             </p>
@@ -81,7 +81,7 @@ export default function TermsPage() {
 
           <Section title="7. Third-Party Services">
             <p>
-              The Service integrates with third-party platforms — including Zoom, Google Meet, and Google Calendar — and may use third-party AI model providers
+              The Service integrates with third-party platforms (including Zoom, Google Meet, and Google Calendar) and may use third-party AI model providers
               to process call audio and transcripts. Your use of those integrations is also subject to the applicable third party&apos;s own terms. SealMe is not
               responsible for the availability or behavior of third-party services.
             </p>
@@ -105,7 +105,7 @@ export default function TermsPage() {
           <Section title="10. Disclaimers">
             <p>
               The Service is provided &quot;as is&quot; without warranties of any kind, express or implied. AI-generated field extraction and contract drafts may
-              contain errors — you are responsible for reviewing any contract before it is sent for signature. SealMe does not provide legal advice, and
+              contain errors. You are responsible for reviewing any contract before it is sent for signature. SealMe does not provide legal advice, and
               generated contracts do not constitute legal advice.
             </p>
           </Section>

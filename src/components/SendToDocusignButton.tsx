@@ -44,7 +44,7 @@ export default function SendToDocusignButton({
         {isPending ? "Sending…" : "Send via DocuSign now"}
       </button>
       <span className="text-center text-[12px]" style={{ color: "var(--ink-muted)" }}>
-        Sends immediately with a standard message — client signs on DocuSign, right while you&apos;re still on the call.
+        Sends immediately with a standard message. Client signs on DocuSign, right while you&apos;re still on the call.
       </span>
     </div>
   );

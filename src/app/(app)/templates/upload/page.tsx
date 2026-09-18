@@ -30,7 +30,7 @@ export default async function UploadTemplatePage() {
         <span className="text-[13px] font-medium">Document</span>
         <input name="file" type="file" required accept=".pdf,.docx,.txt" className="input" style={{ padding: "8px 11px" }} />
         <span className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
-          We look for numbered sections like &quot;1. Services&quot; to split it into clauses — if we can&apos;t find that structure, the whole document becomes one clause you can split by hand.
+          We look for numbered sections like &quot;1. Services&quot; to split it into clauses. If we can&apos;t find that structure, the whole document becomes one clause you can split by hand.
         </span>
       </label>
 

@@ -60,7 +60,7 @@ export default function SsoSettingsPanel({
 
       <div>
         <div className="mb-1.5 text-[12px] font-medium" style={{ color: "var(--ink-muted)" }}>
-          Redirect URI — give this to your identity provider
+          Redirect URI. Give this to your identity provider
         </div>
         <div className="rounded-[8px] px-3 py-2.5 font-mono-tab text-[12px]" style={{ background: "var(--surface-2)", wordBreak: "break-all" }}>
           {redirectUri}
@@ -90,7 +90,7 @@ export default function SsoSettingsPanel({
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-[12.5px] font-medium">
-            Client secret {hasClientSecret && <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>(set — leave blank to keep it)</span>}
+            Client secret {hasClientSecret && <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>(set. Leave blank to keep it)</span>}
           </span>
           <input
             name="clientSecret"

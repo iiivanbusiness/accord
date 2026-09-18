@@ -27,7 +27,7 @@ export async function extractRenewalTerms(contractId: string): Promise<void> {
     system:
       "You read a signed contract's text and figure out when its current term ends and whether it renews " +
       "automatically. Only report a date if the contract actually states or implies one (a fixed term length " +
-      "counts, e.g. \"continues for 3 months\" starting from the given signed date) — never invent one. " +
+      "counts, e.g. \"continues for 3 months\" starting from the given signed date). Never invent one. " +
       `Today's reference date for resolving relative terms is the date the contract was signed: ${signedDateIso}.`,
     messages: [
       {

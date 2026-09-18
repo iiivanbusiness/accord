@@ -44,10 +44,10 @@ export async function confirmTwoFactorSetup(formData: FormData): Promise<{ error
   if (!user.twoFactorSecret) return { error: "Start setup again" };
 
   const allowed = await checkRateLimit(`2fa-confirm:${user.id}`, 10, 15 * 60 * 1000);
-  if (!allowed) return { error: "Too many attempts — try again later" };
+  if (!allowed) return { error: "Too many attempts. Try again later" };
 
   const valid = await verifyTotpCode(code, user.twoFactorSecret);
-  if (!valid) return { error: "That code didn't match — check the time on your phone and try again" };
+  if (!valid) return { error: "That code didn't match. Check the time on your phone and try again" };
 
   const { raw, stored } = generateBackupCodes();
   await prisma.user.update({
@@ -63,10 +63,10 @@ export async function disableTwoFactor(formData: FormData): Promise<{ error?: st
   const password = String(formData.get("password") ?? "");
   const user = await currentUser();
 
-  if (!user.passwordHash) return { error: "Your account has no password set — contact support to disable 2FA" };
+  if (!user.passwordHash) return { error: "Your account has no password set. Contact support to disable 2FA" };
 
   const allowed = await checkRateLimit(`2fa-disable:${user.id}`, 5, 15 * 60 * 1000);
-  if (!allowed) return { error: "Too many attempts — try again later" };
+  if (!allowed) return { error: "Too many attempts. Try again later" };
 
   if (!verifyPassword(password, user.passwordHash)) return { error: "That password is incorrect" };
 

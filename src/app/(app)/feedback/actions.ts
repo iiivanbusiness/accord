@@ -24,7 +24,7 @@ export async function submitFeedback(formData: FormData): Promise<void> {
   const user = await currentUser();
 
   const allowed = await checkRateLimit(`feedback:submit:${user.id}`, 10, 60 * 60 * 1000);
-  if (!allowed) throw new Error("Too many posts — try again later");
+  if (!allowed) throw new Error("Too many posts. Try again later");
 
   const post = await prisma.feedbackPost.create({
     data: { authorId: user.id, title, description },

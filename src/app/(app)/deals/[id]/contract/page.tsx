@@ -101,14 +101,14 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
     {deal.contract.status === "changes_requested" && (
       <div className="mb-[18px] flex flex-wrap items-center gap-3">
         <div className="chip chip-warn px-4 py-3 text-[13.5px]">
-          Changes requested — make edits, then send again
+          Changes requested. Make edits, then send again
         </div>
       </div>
     )}
     {deal.contract.status === "sent" && (
       <div className="mb-[18px] flex flex-wrap items-center gap-3">
         <div className="chip chip-warn px-4 py-3 text-[13.5px]">
-          ✓ Sent to {deal.client.name} — awaiting signature
+          ✓ Sent to {deal.client.name}. Awaiting signature
         </div>
         {deal.contract.viewedAt && (
           <span className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>

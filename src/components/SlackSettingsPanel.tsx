@@ -47,7 +47,7 @@ export default function SlackSettingsPanel({
   if (!configured) {
     return (
       <div className="px-[22px] py-[18px] text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-        Slack isn&apos;t set up for this deployment yet — a SLACK_CLIENT_ID/SECRET needs to be configured first.
+        Slack isn&apos;t set up for this deployment yet. A SLACK_CLIENT_ID/SECRET needs to be configured first.
       </div>
     );
   }

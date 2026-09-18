@@ -15,7 +15,7 @@ export async function signAsCountersigner(contractId: string, token: string, for
   const hdrs = await headers();
   const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ?? hdrs.get("x-real-ip") ?? "unknown";
   const allowed = await checkRateLimit(`countersign:${token}`, 10, 60 * 60 * 1000);
-  if (!allowed) throw new Error("Too many attempts — try again later.");
+  if (!allowed) throw new Error("Too many attempts. Try again later.");
 
   const signer = await prisma.contractSigner.findFirst({ where: { contractId, token } });
   if (!signer) throw new Error("Not found");
@@ -53,7 +53,7 @@ export async function declineToSign(contractId: string, token: string, formData:
   const hdrs = await headers();
   const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ?? hdrs.get("x-real-ip") ?? "unknown";
   const allowed = await checkRateLimit(`countersign-decline:${token}`, 10, 60 * 60 * 1000);
-  if (!allowed) throw new Error("Too many attempts — try again later.");
+  if (!allowed) throw new Error("Too many attempts. Try again later.");
 
   const signer = await prisma.contractSigner.findFirst({ where: { contractId, token } });
   if (!signer) throw new Error("Not found");

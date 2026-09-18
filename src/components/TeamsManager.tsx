@@ -37,7 +37,7 @@ export default function TeamsManager({
 
       {teams.length === 0 && (
         <div className="py-3 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-          No teams yet — create one to give a segment of your org (e.g. &ldquo;Sales EMEA&rdquo;) its own approval rules.
+          No teams yet. Create one to give a segment of your org (e.g. &ldquo;Sales EMEA&rdquo;) its own approval rules.
         </div>
       )}
 

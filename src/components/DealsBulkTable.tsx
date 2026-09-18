@@ -108,7 +108,7 @@ export default function DealsBulkTable({
     startTransition(async () => {
       try {
         const result = await trashAction(ids);
-        setMessage(`Moved ${result.trashed} to trash — restore them anytime from the trash icon above.`);
+        setMessage(`Moved ${result.trashed} to trash. Restore them anytime from the trash icon above.`);
         setSelected(new Set());
       } catch (err) {
         setMessage(err instanceof Error ? err.message : "Something went wrong");

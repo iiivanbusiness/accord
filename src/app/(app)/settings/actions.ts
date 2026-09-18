@@ -238,7 +238,7 @@ export async function updateAllowedDomain(formData: FormData) {
   const raw = String(formData.get("domain") ?? "").trim().toLowerCase();
   const domain = raw.replace(/^@/, "") || null;
   if (domain && !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) {
-    throw new Error("That doesn't look like a domain, e.g. acme.com");
+    throw new Error("That doesn't look like a domain, e.g. yourcompany.com");
   }
 
   const user = await requirePermission("canManageWorkspace");
@@ -312,7 +312,7 @@ export async function toggleSso(): Promise<void> {
       throw new Error("Set an issuer, client ID, and client secret before enabling SSO");
     }
     if (!workspace.allowedEmailDomain) {
-      throw new Error("Set an allowed email domain above first — it's how sign-ins get matched to this workspace");
+      throw new Error("Set an allowed email domain above first. It's how sign-ins get matched to this workspace");
     }
   }
 

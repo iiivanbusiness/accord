@@ -108,7 +108,7 @@ export default async function DealsPage({
       <div>
         <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Deals</h1>
         <div className="mt-1 text-[14px]" style={{ color: "var(--ink-muted)" }}>
-          {deals.length} {deals.length === 1 ? "deal" : "deals"} — from first call to signed contract
+          {deals.length} {deals.length === 1 ? "deal" : "deals"}. From first call to signed contract
         </div>
       </div>
       <div className="flex items-center gap-2">

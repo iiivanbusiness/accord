@@ -45,7 +45,7 @@ export default function ClauseLibraryManager({
 
       {items.length === 0 && !adding && (
         <div className="py-4 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-          No saved clauses yet — add one below, then insert it into any template.
+          No saved clauses yet. Add one below, then insert it into any template.
         </div>
       )}
 

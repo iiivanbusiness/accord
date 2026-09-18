@@ -7,7 +7,7 @@ export default function DeveloperSettingsLink() {
         <div>
           <h2 className="text-[15px] font-medium">API &amp; webhooks</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            Connect your own systems — a REST API and real-time webhooks.
+            Connect your own systems. A REST API and real-time webhooks.
           </div>
         </div>
         <span style={{ color: "var(--ink-muted)" }}>→</span>

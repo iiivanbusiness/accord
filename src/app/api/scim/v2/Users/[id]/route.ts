@@ -17,7 +17,7 @@ async function guardLastTeamManager(userId: string, workspaceId: string) {
   const others = await prisma.user.count({
     where: { workspaceId, id: { not: userId }, deactivatedAt: null, role: { canManageTeam: true } },
   });
-  if (others === 0) return scimError(409, "This is the only active teammate who can manage the team — reassign that role before deactivating them");
+  if (others === 0) return scimError(409, "This is the only active teammate who can manage the team. Reassign that role before deactivating them");
   return null;
 }
 

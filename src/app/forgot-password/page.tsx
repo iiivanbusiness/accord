@@ -28,7 +28,7 @@ export default async function ForgotPasswordPage({
 
         {sent ? (
           <div className="card p-6 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-            If that email has a SealMe account, a reset link is on its way — check your inbox.
+            If that email has a SealMe account, a reset link is on its way. Check your inbox.
           </div>
         ) : (
           <form action={requestPasswordReset} className="card flex flex-col gap-3 p-6">

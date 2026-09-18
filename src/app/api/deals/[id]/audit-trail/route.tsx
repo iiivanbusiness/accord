@@ -55,7 +55,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const events: AuditEvent[] = [];
 
-  events.push({ when: deal.createdAt, label: "Deal created", detail: `${deal.client.name} — ${deal.service}` });
+  events.push({ when: deal.createdAt, label: "Deal created", detail: `${deal.client.name} - ${deal.service}` });
 
   for (const call of deal.calls) {
     events.push({
@@ -80,10 +80,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       if (approval.status === "pending") continue;
       events.push({
         when: approval.decidedAt ?? deal.contract.createdAt,
-        label: `Approval ${approval.status} — ${approval.role.name}`,
+        label: `Approval ${approval.status} - ${approval.role.name}`,
         detail: [approval.decidedByUser ? `by ${approval.decidedByUser.name} (${approval.decidedByUser.email})` : null, approval.note ? `"${approval.note}"` : null]
           .filter(Boolean)
-          .join(" — "),
+          .join(", "),
       });
     }
     if (deal.contract.sentAt) {
@@ -119,7 +119,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     events.push({
       when: entry.createdAt,
       label: `System log: ${entry.action}`,
-      detail: [entry.actorEmail, detail, entry.ip ? `IP ${entry.ip}` : null].filter(Boolean).join(" — ") || null,
+      detail: [entry.actorEmail, detail, entry.ip ? `IP ${entry.ip}` : null].filter(Boolean).join(", ") || null,
     });
   }
 

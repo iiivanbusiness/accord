@@ -108,7 +108,7 @@ export default async function AdminPage() {
                   </div>
                 )}
                 <div className="mt-0.5 text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
-                  Requested {timeAgo(req.createdAt)} — currently {req.workspace.plan}, {req.workspace.callsUsedThisMonth} of {req.workspace.callsLimit} calls
+                  Requested {timeAgo(req.createdAt)}. Currently {req.workspace.plan}, {req.workspace.callsUsedThisMonth} of {req.workspace.callsLimit} calls
                 </div>
               </div>
               <form action={applyPlanChange.bind(null, req.workspaceId, req.id)} className="flex flex-none flex-wrap items-center gap-2">
@@ -132,7 +132,7 @@ export default async function AdminPage() {
         <div className="border-b px-5 py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Client profiles</h2>
           <div className="mt-0.5 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-            Onboarding answers — raw material for figuring out who your ideal customer actually is
+            Onboarding answers. Raw material for figuring out who your ideal customer actually is
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -221,7 +221,7 @@ export default async function AdminPage() {
         <div className="border-b px-5 py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Recent activity</h2>
           <div className="mt-0.5 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-            Security-relevant events across every workspace — last 100
+            Security-relevant events across every workspace. Last 100
           </div>
         </div>
         <div className="overflow-x-auto">

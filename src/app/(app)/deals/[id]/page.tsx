@@ -52,7 +52,7 @@ const STATUS_LABEL: Record<string, string> = {
   ready: "Ready for review",
   pending_approval: "Awaiting approval",
   changes_requested: "Changes requested",
-  sent: "Sent — awaiting signature",
+  sent: "Sent - awaiting signature",
   signed: "Signed",
 };
 
@@ -162,7 +162,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               {deal.calls.map((call, i) => (
                 <div key={call.id} className="border-b pb-3 last:border-b-0 last:pb-0" style={{ borderColor: "var(--hairline-soft)" }}>
                   <div className="mb-1 flex items-center justify-between gap-2">
-                    <span className="text-[13px] font-medium">Call {i + 1} — {CALL_SOURCE_LABEL[call.source] ?? call.source}</span>
+                    <span className="text-[13px] font-medium">Call {i + 1} - {CALL_SOURCE_LABEL[call.source] ?? call.source}</span>
                     <span className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
                       {call.startedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                       {!call.endedAt && call.id === deal.calls[deal.calls.length - 1].id ? " · in progress" : ""}
@@ -198,7 +198,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         {deal.status === "processing" ? (
           <div className="card flex items-center gap-2.5 px-5 py-4 text-[13.5px] font-medium" style={{ color: "var(--ink-muted)" }}>
             <span className="chip-dot h-1.5 w-1.5 rounded-full" style={{ background: "var(--ink-muted)" }} />
-            Analyzing the call — terms appear here live as they&apos;re mentioned.
+            Analyzing the call. Terms appear here live as they&apos;re mentioned.
           </div>
         ) : deal.status === "extraction_failed" ? (
           <div className="card" style={{ borderColor: "rgba(245,185,77,.28)" }}>
@@ -207,7 +207,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
             </div>
             <div className="px-5 py-4">
               <p className="mb-3 text-[13px]" style={{ color: "var(--ink-muted)" }}>
-                Something went wrong while extracting deal terms — check your AI extraction setup (e.g. Anthropic billing) and try again.
+                Something went wrong while extracting deal terms. Check your AI extraction setup (e.g. Anthropic billing) and try again.
               </p>
               <form action={retryExtraction.bind(null, deal.id)}>
                 <button type="submit" className="btn btn-primary w-full justify-center">
@@ -225,7 +225,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               {missing.map((m) => (
                 <div key={m.id} className="border-b py-3 last:border-b-0" style={{ borderColor: "var(--hairline-soft)" }}>
                   <label className="text-[13px] font-medium" htmlFor={m.id}>{m.label}</label>
-                  <div className="mb-2 mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>Not mentioned in the call — add it below.</div>
+                  <div className="mb-2 mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>Not mentioned in the call. Add it below.</div>
                   <input id={m.id} name={m.id} required placeholder={`Add ${m.label.toLowerCase()}…`} className="input w-full" style={{ fontSize: "13px", padding: "8px 11px" }} />
                 </div>
               ))}

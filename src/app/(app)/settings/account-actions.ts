@@ -36,7 +36,7 @@ export async function deleteMyAccount(formData: FormData): Promise<{ error?: str
   }
 
   const allowed = await checkRateLimit(`account-delete:${user.id}`, 5, 15 * 60 * 1000);
-  if (!allowed) return { error: "Too many attempts — try again later" };
+  if (!allowed) return { error: "Too many attempts. Try again later" };
 
   // Google-only accounts have no password to check — the typed confirmation
   // above is the only gate for those.

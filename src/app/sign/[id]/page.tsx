@@ -53,12 +53,12 @@ export default async function SignPage({ params, searchParams }: { params: Promi
       <main className="mx-auto max-w-[720px] px-6 py-10">
         {feedbackSent && (
           <div className="chip chip-success mb-6 w-full justify-start px-4 py-3 text-[13.5px]">
-            ✓ Thanks — your feedback was sent. We&apos;ll follow up.
+            ✓ Thanks. Your feedback was sent. We&apos;ll follow up.
           </div>
         )}
         {expired && (
           <div className="chip chip-warn mb-6 w-full justify-start px-4 py-3 text-[13.5px]">
-            This sign link has expired — ask {contract.deal.workspace.name} to resend it.
+            This sign link has expired. Ask {contract.deal.workspace.name} to resend it.
           </div>
         )}
         {clientSigned && (

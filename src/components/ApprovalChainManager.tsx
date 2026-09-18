@@ -77,7 +77,7 @@ function ChainCard({
 
         {chain.steps.length === 0 && (
           <div className="py-3 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-            No steps yet — contracts matching this chain send immediately.
+            No steps yet. Contracts matching this chain send immediately.
           </div>
         )}
 
@@ -150,12 +150,12 @@ export default function ApprovalChainManager({
   return (
     <div className="px-[22px] py-2">
       <div className="mb-2.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-        Checked top to bottom — the first chain whose team and deal-value conditions both match wins. Put more specific rules above a catch-all.
+        Checked top to bottom. The first chain whose team and deal-value conditions both match wins. Put more specific rules above a catch-all.
       </div>
 
       {chains.length === 0 && (
         <div className="py-3 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-          No approval chains configured — contracts send as soon as someone clicks &ldquo;Send to client&rdquo;.
+          No approval chains configured. Contracts send as soon as someone clicks &ldquo;Send to client&rdquo;.
         </div>
       )}
 

@@ -146,7 +146,7 @@ export default async function SettingsPage({
     )}
     {slack_connected && (
       <div className="chip chip-success mb-4 max-w-[600px] justify-start px-3.5 py-2.5 text-[12.5px]">
-        Slack connected — pick a channel below.
+        Slack connected. Pick a channel below.
       </div>
     )}
 
@@ -234,7 +234,7 @@ export default async function SettingsPage({
           <button type="submit" className="btn btn-secondary btn-sm">Invite</button>
         </form>
         <div className="pb-3 text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
-          They&apos;ll get an email — they need to sign in with Google using that address (no password yet for invited teammates).
+          They&apos;ll get an email. They need to sign in with Google using that address (no password yet for invited teammates).
         </div>
       </div>
     </div>
@@ -244,7 +244,7 @@ export default async function SettingsPage({
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Roles &amp; permissions</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            Owner always has every permission. Custom roles control what teammates can do — and can later gate steps in a contract approval chain.
+            Owner always has every permission. Custom roles control what teammates can do, and can later gate steps in a contract approval chain.
           </div>
         </div>
         <RolesManager
@@ -272,7 +272,7 @@ export default async function SettingsPage({
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Teams</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            Organizational segments (e.g. &ldquo;Sales EMEA&rdquo;, &ldquo;Sales US&rdquo;) — assign teammates to one above, then give a team its own approval chain below.
+            Organizational segments (e.g. &ldquo;Sales EMEA&rdquo;, &ldquo;Sales US&rdquo;). Assign teammates to one above, then give a team its own approval chain below.
           </div>
         </div>
         <TeamsManager
@@ -404,7 +404,7 @@ export default async function SettingsPage({
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">HubSpot</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            Push clients and deals to HubSpot automatically as Contacts and Deals — one-directional, SealMe stays the source of truth.
+            Push clients and deals to HubSpot automatically as Contacts and Deals. One-directional, SealMe stays the source of truth.
           </div>
         </div>
         <HubspotSettingsPanel
@@ -423,7 +423,7 @@ export default async function SettingsPage({
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">DocuSign</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            Hand a contract straight to your own DocuSign account for signing instead of SealMe&apos;s built-in flow — offered as a choice on the Send page once connected.
+            Hand a contract straight to your own DocuSign account for signing instead of SealMe&apos;s built-in flow. Offered as a choice on the Send page once connected.
           </div>
         </div>
         <DocusignSettingsPanel
@@ -442,7 +442,7 @@ export default async function SettingsPage({
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Salesforce</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            Push clients and deals to your own Salesforce org as Contacts and Opportunities — one-directional, SealMe stays the source of truth until a contract is signed.
+            Push clients and deals to your own Salesforce org as Contacts and Opportunities. One-directional, SealMe stays the source of truth until a contract is signed.
           </div>
         </div>
         <SalesforceSettingsPanel
@@ -525,7 +525,7 @@ export default async function SettingsPage({
         <div className="mt-4 border-t pt-4" style={{ borderColor: "var(--hairline-soft)" }}>
           {pendingUpgrade ? (
             <div className="chip chip-warn w-full justify-start px-3.5 py-2.5 text-[12.5px]">
-              Upgrade requested — we&apos;ll be in touch soon.
+              Upgrade requested. We&apos;ll be in touch soon.
             </div>
           ) : (
             <form action={requestUpgrade} className="flex flex-col gap-2 sm:flex-row sm:items-center">

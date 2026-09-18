@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "Privacy Policy — SealMe",
+  title: "Privacy Policy - SealMe",
 };
 
 const LAST_UPDATED = "August 19, 2026";
@@ -20,7 +20,7 @@ export default function PrivacyPage() {
 
       <main className="mx-auto max-w-[820px] px-6 py-16">
         <div className="chip chip-warn mb-6 w-fit uppercase tracking-wide" style={{ fontSize: "10.5px", fontWeight: 600 }}>
-          Draft — pending legal review
+          Draft. Pending legal review
         </div>
         <h1 className="mb-2 text-[36px] font-medium" style={{ letterSpacing: "-0.8px", color: "var(--primary)" }}>Privacy Policy</h1>
         <p className="mb-12 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>Last updated: {LAST_UPDATED}</p>
@@ -29,7 +29,7 @@ export default function PrivacyPage() {
           <Section title="1. Overview">
             <p>
               This Privacy Policy explains how SealMe (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) collects, uses, and shares information when you use our website and
-              service (the &quot;Service&quot;). It applies to workspace administrators, team members, and — where relevant — the sales prospects whose calls are
+              service (the &quot;Service&quot;). It applies to workspace administrators, team members, and (where relevant) the sales prospects whose calls are
               processed through the Service.
             </p>
           </Section>
@@ -37,20 +37,20 @@ export default function PrivacyPage() {
           <Section title="2. Information We Collect">
             <p>We collect the following categories of information:</p>
             <ul className="ml-5 mt-2 flex list-disc flex-col gap-1.5">
-              <li><strong style={{ color: "var(--ink)" }}>Account data</strong> — name, work email, password hash, and workspace details.</li>
-              <li><strong style={{ color: "var(--ink)" }}>Call data</strong> — audio captured during calls you connect to SealMe, and the transcripts and deal
+              <li><strong style={{ color: "var(--ink)" }}>Account data</strong>. Name, work email, password hash, and workspace details.</li>
+              <li><strong style={{ color: "var(--ink)" }}>Call data</strong>. Audio captured during calls you connect to SealMe, and the transcripts and deal
                 terms extracted from it.</li>
-              <li><strong style={{ color: "var(--ink)" }}>Deal and contract data</strong> — client names, pricing, contract templates, clauses, and signature
+              <li><strong style={{ color: "var(--ink)" }}>Deal and contract data</strong>. Client names, pricing, contract templates, clauses, and signature
                 records you create in the Service.</li>
-              <li><strong style={{ color: "var(--ink)" }}>Calendar data</strong> — if you connect Google Calendar, we access event details needed to schedule
+              <li><strong style={{ color: "var(--ink)" }}>Calendar data</strong>. If you connect Google Calendar, we access event details needed to schedule
                 and match calls to deals.</li>
-              <li><strong style={{ color: "var(--ink)" }}>Usage and device data</strong> — log data, browser type, and product usage analytics.</li>
+              <li><strong style={{ color: "var(--ink)" }}>Usage and device data</strong>. Log data, browser type, and product usage analytics.</li>
             </ul>
           </Section>
 
           <Section title="3. How We Use Information">
             <ul className="ml-5 flex list-disc flex-col gap-1.5">
-              <li>To operate the Service — capturing deal terms, drafting contracts, and routing them for signature;</li>
+              <li>To operate the Service: capturing deal terms, drafting contracts, and routing them for signature;</li>
               <li>To maintain and secure workspace accounts;</li>
               <li>To provide customer support and respond to requests;</li>
               <li>To improve accuracy of AI-driven field extraction and contract drafting;</li>
@@ -88,7 +88,7 @@ export default function PrivacyPage() {
 
           <Section title="7. Data Security">
             <p>
-              We use industry-standard technical and organizational measures — including encryption in transit and access controls — to protect information
+              We use industry-standard technical and organizational measures (including encryption in transit and access controls) to protect information
               against unauthorized access, alteration, or loss. No method of transmission or storage is completely secure, and we cannot guarantee absolute
               security.
             </p>

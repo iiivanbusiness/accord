@@ -35,7 +35,7 @@ export default function SalesforceSettingsPanel({
   if (!configured) {
     return (
       <div className="px-[22px] py-[18px] text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-        Salesforce isn&apos;t set up for this deployment yet — a SALESFORCE_CLIENT_ID/SECRET needs to be configured first.
+        Salesforce isn&apos;t set up for this deployment yet. A SALESFORCE_CLIENT_ID/SECRET needs to be configured first.
       </div>
     );
   }

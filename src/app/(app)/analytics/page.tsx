@@ -62,7 +62,7 @@ export default async function AnalyticsPage() {
     <div className="mb-6">
       <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Analytics</h1>
       <div className="mt-1 text-[14px]" style={{ color: "var(--ink-muted)" }}>
-        How your deals are moving from call to signature{!canViewAll && " — your own deals only"}
+        How your deals are moving from call to signature{!canViewAll && ". Your own deals only"}
       </div>
     </div>
 

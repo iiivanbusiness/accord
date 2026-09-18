@@ -35,7 +35,7 @@ export default async function DealsTrashPage() {
           </Link>
           <h1 className="mt-1 text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Trash</h1>
           <div className="mt-1 text-[14px]" style={{ color: "var(--ink-muted)" }}>
-            {deals.length} {deals.length === 1 ? "deal" : "deals"} — restore anytime, or empty the trash to delete them for good
+            {deals.length} {deals.length === 1 ? "deal" : "deals"}. Restore anytime, or empty the trash to delete them for good
           </div>
         </div>
         {deals.length > 0 && <EmptyTrashButton action={emptyTrash} count={deals.length} />}

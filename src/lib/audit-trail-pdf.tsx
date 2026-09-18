@@ -40,7 +40,7 @@ export function AuditTrailPdfDocument({
     <Document>
       <Page size="A4" style={styles.page}>
         <Text style={styles.title}>Audit trail</Text>
-        <Text style={styles.subtitle}>{templateName} — {workspaceName} and {clientName}</Text>
+        <Text style={styles.subtitle}>{templateName} - {workspaceName} and {clientName}</Text>
         <Text style={styles.generatedAt}>Generated {fmt(generatedAt)}</Text>
 
         <View style={styles.section}>

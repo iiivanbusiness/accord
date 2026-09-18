@@ -107,7 +107,7 @@ export default function ActionItemsCard({
                   </div>
                   {item.dueDate && (
                     <div className="mt-0.5 text-[11.5px]" style={{ color: overdue ? "#c0392b" : "var(--ink-muted)" }}>
-                      {overdue ? "Overdue — was due" : "Due"} {formatDue(item.dueDate)}
+                      {overdue ? "Overdue. Was due" : "Due"} {formatDue(item.dueDate)}
                     </div>
                   )}
                   {item.sourceQuote && openQuote === item.id && (

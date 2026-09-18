@@ -31,7 +31,7 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
       <div>
         <div className="flex items-center gap-2">
           <h1 className="text-[23px] font-medium" style={{ letterSpacing: "-0.6px" }}>{template.name}</h1>
-          {template.locked && <span title="Locked — approved wording" className="text-[18px]">🔒</span>}
+          {template.locked && <span title="Locked - approved wording" className="text-[18px]">🔒</span>}
         </div>
         <div className="mt-1 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>{template.description}</div>
       </div>
@@ -41,7 +41,7 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
     {template.locked && (
       <div className="mb-[18px] chip chip-neutral px-4 py-3 text-[13.5px]" style={{ width: "fit-content" }}>
         🔒 Locked{template.lockedByUser ? ` by ${template.lockedByUser.name}` : ""}
-        {template.lockedAt ? ` on ${template.lockedAt.toLocaleDateString()}` : ""} — approved wording, edits need an approver
+        {template.lockedAt ? ` on ${template.lockedAt.toLocaleDateString()}` : ""}. Approved wording, edits need an approver
       </div>
     )}
 
@@ -70,7 +70,7 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
         ) : (
           canManage && (
             <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
-              Locked — ask an approver to unlock before editing.
+              Locked. Ask an approver to unlock before editing.
             </div>
           )
         )}
@@ -90,7 +90,7 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
               disabled={template.deals.length > 0}
               className="btn btn-secondary w-full justify-center"
               style={{ color: template.deals.length > 0 ? "var(--ink-muted)" : "#ff6b57" }}
-              title={template.deals.length > 0 ? "In use by a deal — can't be deleted" : undefined}
+              title={template.deals.length > 0 ? "In use by a deal. Can't be deleted" : undefined}
             >
               Delete template
             </button>

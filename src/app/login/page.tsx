@@ -63,7 +63,7 @@ export default async function LoginPage({
         )}
         {reset && (
           <div className="chip chip-success mb-4 w-full justify-center py-2.5 text-[12.5px]">
-            Password updated — sign in below.
+            Password updated. Sign in below.
           </div>
         )}
 

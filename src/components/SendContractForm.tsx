@@ -47,7 +47,7 @@ export default function SendContractForm({
         setResult(res);
         setTimeout(() => router.push(`/deals/${dealId}/contract`), 1600);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Couldn't send the email — check your Resend setup and try again");
+        setError(err instanceof Error ? err.message : "Couldn't send the email. Check your Resend setup and try again");
       }
     });
   }
@@ -76,7 +76,7 @@ export default function SendContractForm({
         <input name="to" type="email" required defaultValue={defaultTo} placeholder="client@company.com" className="input" />
       </label>
       <label className="flex flex-col gap-1.5">
-        <span className="text-[13px] font-medium">CC <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>(optional — comma-separated, gets a copy but doesn&apos;t sign)</span></span>
+        <span className="text-[13px] font-medium">CC <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>(optional. Comma-separated, gets a copy but doesn&apos;t sign)</span></span>
         <input name="cc" placeholder="assistant@client.com, ops@yourcompany.com" className="input" />
       </label>
       <label className="flex flex-col gap-1.5">

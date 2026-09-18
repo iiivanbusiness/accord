@@ -19,9 +19,9 @@ export async function extractActionItems(callId: string): Promise<void> {
     max_tokens: 1536,
     system:
       "You read a raw call transcript between an agency (\"we\"/\"I\"/\"us\") and a client, and pull out concrete " +
-      "commitments made during the call that are NOT the deal terms themselves (price, service, contract length) — " +
+      "commitments made during the call that are NOT the deal terms themselves (price, service, contract length). " +
       "things like \"I'll send the proposal by Friday\" or \"you need to approve the brief\". Only report an item " +
-      "if someone actually committed to it on the call — never invent one. Quote the exact transcript sentence for each. " +
+      "if someone actually committed to it on the call. Never invent one. Quote the exact transcript sentence for each. " +
       `Today's reference date for resolving relative deadlines ("by Friday", "next week") is ${referenceDate}, the day of this call.`,
     messages: [
       {

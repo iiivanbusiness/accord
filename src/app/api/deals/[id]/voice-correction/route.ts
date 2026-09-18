@@ -31,7 +31,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!deal) return NextResponse.json({ error: "Deal not found" }, { status: 404 });
 
   const allowed = await checkRateLimit(`voice-correction:${deal.id}`, 30, 60 * 60 * 1000);
-  if (!allowed) return NextResponse.json({ error: "Too many attempts — try again later" }, { status: 429 });
+  if (!allowed) return NextResponse.json({ error: "Too many attempts. Try again later" }, { status: 429 });
 
   const contentType = req.headers.get("content-type") || "audio/webm";
   const audioBytes = Buffer.from(await req.arrayBuffer());
@@ -39,10 +39,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   try {
     const transcript = await transcribeVoiceClip(audioBytes, contentType);
-    if (!transcript.trim()) return NextResponse.json({ error: "Didn't catch anything — try holding the button a bit longer" });
+    if (!transcript.trim()) return NextResponse.json({ error: "Didn't catch anything. Try holding the button a bit longer" });
 
     const proposal = await interpretVoiceCorrection(id, transcript, currentUser?.id);
-    if (!proposal) return NextResponse.json({ error: "Nothing to correct yet — the call hasn't produced any fields" });
+    if (!proposal) return NextResponse.json({ error: "Nothing to correct yet. The call hasn't produced any fields" });
 
     let audioBase64: string | null = null;
     if (isFishAudioConfigured()) {
@@ -57,6 +57,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ transcript, proposal, audioBase64 });
   } catch (err) {
     console.error(`Voice correction failed for deal ${id}`, err);
-    return NextResponse.json({ error: "Something went wrong understanding that — try again" }, { status: 500 });
+    return NextResponse.json({ error: "Something went wrong understanding that. Try again" }, { status: 500 });
   }
 }

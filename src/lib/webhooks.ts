@@ -56,6 +56,6 @@ export async function sendTestWebhook(endpointId: string): Promise<void> {
   const endpoint = await prisma.webhookEndpoint.findUnique({ where: { id: endpointId } });
   if (!endpoint) throw new Error("Webhook endpoint not found");
   await deliverToEndpoint(endpoint.id, endpoint.url, endpoint.secret, "test", {
-    message: "This is a test event from SealMe — no real deal was created.",
+    message: "This is a test event from SealMe. No real deal was created.",
   });
 }

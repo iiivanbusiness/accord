@@ -19,7 +19,7 @@ export default function CountersignerFields({ clientName }: { clientName: string
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[13px] font-medium">Additional signers <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>(optional — sign after {clientName}, in order)</span></span>
+      <span className="text-[13px] font-medium">Additional signers <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>(optional. Sign after {clientName}, in order)</span></span>
       {rows.map((row) => (
         <div key={row.id} className="flex items-center gap-2">
           <input name="signerName" placeholder="Name" className="input flex-1" style={{ fontSize: "13px", padding: "8px 11px" }} defaultValue={row.name} />
