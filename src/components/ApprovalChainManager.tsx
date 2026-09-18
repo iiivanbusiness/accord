@@ -182,13 +182,13 @@ export default function ApprovalChainManager({
             {createError}
           </div>
         )}
-        <form action={runCreate} className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <input name="name" required placeholder="Chain name, e.g. Enterprise" className="input flex-1" style={{ fontSize: "12.5px", padding: "7px 10px" }} />
-          <select name="teamId" className="input" style={{ fontSize: "12.5px", padding: "7px 10px", minWidth: 140 }} defaultValue="">
+        <form action={runCreate} className="flex flex-wrap gap-2 sm:items-center">
+          <input name="name" required placeholder="Chain name, e.g. Enterprise" className="input min-w-0 flex-1 basis-[160px]" style={{ fontSize: "12.5px", padding: "7px 10px" }} />
+          <select name="teamId" className="input flex-none" style={{ fontSize: "12.5px", padding: "7px 10px", minWidth: 140 }} defaultValue="">
             <option value="">Any team</option>
             {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
-          <input name="minDealValue" type="number" min="0" placeholder="Min € value" className="input" style={{ fontSize: "12.5px", padding: "7px 10px", width: 120 }} />
+          <input name="minDealValue" type="number" min="0" placeholder="Min € value" className="input flex-none" style={{ fontSize: "12.5px", padding: "7px 10px", width: 120 }} />
           <button type="submit" disabled={isPending} className="btn btn-secondary btn-sm flex-none">+ Add chain</button>
         </form>
       </div>

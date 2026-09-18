@@ -11,6 +11,7 @@ import TeamSelect from "@/components/TeamSelect";
 import TeamsManager from "@/components/TeamsManager";
 import ApprovalChainManager from "@/components/ApprovalChainManager";
 import ApprovalDelegatesPanel from "@/components/ApprovalDelegatesPanel";
+import InviteTeammateForm from "@/components/InviteTeammateForm";
 import ScimSettingsPanel from "@/components/ScimSettingsPanel";
 import SsoSettingsPanel from "@/components/SsoSettingsPanel";
 import DeveloperSettingsLink from "@/components/DeveloperSettingsLink";
@@ -222,17 +223,7 @@ export default async function SettingsPage({
             </div>
           </div>
         ))}
-        <form action={inviteTeammate} className="flex flex-col gap-2 py-3.5 sm:flex-row sm:items-center">
-          <input
-            name="email"
-            type="email"
-            required
-            placeholder="teammate@company.com"
-            className="input flex-1"
-            style={{ fontSize: "13px", padding: "8px 11px" }}
-          />
-          <button type="submit" className="btn btn-secondary btn-sm">Invite</button>
-        </form>
+        <InviteTeammateForm inviteAction={inviteTeammate} />
         <div className="pb-3 text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
           They&apos;ll get an email. They need to sign in with Google using that address (no password yet for invited teammates).
         </div>
