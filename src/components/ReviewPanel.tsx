@@ -102,14 +102,14 @@ export default function ReviewPanel({
   delegatedAssigneeIds: string[];
   currentUserCanManageWorkspace: boolean;
   getReviewStateAction: (dealId: string) => Promise<ReviewState | null>;
-  sendToAction: (dealId: string, assigneeId: string) => Promise<void>;
-  decideAction: (dealId: string, reviewStepId: string, decision: "approve" | "reject", formData: FormData) => Promise<void>;
-  addChecklistItemAction: (dealId: string, reviewStepId: string, formData: FormData) => Promise<void>;
-  toggleChecklistItemAction: (dealId: string, itemId: string, done: boolean) => Promise<void>;
-  removeChecklistItemAction: (dealId: string, itemId: string) => Promise<void>;
-  addCommentAction: (dealId: string, reviewStepId: string, body: string) => Promise<void>;
-  deleteCommentAction: (dealId: string, commentId: string) => Promise<void>;
-  updateStepMetaAction: (dealId: string, reviewStepId: string, formData: FormData) => Promise<void>;
+  sendToAction: (dealId: string, assigneeId: string) => Promise<{ error?: string }>;
+  decideAction: (dealId: string, reviewStepId: string, decision: "approve" | "reject", formData: FormData) => Promise<{ error?: string }>;
+  addChecklistItemAction: (dealId: string, reviewStepId: string, formData: FormData) => Promise<{ error?: string }>;
+  toggleChecklistItemAction: (dealId: string, itemId: string, done: boolean) => Promise<{ error?: string }>;
+  removeChecklistItemAction: (dealId: string, itemId: string) => Promise<{ error?: string }>;
+  addCommentAction: (dealId: string, reviewStepId: string, body: string) => Promise<{ error?: string }>;
+  deleteCommentAction: (dealId: string, commentId: string) => Promise<{ error?: string }>;
+  updateStepMetaAction: (dealId: string, reviewStepId: string, formData: FormData) => Promise<{ error?: string }>;
 }) {
   const [note, setNote] = useState("");
   const [newItemLabel, setNewItemLabel] = useState("");
@@ -181,15 +181,21 @@ export default function ReviewPanel({
   const canDecideCurrent = Boolean(activeStep && (activeStep.assigneeId === currentUserId || actingAsDelegate));
   const canEditMeta = Boolean(activeStep && (canDecideCurrent || currentUserCanManageWorkspace));
 
-  function run(fn: () => Promise<void>) {
+  // Actions return `{ error? }` instead of throwing — Next.js redacts a
+  // thrown Server Action error's message in production (replacing it with
+  // an opaque "Minified React error #…"), so the specific, useful message
+  // ("This client has no email on file yet", "An earlier step hasn't been
+  // approved yet"...) only survives the trip to the client as data.
+  function run(fn: () => Promise<{ error?: string }>, onSuccess?: () => void) {
     setError(null);
     startTransition(async () => {
-      try {
-        await fn();
-        await refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
+      const result = await fn();
+      if (result.error) {
+        setError(result.error);
+        return;
       }
+      onSuccess?.();
+      await refresh();
     });
   }
 
@@ -197,50 +203,54 @@ export default function ReviewPanel({
     if (!sendToId) return;
     setError(null);
     startSending(async () => {
-      try {
-        await sendToAction(dealId, sendToId);
-        await refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
+      const result = await sendToAction(dealId, sendToId);
+      if (result.error) {
+        setError(result.error);
+        return;
       }
+      await refresh();
     });
   }
 
   function decide(decision: "approve" | "reject") {
     if (!activeStep) return;
-    run(async () => {
-      const formData = new FormData();
-      formData.set("note", note);
-      await decideAction(dealId, activeStep.id, decision, formData);
-      setNote("");
-    });
+    run(
+      () => {
+        const formData = new FormData();
+        formData.set("note", note);
+        return decideAction(dealId, activeStep.id, decision, formData);
+      },
+      () => setNote("")
+    );
   }
 
   function addItem() {
     if (!activeStep || !newItemLabel.trim()) return;
-    run(async () => {
-      const formData = new FormData();
-      formData.set("label", newItemLabel.trim());
-      await addChecklistItemAction(dealId, activeStep.id, formData);
-      setNewItemLabel("");
-    });
+    run(
+      () => {
+        const formData = new FormData();
+        formData.set("label", newItemLabel.trim());
+        return addChecklistItemAction(dealId, activeStep.id, formData);
+      },
+      () => setNewItemLabel("")
+    );
   }
 
   function addComment() {
     if (!activeStep || !commentDraft.trim()) return;
-    run(async () => {
-      await addCommentAction(dealId, activeStep.id, commentDraft.trim());
-      setCommentDraft("");
-    });
+    run(
+      () => addCommentAction(dealId, activeStep.id, commentDraft.trim()),
+      () => setCommentDraft("")
+    );
   }
 
   function updatePriority(value: string) {
     if (!activeStep) return;
-    run(async () => {
+    run(() => {
       const formData = new FormData();
       formData.set("priority", value);
       formData.set("dueAt", activeStep.dueAt ? activeStep.dueAt.toISOString().slice(0, 10) : "");
-      await updateStepMetaAction(dealId, activeStep.id, formData);
+      return updateStepMetaAction(dealId, activeStep.id, formData);
     });
   }
 

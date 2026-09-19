@@ -87,7 +87,7 @@ export default function VoiceCorrectionButton({
 }: {
   dealId: string;
   applyAction: (dealId: string, fieldKey: string, newValue: string) => Promise<void>;
-  reviewAction: (dealId: string, recipientUserId: string) => Promise<void>;
+  reviewAction: (dealId: string, recipientUserId: string) => Promise<{ error?: string }>;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<Status>("idle");
@@ -190,7 +190,11 @@ export default function VoiceCorrectionButton({
         if (proposal.intent === "update_field") {
           await applyAction(dealId, proposal.fieldKey, proposal.proposedValue);
         } else if (proposal.intent === "send_for_review") {
-          await reviewAction(dealId, proposal.recipientUserId);
+          const result = await reviewAction(dealId, proposal.recipientUserId);
+          if (result.error) {
+            setError(result.error);
+            return;
+          }
           setJustSentTo(proposal.recipientName);
           setTimeout(() => setJustSentTo(null), 2200);
         }

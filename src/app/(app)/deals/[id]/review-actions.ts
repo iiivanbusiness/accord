@@ -109,7 +109,7 @@ export async function getReviewState(dealId: string): Promise<{ contractStatus: 
 // finished), it starts a fresh step. Open to any workspace member who can
 // see the deal, same visibility gate as a deal note/comment — this is
 // deliberately informal, not an admin-only action.
-export async function sendForReviewTo(dealId: string, assigneeId: string) {
+export async function sendForReviewTo(dealId: string, assigneeId: string): Promise<{ error?: string }> {
   const { where } = await dealVisibilityFilter();
   const workspaceId = await requireWorkspaceId();
 
@@ -117,10 +117,10 @@ export async function sendForReviewTo(dealId: string, assigneeId: string) {
     where: { id: dealId, workspaceId, ...where },
     include: { contract: true, client: true, template: true, workspace: true },
   });
-  if (!deal || !deal.contract) throw new Error("Generate a contract for this deal first");
+  if (!deal || !deal.contract) return { error: "Generate a contract for this deal first" };
 
   const assignee = await prisma.user.findFirst({ where: { id: assigneeId, workspaceId } });
-  if (!assignee) throw new Error("Teammate not found");
+  if (!assignee) return { error: "Teammate not found" };
 
   const activeStep = await prisma.reviewStep.findFirst({ where: { contractId: deal.contract.id, status: "pending" }, orderBy: { order: "asc" } });
   const startingFreshChain = !activeStep && deal.contract.status !== "sent" && deal.contract.status !== "signed";
@@ -134,7 +134,7 @@ export async function sendForReviewTo(dealId: string, assigneeId: string) {
   // instead of leaving an orphaned review step behind.
   const needsPendingEmail = startingFreshChain && !deal.contract.pendingTo && !deal.contract.pendingSubject && !deal.contract.pendingMessage;
   if (needsPendingEmail && !deal.client.email) {
-    throw new Error("This client has no email on file yet. Add one before sending for review");
+    return { error: "This client has no email on file yet. Add one before sending for review" };
   }
 
   let stepId: string;
@@ -168,34 +168,35 @@ export async function sendForReviewTo(dealId: string, assigneeId: string) {
 
   revalidatePath(`/deals/${dealId}`);
   revalidatePath(`/deals/${dealId}/contract`);
+  return {};
 }
 
-// Invoked from a client component (ReviewPanel) that wraps this in its
-// own try/catch to show inline errors, so this never calls redirect() —
-// redirect() throws to signal Next.js, and a client-side catch would treat
-// that throw as a failure instead of letting it navigate. revalidatePath
-// refreshes the page in place instead, which is also just a better fit
-// here: the decider is already looking at this exact page.
-export async function decideReviewStep(dealId: string, reviewStepId: string, decision: "approve" | "reject", formData: FormData) {
+// Invoked from a client component (ReviewPanel) that reads the returned
+// `error` field to show inline errors, so this never calls redirect() —
+// redirect() throws to signal Next.js, and treating that throw as a
+// mutation failure would break navigation. revalidatePath refreshes the
+// page in place instead, which is also just a better fit here: the
+// decider is already looking at this exact page.
+export async function decideReviewStep(dealId: string, reviewStepId: string, decision: "approve" | "reject", formData: FormData): Promise<{ error?: string }> {
   const note = String(formData.get("note") ?? "").trim() || null;
   const workspaceId = await requireWorkspaceId();
 
   const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId }, include: { contract: true } });
-  if (!deal || !deal.contract) throw new Error("Deal not found");
+  if (!deal || !deal.contract) return { error: "Deal not found" };
 
   const reviewStep = await prisma.reviewStep.findFirst({ where: { id: reviewStepId, contractId: deal.contract.id } });
-  if (!reviewStep) throw new Error("Review step not found");
-  if (reviewStep.status !== "pending") throw new Error("This step was already decided");
+  if (!reviewStep) return { error: "Review step not found" };
+  if (reviewStep.status !== "pending") return { error: "This step was already decided" };
 
   // Steps must be decided strictly in order.
   const earlierUnresolved = await prisma.reviewStep.count({
     where: { contractId: deal.contract.id, order: { lt: reviewStep.order }, status: { not: "approved" } },
   });
-  if (earlierUnresolved > 0) throw new Error("An earlier step hasn't been approved yet");
+  if (earlierUnresolved > 0) return { error: "An earlier step hasn't been approved yet" };
 
   const user = await currentUserWithRole();
   const { eligible, onBehalfOfUserId } = await checkReviewStepEligibility(reviewStep, user.id);
-  if (!eligible) throw new Error("You're not eligible to decide this review step");
+  if (!eligible) return { error: "You're not eligible to decide this review step" };
 
   if (decision === "reject") {
     await prisma.reviewStep.update({
@@ -210,7 +211,7 @@ export async function decideReviewStep(dealId: string, reviewStepId: string, dec
 
     revalidatePath(`/deals/${dealId}`);
     revalidatePath(`/deals/${dealId}/contract`);
-    return;
+    return {};
   }
 
   const nextStep = await prisma.reviewStep.findFirst({
@@ -223,9 +224,14 @@ export async function decideReviewStep(dealId: string, reviewStepId: string, dec
   // Resend outage, whatever), the step stays "pending" so this is simply
   // retryable — the alternative (marking it approved regardless) would
   // strand the contract in pending_approval forever with no pending step
-  // left to act on.
+  // left to act on. Caught explicitly (rather than left to throw) so the
+  // real reason — not a redacted production error — reaches the reviewer.
   if (!nextStep) {
-    await performActualSend(deal.contract.id);
+    try {
+      await performActualSend(deal.contract.id);
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Couldn't send the contract to the client" };
+    }
   }
 
   await prisma.reviewStep.update({
@@ -240,110 +246,117 @@ export async function decideReviewStep(dealId: string, reviewStepId: string, dec
 
   revalidatePath(`/deals/${dealId}`);
   revalidatePath(`/deals/${dealId}/contract`);
+  return {};
 }
 
-export async function addChecklistItem(dealId: string, reviewStepId: string, formData: FormData) {
+export async function addChecklistItem(dealId: string, reviewStepId: string, formData: FormData): Promise<{ error?: string }> {
   const label = String(formData.get("label") ?? "").trim();
-  if (!label) throw new Error("Enter a checklist item");
+  if (!label) return { error: "Enter a checklist item" };
 
   const workspaceId = await requireWorkspaceId();
   const reviewStep = await prisma.reviewStep.findFirst({ where: { id: reviewStepId, contract: { deal: { id: dealId, workspaceId } } } });
-  if (!reviewStep) throw new Error("Review step not found");
+  if (!reviewStep) return { error: "Review step not found" };
 
   const user = await currentUserWithRole();
   const { eligible } = await checkReviewStepEligibility(reviewStep, user.id);
-  if (!eligible) throw new Error("You're not eligible to edit this review step");
+  if (!eligible) return { error: "You're not eligible to edit this review step" };
 
   await prisma.reviewChecklistItem.create({ data: { reviewStepId, label } });
   revalidatePath(`/deals/${dealId}`);
   revalidatePath(`/deals/${dealId}/contract`);
+  return {};
 }
 
-export async function toggleChecklistItem(dealId: string, itemId: string, done: boolean) {
+export async function toggleChecklistItem(dealId: string, itemId: string, done: boolean): Promise<{ error?: string }> {
   const workspaceId = await requireWorkspaceId();
   const item = await prisma.reviewChecklistItem.findFirst({
     where: { id: itemId, reviewStep: { contract: { deal: { id: dealId, workspaceId } } } },
     include: { reviewStep: true },
   });
-  if (!item) throw new Error("Checklist item not found");
+  if (!item) return { error: "Checklist item not found" };
 
   const user = await currentUserWithRole();
   const { eligible } = await checkReviewStepEligibility(item.reviewStep, user.id);
-  if (!eligible) throw new Error("You're not eligible to edit this review step");
+  if (!eligible) return { error: "You're not eligible to edit this review step" };
 
   await prisma.reviewChecklistItem.update({ where: { id: itemId }, data: { done, doneAt: done ? new Date() : null } });
   revalidatePath(`/deals/${dealId}`);
   revalidatePath(`/deals/${dealId}/contract`);
+  return {};
 }
 
-export async function removeChecklistItem(dealId: string, itemId: string) {
+export async function removeChecklistItem(dealId: string, itemId: string): Promise<{ error?: string }> {
   const workspaceId = await requireWorkspaceId();
   const item = await prisma.reviewChecklistItem.findFirst({
     where: { id: itemId, reviewStep: { contract: { deal: { id: dealId, workspaceId } } } },
     include: { reviewStep: true },
   });
-  if (!item) throw new Error("Checklist item not found");
+  if (!item) return { error: "Checklist item not found" };
 
   const user = await currentUserWithRole();
   const { eligible } = await checkReviewStepEligibility(item.reviewStep, user.id);
-  if (!eligible) throw new Error("You're not eligible to edit this review step");
+  if (!eligible) return { error: "You're not eligible to edit this review step" };
 
   await prisma.reviewChecklistItem.delete({ where: { id: itemId } });
   revalidatePath(`/deals/${dealId}`);
   revalidatePath(`/deals/${dealId}/contract`);
+  return {};
 }
 
 // Comments are visible workspace-wide (same as DealNote) — anyone signed
 // into the workspace can leave one, not just the step's assignee, since a
 // comment is a lighter-weight "hey, noticed this" than the actual decision.
-export async function addReviewComment(dealId: string, reviewStepId: string, body: string) {
+export async function addReviewComment(dealId: string, reviewStepId: string, body: string): Promise<{ error?: string }> {
   const trimmed = body.trim();
-  if (!trimmed) throw new Error("Comment can't be empty");
+  if (!trimmed) return { error: "Comment can't be empty" };
 
   const workspaceId = await requireWorkspaceId();
   const reviewStep = await prisma.reviewStep.findFirst({ where: { id: reviewStepId, contract: { deal: { id: dealId, workspaceId } } } });
-  if (!reviewStep) throw new Error("Review step not found");
+  if (!reviewStep) return { error: "Review step not found" };
 
   const user = await currentUserWithRole();
   await prisma.reviewComment.create({ data: { reviewStepId, authorEmail: user.email, authorName: user.name, body: trimmed } });
   revalidatePath(`/deals/${dealId}`);
   revalidatePath(`/deals/${dealId}/contract`);
+  return {};
 }
 
-export async function deleteReviewComment(dealId: string, commentId: string) {
+export async function deleteReviewComment(dealId: string, commentId: string): Promise<{ error?: string }> {
   const workspaceId = await requireWorkspaceId();
   const comment = await prisma.reviewComment.findFirst({ where: { id: commentId, reviewStep: { contract: { deal: { id: dealId, workspaceId } } } } });
-  if (!comment) throw new Error("Comment not found");
+  if (!comment) return { error: "Comment not found" };
 
   const user = await currentUserWithRole();
-  if (comment.authorEmail !== user.email) throw new Error("You can only delete your own comments");
+  if (comment.authorEmail !== user.email) return { error: "You can only delete your own comments" };
 
   await prisma.reviewComment.delete({ where: { id: commentId } });
   revalidatePath(`/deals/${dealId}`);
   revalidatePath(`/deals/${dealId}/contract`);
+  return {};
 }
 
 // Set or clear a step's due date / priority — either the assignee
 // themselves or anyone who can manage the workspace (an admin helping
 // triage) can adjust these; they're not part of the approve/reject
 // decision itself.
-export async function updateReviewStepMeta(dealId: string, reviewStepId: string, formData: FormData) {
+export async function updateReviewStepMeta(dealId: string, reviewStepId: string, formData: FormData): Promise<{ error?: string }> {
   const workspaceId = await requireWorkspaceId();
   const reviewStep = await prisma.reviewStep.findFirst({ where: { id: reviewStepId, contract: { deal: { id: dealId, workspaceId } } } });
-  if (!reviewStep) throw new Error("Review step not found");
+  if (!reviewStep) return { error: "Review step not found" };
 
   const user = await currentUserWithRole();
   const { eligible } = await checkReviewStepEligibility(reviewStep, user.id);
-  if (!eligible && !user.role?.canManageWorkspace) throw new Error("You're not eligible to edit this review step");
+  if (!eligible && !user.role?.canManageWorkspace) return { error: "You're not eligible to edit this review step" };
 
   const priority = String(formData.get("priority") ?? "normal");
-  if (!["low", "normal", "high", "urgent"].includes(priority)) throw new Error("Invalid priority");
+  if (!["low", "normal", "high", "urgent"].includes(priority)) return { error: "Invalid priority" };
 
   const rawDueAt = String(formData.get("dueAt") ?? "").trim();
   const dueAt = rawDueAt ? new Date(rawDueAt) : null;
-  if (rawDueAt && Number.isNaN(dueAt?.getTime())) throw new Error("Invalid due date");
+  if (rawDueAt && Number.isNaN(dueAt?.getTime())) return { error: "Invalid due date" };
 
   await prisma.reviewStep.update({ where: { id: reviewStepId }, data: { priority, dueAt, dueReminderSentAt: null } });
   revalidatePath(`/deals/${dealId}`);
   revalidatePath(`/deals/${dealId}/contract`);
+  return {};
 }
