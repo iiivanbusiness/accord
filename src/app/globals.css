@@ -497,6 +497,14 @@ a {
   100% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
 }
 
+/* ---------- review panel timeline (ReviewPanel) ---------- */
+@keyframes review-row-in { 0% { opacity: 0; transform: translateY(-6px); } 100% { opacity: 1; transform: translateY(0); } }
+@keyframes review-row-flash {
+  0% { background: rgba(0,153,255,0.16); }
+  70% { background: rgba(0,153,255,0.16); }
+  100% { background: transparent; }
+}
+
 /* ---------- FAQ chat widget: animated assistant avatar orb ---------- */
 .faq-orb {
   background: radial-gradient(circle at 30% 30%, #d6ecff, #6ea8ff 45%, #3b5bdb 75%);

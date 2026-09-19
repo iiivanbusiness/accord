@@ -32,6 +32,73 @@ async function checkReviewStepEligibility(reviewStep: ReviewStepWithAssignee, us
   return { eligible: true, onBehalfOfUserId: delegation.fromUserId };
 }
 
+export type ReviewStepData = {
+  id: string;
+  order: number;
+  status: string;
+  assigneeId: string;
+  assigneeName: string;
+  decidedByName: string | null;
+  decidedOnBehalfOfName: string | null;
+  decidedAt: Date | null;
+  note: string | null;
+  priority: string;
+  dueAt: Date | null;
+  checklistItems: { id: string; label: string; done: boolean }[];
+  comments: { id: string; authorName: string; authorEmail: string; body: string; createdAt: string }[];
+};
+
+// Polled by ReviewPanel (a client component) every few seconds so that when
+// a teammate decides their step from their own device, everyone else
+// looking at the same deal sees it update on its own — the mutations above
+// already revalidatePath, but that only refreshes the page for whoever just
+// acted. This is the read side that makes the state visible live to
+// everyone else without them having to reload.
+export async function getReviewState(dealId: string): Promise<{ contractStatus: string; dealStatus: string; steps: ReviewStepData[] } | null> {
+  const { where } = await dealVisibilityFilter();
+  const workspaceId = await requireWorkspaceId();
+  const deal = await prisma.deal.findFirst({
+    where: { id: dealId, workspaceId, ...where },
+    include: {
+      contract: {
+        include: {
+          reviewSteps: {
+            include: {
+              assignee: true,
+              decidedByUser: true,
+              decidedOnBehalfOfUser: true,
+              checklistItems: { orderBy: { createdAt: "asc" } },
+              comments: { orderBy: { createdAt: "asc" } },
+            },
+            orderBy: { order: "asc" },
+          },
+        },
+      },
+    },
+  });
+  if (!deal || !deal.contract) return null;
+
+  return {
+    contractStatus: deal.contract.status,
+    dealStatus: deal.status,
+    steps: deal.contract.reviewSteps.map((s) => ({
+      id: s.id,
+      order: s.order,
+      status: s.status,
+      assigneeId: s.assigneeId,
+      assigneeName: s.assignee.name,
+      decidedByName: s.decidedByUser?.name ?? null,
+      decidedOnBehalfOfName: s.decidedOnBehalfOfUser?.name ?? null,
+      decidedAt: s.decidedAt,
+      note: s.note,
+      priority: s.priority,
+      dueAt: s.dueAt,
+      checklistItems: s.checklistItems.map((i) => ({ id: i.id, label: i.label, done: i.done })),
+      comments: s.comments.map((c) => ({ id: c.id, authorName: c.authorName, authorEmail: c.authorEmail, body: c.body, createdAt: c.createdAt.toISOString() })),
+    })),
+  };
+}
+
 // Manual "Send to X" — the informal override sitting alongside the
 // automatic ReviewChain: pick anyone, at any time, and the review routes
 // to them right now. If a step is already active, this REASSIGNS it

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import SentConfirmationCard from "./SentConfirmationCard";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 type ChecklistItem = { id: string; label: string; done: boolean };
 type Comment = { id: string; authorName: string; authorEmail: string; body: string; createdAt: string };
@@ -21,6 +20,9 @@ type ReviewStepItem = {
   comments: Comment[];
 };
 type TeammateOption = { id: string; name: string };
+type ReviewState = { contractStatus: string; dealStatus: string; steps: ReviewStepItem[] };
+
+const POLL_INTERVAL_MS = 5000;
 
 function formatDate(date: Date): string {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -62,16 +64,25 @@ function Spinner() {
 // (or starting a fresh one if nothing is). The chain (configured in
 // Settings) is just the default that fires this same underlying state on
 // "Send to client" — this panel doesn't care which path created it.
+//
+// The timeline itself is the confirmation: there's no separate "sent!"
+// takeover card. Every mutation (ours or, via polling, a teammate's on
+// their own device) flows through the same refresh() -> applyState() path,
+// which diffs the incoming steps against what was last shown and marks
+// whichever rows are new or changed status so they animate in place —
+// so the tracking line is always on screen and always current, instead of
+// being hidden behind a modal moment you could miss.
 export default function ReviewPanel({
   dealId,
-  contractStatus,
-  dealStatus,
-  steps,
+  initialContractStatus,
+  initialDealStatus,
+  initialSteps,
   teammates,
   currentUserId,
   currentUserEmail,
   delegatedAssigneeIds,
   currentUserCanManageWorkspace,
+  getReviewStateAction,
   sendToAction,
   decideAction,
   addChecklistItemAction,
@@ -82,14 +93,15 @@ export default function ReviewPanel({
   updateStepMetaAction,
 }: {
   dealId: string;
-  contractStatus: string;
-  dealStatus: string;
-  steps: ReviewStepItem[];
+  initialContractStatus: string;
+  initialDealStatus: string;
+  initialSteps: ReviewStepItem[];
   teammates: TeammateOption[];
   currentUserId: string;
   currentUserEmail: string;
   delegatedAssigneeIds: string[];
   currentUserCanManageWorkspace: boolean;
+  getReviewStateAction: (dealId: string) => Promise<ReviewState | null>;
   sendToAction: (dealId: string, assigneeId: string) => Promise<void>;
   decideAction: (dealId: string, reviewStepId: string, decision: "approve" | "reject", formData: FormData) => Promise<void>;
   addChecklistItemAction: (dealId: string, reviewStepId: string, formData: FormData) => Promise<void>;
@@ -104,9 +116,58 @@ export default function ReviewPanel({
   const [commentDraft, setCommentDraft] = useState("");
   const [sendToId, setSendToId] = useState(teammates[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
-  const [justSentTo, setJustSentTo] = useState<string | null>(null);
   const [isSending, startSending] = useTransition();
   const [isPending, startTransition] = useTransition();
+
+  const [contractStatus, setContractStatus] = useState(initialContractStatus);
+  const [dealStatus, setDealStatus] = useState(initialDealStatus);
+  const [steps, setSteps] = useState(initialSteps);
+  const [newRowIds, setNewRowIds] = useState<Set<string>>(new Set());
+  const [changedRowIds, setChangedRowIds] = useState<Set<string>>(new Set());
+  const prevStatusRef = useRef<Map<string, string>>(new Map(initialSteps.map((s) => [s.id, s.status])));
+  const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function applyState(data: ReviewState) {
+    const nextNew = new Set<string>();
+    const nextChanged = new Set<string>();
+    for (const s of data.steps) {
+      const prevStatus = prevStatusRef.current.get(s.id);
+      if (prevStatus === undefined) nextNew.add(s.id);
+      else if (prevStatus !== s.status) nextChanged.add(s.id);
+    }
+    prevStatusRef.current = new Map(data.steps.map((s) => [s.id, s.status]));
+
+    setContractStatus(data.contractStatus);
+    setDealStatus(data.dealStatus);
+    setSteps(data.steps);
+
+    if (nextNew.size > 0 || nextChanged.size > 0) {
+      setNewRowIds(nextNew);
+      setChangedRowIds(nextChanged);
+      if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+      flashTimeoutRef.current = setTimeout(() => {
+        setNewRowIds(new Set());
+        setChangedRowIds(new Set());
+      }, 1700);
+    }
+  }
+
+  async function refresh() {
+    const data = await getReviewStateAction(dealId);
+    if (data) applyState(data);
+  }
+
+  // Picks up a teammate's own decision on their own device without anyone
+  // having to reload — this is what makes "did he actually review it yet"
+  // a question the panel answers on its own instead of one you have to ask.
+  useEffect(() => {
+    const interval = setInterval(refresh, POLL_INTERVAL_MS);
+    return () => {
+      clearInterval(interval);
+      if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dealId]);
 
   const sorted = [...steps].sort((a, b) => a.order - b.order);
   const activeStep = sorted.find((s) => s.status === "pending") ?? null;
@@ -125,25 +186,20 @@ export default function ReviewPanel({
     startTransition(async () => {
       try {
         await fn();
+        await refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");
       }
     });
   }
 
-  // A dedicated transition (and an explicit "sent!" payoff, same pattern as
-  // the voice-correction confirmation) instead of just `run` — clicking
-  // this was previously indistinguishable from doing nothing, since the
-  // panel's own re-render is the only other signal that anything happened.
   function sendTo() {
     if (!sendToId) return;
-    const recipientName = teammates.find((t) => t.id === sendToId)?.name ?? "them";
     setError(null);
     startSending(async () => {
       try {
         await sendToAction(dealId, sendToId);
-        setJustSentTo(recipientName);
-        setTimeout(() => setJustSentTo(null), 2200);
+        await refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");
       }
@@ -220,214 +276,213 @@ export default function ReviewPanel({
         </div>
       )}
 
-      {justSentTo ? (
-        <SentConfirmationCard title={`Sent to ${justSentTo} for review`} />
-      ) : (
-        <>
-          {rows.length > 0 && (
-            <div className="flex flex-col">
-              {rows.map((row, i) => {
-                const isLast = i === rows.length - 1;
-                const timeLabel =
-                  row.kind === "done"
-                    ? row.step.decidedAt ? formatDate(row.step.decidedAt) : ""
-                    : row.kind === "active"
-                      ? "now"
-                      : "next";
-                return (
-                  <div key={row.step.id} className="flex gap-2.5">
-                    <div
-                      className="flex-none pt-[3px] text-right text-[11px] font-medium"
-                      style={{ width: 32, color: row.kind === "active" ? "var(--accent-blue)" : "var(--ink-muted)" }}
+      {rows.length > 0 && (
+        <div className="flex flex-col">
+          {rows.map((row, i) => {
+            const isLast = i === rows.length - 1;
+            const timeLabel =
+              row.kind === "done"
+                ? row.step.decidedAt ? formatDate(row.step.decidedAt) : ""
+                : row.kind === "active"
+                  ? "now"
+                  : "next";
+            const rowAnimation = newRowIds.has(row.step.id)
+              ? "review-row-in 0.35s ease-out"
+              : changedRowIds.has(row.step.id)
+                ? "review-row-flash 1.6s ease-out"
+                : undefined;
+            return (
+              <div key={row.step.id} className="flex gap-2.5 rounded-[8px]" style={{ animation: rowAnimation }}>
+                <div
+                  className="flex-none pt-[3px] text-right text-[11px] font-medium"
+                  style={{ width: 32, color: row.kind === "active" ? "var(--accent-blue)" : "var(--ink-muted)" }}
+                >
+                  {timeLabel}
+                </div>
+
+                <div className="flex flex-none flex-col items-center" style={{ width: 18 }}>
+                  <span
+                    className="flex flex-none items-center justify-center rounded-full text-[10px] font-bold"
+                    style={
+                      row.kind === "done"
+                        ? { width: 18, height: 18, background: row.step.status === "approved" ? "var(--accent-blue)" : "#c0392b", color: "#fff" }
+                        : row.kind === "active"
+                          ? { width: 10, height: 10, marginTop: 4, border: "2px solid var(--accent-blue)", background: "var(--surface-1)" }
+                          : { width: 8, height: 8, marginTop: 5, border: "1.5px solid var(--hairline)", background: "transparent" }
+                    }
+                  >
+                    {row.kind === "done" ? (row.step.status === "approved" ? "✓" : "✕") : null}
+                  </span>
+                  {!isLast && (
+                    <div className="w-0 flex-1" style={{ minHeight: 14, borderLeft: "1.5px dashed var(--hairline)" }} />
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1 pb-5">
+                  <div className="flex flex-wrap items-baseline gap-1.5">
+                    <span
+                      className="text-[13px] font-medium"
+                      style={
+                        row.kind === "upcoming"
+                          ? { color: "var(--ink-muted)" }
+                          : row.kind === "done"
+                            ? { color: "var(--ink-muted)", textDecoration: "line-through" }
+                            : undefined
+                      }
                     >
-                      {timeLabel}
-                    </div>
+                      {row.step.assigneeName}
+                    </span>
+                    <span className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
+                      {row.kind === "done"
+                        ? row.step.status === "approved" ? "approved" : "requested changes"
+                        : row.kind === "active"
+                          ? "reviewing now"
+                          : "up next"}
+                    </span>
+                  </div>
 
-                    <div className="flex flex-none flex-col items-center" style={{ width: 18 }}>
-                      <span
-                        className="flex flex-none items-center justify-center rounded-full text-[10px] font-bold"
-                        style={
-                          row.kind === "done"
-                            ? { width: 18, height: 18, background: row.step.status === "approved" ? "var(--accent-blue)" : "#c0392b", color: "#fff" }
-                            : row.kind === "active"
-                              ? { width: 10, height: 10, marginTop: 4, border: "2px solid var(--accent-blue)", background: "var(--surface-1)" }
-                              : { width: 8, height: 8, marginTop: 5, border: "1.5px solid var(--hairline)", background: "transparent" }
-                        }
-                      >
-                        {row.kind === "done" ? (row.step.status === "approved" ? "✓" : "✕") : null}
-                      </span>
-                      {!isLast && (
-                        <div className="w-0 flex-1" style={{ minHeight: 14, borderLeft: "1.5px dashed var(--hairline)" }} />
+                  {row.kind === "active" && (
+                    <div className="mt-2.5 flex min-w-0 flex-col gap-3">
+                      {actingAsDelegate && (
+                        <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
+                          You&apos;re acting as a review backup, not directly as {activeStep!.assigneeName}.
+                        </div>
                       )}
-                    </div>
 
-                    <div className="min-w-0 flex-1 pb-5">
-                      <div className="flex flex-wrap items-baseline gap-1.5">
-                        <span
-                          className="text-[13px] font-medium"
-                          style={
-                            row.kind === "upcoming"
-                              ? { color: "var(--ink-muted)" }
-                              : row.kind === "done"
-                                ? { color: "var(--ink-muted)", textDecoration: "line-through" }
-                                : undefined
-                          }
+                      {canEditMeta && (
+                        <select
+                          value={activeStep!.priority}
+                          onChange={(e) => updatePriority(e.target.value)}
+                          disabled={isPending}
+                          className="input w-full"
+                          style={{ fontSize: "12px", padding: "5px 8px" }}
                         >
-                          {row.step.assigneeName}
-                        </span>
-                        <span className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
-                          {row.kind === "done"
-                            ? row.step.status === "approved" ? "approved" : "requested changes"
-                            : row.kind === "active"
-                              ? "reviewing now"
-                              : "up next"}
-                        </span>
+                          <option value="low">Low priority</option>
+                          <option value="normal">Normal priority</option>
+                          <option value="high">High priority</option>
+                          <option value="urgent">Urgent</option>
+                        </select>
+                      )}
+
+                      <div className="flex flex-col gap-1.5">
+                        {activeStep!.checklistItems.map((item) => (
+                          <div key={item.id} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={item.done}
+                              disabled={!canDecideCurrent || isPending}
+                              onChange={(e) => run(() => toggleChecklistItemAction(dealId, item.id, e.target.checked))}
+                            />
+                            <span className="flex-1 text-[13px]" style={item.done ? { color: "var(--ink-muted)", textDecoration: "line-through" } : undefined}>
+                              {item.label}
+                            </span>
+                            {canDecideCurrent && (
+                              <button type="button" disabled={isPending} onClick={() => run(() => removeChecklistItemAction(dealId, item.id))} className="text-[11px]" style={{ color: "var(--ink-muted)" }}>
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        ))}
                       </div>
+                      {canDecideCurrent && (
+                        <div className="flex gap-2">
+                          <input
+                            value={newItemLabel}
+                            onChange={(e) => setNewItemLabel(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addItem(); } }}
+                            placeholder="Add a checklist item…"
+                            disabled={isPending}
+                            className="input flex-1"
+                            style={{ fontSize: "12.5px", padding: "6px 9px" }}
+                          />
+                          <button type="button" disabled={isPending || !newItemLabel.trim()} onClick={addItem} className="btn btn-secondary btn-sm">
+                            Add
+                          </button>
+                        </div>
+                      )}
 
-                      {row.kind === "active" && (
-                        <div className="mt-2.5 flex min-w-0 flex-col gap-3">
-                          {actingAsDelegate && (
-                            <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
-                              You&apos;re acting as a review backup, not directly as {activeStep!.assigneeName}.
-                            </div>
-                          )}
-
-                          {canEditMeta && (
-                            <select
-                              value={activeStep!.priority}
-                              onChange={(e) => updatePriority(e.target.value)}
-                              disabled={isPending}
-                              className="input w-full"
-                              style={{ fontSize: "12px", padding: "5px 8px" }}
-                            >
-                              <option value="low">Low priority</option>
-                              <option value="normal">Normal priority</option>
-                              <option value="high">High priority</option>
-                              <option value="urgent">Urgent</option>
-                            </select>
-                          )}
-
-                          <div className="flex flex-col gap-1.5">
-                            {activeStep!.checklistItems.map((item) => (
-                              <div key={item.id} className="flex items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  checked={item.done}
-                                  disabled={!canDecideCurrent || isPending}
-                                  onChange={(e) => run(() => toggleChecklistItemAction(dealId, item.id, e.target.checked))}
-                                />
-                                <span className="flex-1 text-[13px]" style={item.done ? { color: "var(--ink-muted)", textDecoration: "line-through" } : undefined}>
-                                  {item.label}
-                                </span>
-                                {canDecideCurrent && (
-                                  <button type="button" disabled={isPending} onClick={() => run(() => removeChecklistItemAction(dealId, item.id))} className="text-[11px]" style={{ color: "var(--ink-muted)" }}>
-                                    Remove
+                      <div className="flex flex-col gap-2">
+                        {activeStep!.comments.map((c) => (
+                          <div key={c.id} className="rounded-[8px] px-2.5 py-2" style={{ background: "var(--surface-1)" }}>
+                            <div className="mb-0.5 flex items-center justify-between gap-2">
+                              <span className="text-[12px] font-medium">{c.authorName}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10.5px]" style={{ color: "var(--ink-muted)" }}>{timeAgo(c.createdAt)}</span>
+                                {c.authorEmail === currentUserEmail && (
+                                  <button type="button" disabled={isPending} onClick={() => run(() => deleteCommentAction(dealId, c.id))} className="text-[10.5px]" style={{ color: "var(--ink-muted)" }}>
+                                    Delete
                                   </button>
                                 )}
                               </div>
-                            ))}
-                          </div>
-                          {canDecideCurrent && (
-                            <div className="flex gap-2">
-                              <input
-                                value={newItemLabel}
-                                onChange={(e) => setNewItemLabel(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addItem(); } }}
-                                placeholder="Add a checklist item…"
-                                disabled={isPending}
-                                className="input flex-1"
-                                style={{ fontSize: "12.5px", padding: "6px 9px" }}
-                              />
-                              <button type="button" disabled={isPending || !newItemLabel.trim()} onClick={addItem} className="btn btn-secondary btn-sm">
-                                Add
-                              </button>
                             </div>
-                          )}
-
-                          <div className="flex flex-col gap-2">
-                            {activeStep!.comments.map((c) => (
-                              <div key={c.id} className="rounded-[8px] px-2.5 py-2" style={{ background: "var(--surface-1)" }}>
-                                <div className="mb-0.5 flex items-center justify-between gap-2">
-                                  <span className="text-[12px] font-medium">{c.authorName}</span>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[10.5px]" style={{ color: "var(--ink-muted)" }}>{timeAgo(c.createdAt)}</span>
-                                    {c.authorEmail === currentUserEmail && (
-                                      <button type="button" disabled={isPending} onClick={() => run(() => deleteCommentAction(dealId, c.id))} className="text-[10.5px]" style={{ color: "var(--ink-muted)" }}>
-                                        Delete
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                                <p className="text-[12.5px] leading-relaxed" style={{ whiteSpace: "pre-wrap" }}>{c.body}</p>
-                              </div>
-                            ))}
+                            <p className="text-[12.5px] leading-relaxed" style={{ whiteSpace: "pre-wrap" }}>{c.body}</p>
                           </div>
-                          <div className="flex gap-2">
-                            <textarea
-                              value={commentDraft}
-                              onChange={(e) => setCommentDraft(e.target.value)}
-                              placeholder="Leave a comment…"
-                              rows={2}
-                              disabled={isPending}
-                              className="input flex-1"
-                              style={{ fontSize: "12.5px", padding: "6px 9px" }}
-                            />
-                            <button type="button" disabled={isPending || !commentDraft.trim()} onClick={addComment} className="btn btn-secondary btn-sm self-end">
-                              Post
-                            </button>
-                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <textarea
+                          value={commentDraft}
+                          onChange={(e) => setCommentDraft(e.target.value)}
+                          placeholder="Leave a comment…"
+                          rows={2}
+                          disabled={isPending}
+                          className="input flex-1"
+                          style={{ fontSize: "12.5px", padding: "6px 9px" }}
+                        />
+                        <button type="button" disabled={isPending || !commentDraft.trim()} onClick={addComment} className="btn btn-secondary btn-sm self-end">
+                          Post
+                        </button>
+                      </div>
 
-                          {canDecideCurrent && (
-                            <div>
-                              <textarea
-                                value={note}
-                                onChange={(e) => setNote(e.target.value)}
-                                placeholder="Add a note (optional)"
-                                rows={2}
-                                className="input mb-2.5 w-full"
-                                style={{ fontSize: "13px", padding: "8px 11px" }}
-                              />
-                              <button type="button" disabled={isPending} onClick={() => decide("approve")} className="btn btn-primary w-full justify-center">
-                                {isPending ? "Working…" : "✓ Mark as done"}
-                              </button>
-                              <button type="button" disabled={isPending} onClick={() => decide("reject")} className="mt-2 w-full text-center text-[12.5px] font-medium" style={{ color: "var(--ink-muted)" }}>
-                                {isPending ? "Working…" : "Request changes instead"}
-                              </button>
-                            </div>
-                          )}
+                      {canDecideCurrent && (
+                        <div>
+                          <textarea
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                            placeholder="Add a note (optional)"
+                            rows={2}
+                            className="input mb-2.5 w-full"
+                            style={{ fontSize: "13px", padding: "8px 11px" }}
+                          />
+                          <button type="button" disabled={isPending} onClick={() => decide("approve")} className="btn btn-primary w-full justify-center">
+                            {isPending ? "Working…" : "✓ Mark as done"}
+                          </button>
+                          <button type="button" disabled={isPending} onClick={() => decide("reject")} className="mt-2 w-full text-center text-[12.5px] font-medium" style={{ color: "var(--ink-muted)" }}>
+                            {isPending ? "Working…" : "Request changes instead"}
+                          </button>
                         </div>
                       )}
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-          {teammates.length > 0 && (
-            <div className="flex items-center gap-1.5 rounded-full p-1.5" style={{ background: "var(--surface-2)" }}>
-              <select
-                value={sendToId}
-                onChange={(e) => setSendToId(e.target.value)}
-                disabled={isSending}
-                className="min-w-0 flex-1 bg-transparent text-[12.5px] font-medium outline-none"
-                style={{ padding: "6px 8px", color: "var(--ink)" }}
-              >
-                {teammates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
-              <button
-                type="button"
-                disabled={isSending || !sendToId}
-                onClick={sendTo}
-                aria-label="Send for review"
-                className="flex flex-none items-center justify-center rounded-full"
-                style={{ width: 30, height: 30, background: "var(--accent-blue)", opacity: isSending || !sendToId ? 0.6 : 1 }}
-              >
-                {isSending ? <Spinner /> : <SendIcon />}
-              </button>
-            </div>
-          )}
-        </>
+      {teammates.length > 0 && (
+        <div className="flex items-center gap-1.5 rounded-full p-1.5" style={{ background: "var(--surface-2)" }}>
+          <select
+            value={sendToId}
+            onChange={(e) => setSendToId(e.target.value)}
+            disabled={isSending}
+            className="min-w-0 flex-1 bg-transparent text-[12.5px] font-medium outline-none"
+            style={{ padding: "6px 8px", color: "var(--ink)" }}
+          >
+            {teammates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+          <button
+            type="button"
+            disabled={isSending || !sendToId}
+            onClick={sendTo}
+            aria-label="Send for review"
+            className="flex flex-none items-center justify-center rounded-full"
+            style={{ width: 30, height: 30, background: "var(--accent-blue)", opacity: isSending || !sendToId ? 0.6 : 1 }}
+          >
+            {isSending ? <Spinner /> : <SendIcon />}
+          </button>
+        </div>
       )}
     </div>
   );

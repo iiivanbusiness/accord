@@ -24,6 +24,7 @@ import {
   updateFieldValues,
 } from "./actions";
 import {
+  getReviewState,
   sendForReviewTo,
   decideReviewStep,
   addChecklistItem,
@@ -227,9 +228,9 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         {deal.contract && (
           <ReviewPanel
             dealId={deal.id}
-            contractStatus={deal.contract.status}
-            dealStatus={deal.status}
-            steps={deal.contract.reviewSteps.map((s) => ({
+            initialContractStatus={deal.contract.status}
+            initialDealStatus={deal.status}
+            initialSteps={deal.contract.reviewSteps.map((s) => ({
               id: s.id,
               order: s.order,
               status: s.status,
@@ -249,6 +250,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
             currentUserEmail={currentUser.email}
             delegatedAssigneeIds={delegatedAssigneeIds}
             currentUserCanManageWorkspace={Boolean(currentUser.role?.canManageWorkspace)}
+            getReviewStateAction={getReviewState}
             sendToAction={sendForReviewTo}
             decideAction={decideReviewStep}
             addChecklistItemAction={addChecklistItem}
