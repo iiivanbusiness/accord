@@ -17,7 +17,7 @@ export default function ClientProfileForm({
   updateAction,
 }: {
   client: Client;
-  updateAction: (clientId: string, formData: FormData) => Promise<void>;
+  updateAction: (clientId: string, formData: FormData) => Promise<{ error?: string }>;
 }) {
   const router = useRouter();
   const [saved, setSaved] = useState(false);
@@ -28,13 +28,13 @@ export default function ClientProfileForm({
     setError(null);
     setSaved(false);
     startTransition(async () => {
-      try {
-        await updateAction(client.id, formData);
-        setSaved(true);
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Couldn't save those changes");
+      const result = await updateAction(client.id, formData);
+      if (result.error) {
+        setError(result.error);
+        return;
       }
+      setSaved(true);
+      router.refresh();
     });
   }
 

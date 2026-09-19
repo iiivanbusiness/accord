@@ -14,7 +14,7 @@ export default function RoleSelect({
   userId: string;
   currentRoleId: string | null;
   roles: RoleOption[];
-  action: (userId: string, formData: FormData) => Promise<void>;
+  action: (userId: string, formData: FormData) => Promise<{ error?: string }>;
   disabled?: boolean;
 }) {
   const [value, setValue] = useState(currentRoleId ?? "");
@@ -26,13 +26,12 @@ export default function RoleSelect({
     setValue(nextRoleId);
     setError(null);
     startTransition(async () => {
-      try {
-        const formData = new FormData();
-        formData.set("roleId", nextRoleId);
-        await action(userId, formData);
-      } catch (err) {
+      const formData = new FormData();
+      formData.set("roleId", nextRoleId);
+      const result = await action(userId, formData);
+      if (result.error) {
         setValue(previous);
-        setError(err instanceof Error ? err.message : "Couldn't change role");
+        setError(result.error);
       }
     });
   }

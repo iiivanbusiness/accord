@@ -13,21 +13,18 @@ export default function HubspotSettingsPanel({
   connected: boolean;
   portalId: string | null;
   enabled: boolean;
-  connectAction: (formData: FormData) => Promise<void>;
-  toggleAction: () => Promise<void>;
-  disconnectAction: () => Promise<void>;
+  connectAction: (formData: FormData) => Promise<{ error?: string }>;
+  toggleAction: () => Promise<{ error?: string }>;
+  disconnectAction: () => Promise<{ error?: string }>;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function run(fn: () => Promise<void>) {
+  function run(fn: () => Promise<{ error?: string }>) {
     setError(null);
     startTransition(async () => {
-      try {
-        await fn();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
-      }
+      const result = await fn();
+      if (result.error) setError(result.error);
     });
   }
 

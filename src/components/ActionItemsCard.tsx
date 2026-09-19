@@ -26,7 +26,7 @@ export default function ActionItemsCard({
 }: {
   dealId: string;
   items: ActionItem[];
-  toggleAction: (dealId: string, itemId: string) => Promise<void>;
+  toggleAction: (dealId: string, itemId: string) => Promise<{ error?: string }>;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [openQuote, setOpenQuote] = useState<string | null>(null);
@@ -35,11 +35,8 @@ export default function ActionItemsCard({
   function toggle(itemId: string) {
     setError(null);
     startTransition(async () => {
-      try {
-        await toggleAction(dealId, itemId);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
-      }
+      const result = await toggleAction(dealId, itemId);
+      if (result.error) setError(result.error);
     });
   }
 

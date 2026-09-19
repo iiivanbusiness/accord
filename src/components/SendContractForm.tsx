@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import CountersignerFields from "./CountersignerFields";
 import SentConfirmationCard from "./SentConfirmationCard";
 
-type SendResult = { status: "sent" } | { status: "pending_approval"; assigneeName: string };
+type SendResult = { status: "sent" } | { status: "pending_approval"; assigneeName: string } | { status: "error"; error: string };
 
 // Wraps the manual Send form: submits via the sendContractEmail action
 // directly (not a native <form action> redirect) so a successful send can
@@ -42,13 +42,13 @@ export default function SendContractForm({
   function handleSubmit(formData: FormData) {
     setError(null);
     startTransition(async () => {
-      try {
-        const res = await sendAction(dealId, formData);
-        setResult(res);
-        setTimeout(() => router.push(`/deals/${dealId}/contract`), 1600);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Couldn't send the email. Check your Resend setup and try again");
+      const res = await sendAction(dealId, formData);
+      if (res.status === "error") {
+        setError(res.error);
+        return;
       }
+      setResult(res);
+      setTimeout(() => router.push(`/deals/${dealId}/contract`), 1600);
     });
   }
 

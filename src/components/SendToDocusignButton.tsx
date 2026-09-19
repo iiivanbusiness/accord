@@ -7,7 +7,7 @@ export default function SendToDocusignButton({
   sendAction,
 }: {
   dealId: string;
-  sendAction: (dealId: string) => Promise<void>;
+  sendAction: (dealId: string) => Promise<{ error?: string }>;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -16,12 +16,12 @@ export default function SendToDocusignButton({
   function handleClick() {
     setError(null);
     startTransition(async () => {
-      try {
-        await sendAction(dealId);
-        setSent(true);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Couldn't send to DocuSign");
+      const result = await sendAction(dealId);
+      if (result.error) {
+        setError(result.error);
+        return;
       }
+      setSent(true);
     });
   }
 

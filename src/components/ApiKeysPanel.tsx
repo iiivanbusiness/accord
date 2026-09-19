@@ -15,7 +15,7 @@ export default function ApiKeysPanel({
 }: {
   keys: ApiKeyItem[];
   createAction: (formData: FormData) => Promise<string>;
-  revokeAction: (keyId: string) => Promise<void>;
+  revokeAction: (keyId: string) => Promise<{ error?: string }>;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [freshKey, setFreshKey] = useState<string | null>(null);
@@ -44,11 +44,8 @@ export default function ApiKeysPanel({
   function handleRevoke(keyId: string) {
     setError(null);
     startTransition(async () => {
-      try {
-        await revokeAction(keyId);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
-      }
+      const result = await revokeAction(keyId);
+      if (result.error) setError(result.error);
     });
   }
 

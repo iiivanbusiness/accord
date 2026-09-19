@@ -308,16 +308,16 @@ export async function updateSsoConfig(formData: FormData) {
   revalidatePath("/settings");
 }
 
-export async function toggleSso(): Promise<void> {
+export async function toggleSso(): Promise<{ error?: string }> {
   const user = await requirePermission("canManageWorkspace");
   const workspace = await prisma.workspace.findUniqueOrThrow({ where: { id: user.workspaceId } });
 
   if (!workspace.ssoEnabled) {
     if (!workspace.ssoIssuer || !workspace.ssoClientId || !workspace.ssoClientSecret) {
-      throw new Error("Set an issuer, client ID, and client secret before enabling SSO");
+      return { error: "Set an issuer, client ID, and client secret before enabling SSO" };
     }
     if (!workspace.allowedEmailDomain) {
-      throw new Error("Set an allowed email domain above first. It's how sign-ins get matched to this workspace");
+      return { error: "Set an allowed email domain above first. It's how sign-ins get matched to this workspace" };
     }
   }
 
@@ -330,4 +330,5 @@ export async function toggleSso(): Promise<void> {
     action: workspace.ssoEnabled ? "workspace.sso_disabled" : "workspace.sso_enabled",
   });
   revalidatePath("/settings");
+  return {};
 }

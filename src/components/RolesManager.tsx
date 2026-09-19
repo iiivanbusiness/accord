@@ -45,9 +45,9 @@ export default function RolesManager({
   deleteRoleAction,
 }: {
   roles: Role[];
-  createRoleAction: (formData: FormData) => Promise<void>;
-  updateRoleAction: (roleId: string, formData: FormData) => Promise<void>;
-  deleteRoleAction: (roleId: string) => Promise<void>;
+  createRoleAction: (formData: FormData) => Promise<{ error?: string }>;
+  updateRoleAction: (roleId: string, formData: FormData) => Promise<{ error?: string }>;
+  deleteRoleAction: (roleId: string) => Promise<{ error?: string }>;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -55,17 +55,17 @@ export default function RolesManager({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function runAction(fn: () => Promise<void>) {
+  function runAction(fn: () => Promise<{ error?: string }>) {
     setError(null);
     startTransition(async () => {
-      try {
-        await fn();
-        setEditingId(null);
-        setAdding(false);
-        setConfirmingDeleteId(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
+      const result = await fn();
+      if (result.error) {
+        setError(result.error);
+        return;
       }
+      setEditingId(null);
+      setAdding(false);
+      setConfirmingDeleteId(null);
     });
   }
 

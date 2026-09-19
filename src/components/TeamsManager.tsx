@@ -10,20 +10,17 @@ export default function TeamsManager({
   deleteTeamAction,
 }: {
   teams: TeamItem[];
-  createTeamAction: (formData: FormData) => Promise<void>;
-  deleteTeamAction: (teamId: string) => Promise<void>;
+  createTeamAction: (formData: FormData) => Promise<{ error?: string }>;
+  deleteTeamAction: (teamId: string) => Promise<{ error?: string }>;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function run(fn: () => Promise<void>) {
+  function run(fn: () => Promise<{ error?: string }>) {
     setError(null);
     startTransition(async () => {
-      try {
-        await fn();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
-      }
+      const result = await fn();
+      if (result.error) setError(result.error);
     });
   }
 

@@ -28,11 +28,11 @@ function ChainCard({
   index: number;
   isLast: boolean;
   teammates: TeammateOption[];
-  addStepAction: (chainId: string, formData: FormData) => Promise<void>;
-  removeStepAction: (stepId: string) => Promise<void>;
-  moveStepAction: (stepId: string, direction: "up" | "down") => Promise<void>;
-  moveChainAction: (chainId: string, direction: "up" | "down") => Promise<void>;
-  deleteChainAction: (chainId: string) => Promise<void>;
+  addStepAction: (chainId: string, formData: FormData) => Promise<{ error?: string }>;
+  removeStepAction: (stepId: string) => Promise<{ error?: string }>;
+  moveStepAction: (stepId: string, direction: "up" | "down") => Promise<{ error?: string }>;
+  moveChainAction: (chainId: string, direction: "up" | "down") => Promise<{ error?: string }>;
+  deleteChainAction: (chainId: string) => Promise<{ error?: string }>;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -40,14 +40,11 @@ function ChainCard({
   const usedAssigneeIds = new Set(chain.steps.map((s) => s.assigneeId));
   const availableTeammates = teammates.filter((t) => !usedAssigneeIds.has(t.id));
 
-  function run(fn: () => Promise<void>) {
+  function run(fn: () => Promise<{ error?: string }>) {
     setError(null);
     startTransition(async () => {
-      try {
-        await fn();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
-      }
+      const result = await fn();
+      if (result.error) setError(result.error);
     });
   }
 
@@ -132,12 +129,12 @@ export default function ReviewChainManager({
   chains: Chain[];
   teammates: TeammateOption[];
   teams: TeamOption[];
-  createChainAction: (formData: FormData) => Promise<void>;
-  deleteChainAction: (chainId: string) => Promise<void>;
-  moveChainAction: (chainId: string, direction: "up" | "down") => Promise<void>;
-  addStepAction: (chainId: string, formData: FormData) => Promise<void>;
-  removeStepAction: (stepId: string) => Promise<void>;
-  moveStepAction: (stepId: string, direction: "up" | "down") => Promise<void>;
+  createChainAction: (formData: FormData) => Promise<{ error?: string }>;
+  deleteChainAction: (chainId: string) => Promise<{ error?: string }>;
+  moveChainAction: (chainId: string, direction: "up" | "down") => Promise<{ error?: string }>;
+  addStepAction: (chainId: string, formData: FormData) => Promise<{ error?: string }>;
+  removeStepAction: (stepId: string) => Promise<{ error?: string }>;
+  moveStepAction: (stepId: string, direction: "up" | "down") => Promise<{ error?: string }>;
 }) {
   const [createError, setCreateError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -145,11 +142,8 @@ export default function ReviewChainManager({
   function runCreate(formData: FormData) {
     setCreateError(null);
     startTransition(async () => {
-      try {
-        await createChainAction(formData);
-      } catch (err) {
-        setCreateError(err instanceof Error ? err.message : "Something went wrong");
-      }
+      const result = await createChainAction(formData);
+      if (result.error) setCreateError(result.error);
     });
   }
 

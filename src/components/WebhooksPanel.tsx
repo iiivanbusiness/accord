@@ -16,23 +16,20 @@ function EndpointCard({
   testAction,
 }: {
   endpoint: Endpoint;
-  toggleAction: (id: string) => Promise<void>;
-  deleteAction: (id: string) => Promise<void>;
-  testAction: (id: string) => Promise<void>;
+  toggleAction: (id: string) => Promise<{ error?: string }>;
+  deleteAction: (id: string) => Promise<{ error?: string }>;
+  testAction: (id: string) => Promise<{ error?: string }>;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [showSecret, setShowSecret] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  function run(fn: () => Promise<void>) {
+  function run(fn: () => Promise<{ error?: string }>) {
     setError(null);
     startTransition(async () => {
-      try {
-        await fn();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
-      }
+      const result = await fn();
+      if (result.error) setError(result.error);
     });
   }
 
@@ -105,10 +102,10 @@ export default function WebhooksPanel({
 }: {
   endpoints: Endpoint[];
   availableEvents: string[];
-  createAction: (formData: FormData) => Promise<void>;
-  toggleAction: (id: string) => Promise<void>;
-  deleteAction: (id: string) => Promise<void>;
-  testAction: (id: string) => Promise<void>;
+  createAction: (formData: FormData) => Promise<{ error?: string }>;
+  toggleAction: (id: string) => Promise<{ error?: string }>;
+  deleteAction: (id: string) => Promise<{ error?: string }>;
+  testAction: (id: string) => Promise<{ error?: string }>;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -116,11 +113,8 @@ export default function WebhooksPanel({
   function runCreate(formData: FormData) {
     setError(null);
     startTransition(async () => {
-      try {
-        await createAction(formData);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
-      }
+      const result = await createAction(formData);
+      if (result.error) setError(result.error);
     });
   }
 

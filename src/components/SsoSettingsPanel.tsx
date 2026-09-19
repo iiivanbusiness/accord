@@ -17,7 +17,7 @@ export default function SsoSettingsPanel({
   hasClientSecret: boolean;
   redirectUri: string;
   updateConfigAction: (formData: FormData) => Promise<void>;
-  toggleAction: () => Promise<void>;
+  toggleAction: () => Promise<{ error?: string }>;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -25,11 +25,8 @@ export default function SsoSettingsPanel({
   function handleToggle() {
     setError(null);
     startTransition(async () => {
-      try {
-        await toggleAction();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
-      }
+      const result = await toggleAction();
+      if (result.error) setError(result.error);
     });
   }
 

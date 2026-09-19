@@ -38,16 +38,16 @@ export async function retryExtraction(dealId: string) {
 // shortcut to the same pipeline, not a way around it. A confirmation
 // click (not a fully silent auto-send) on purpose: the rep glances at the
 // terms and decides, rather than the system sending without anyone looking.
-export async function sendViaDocusignNow(dealId: string) {
+export async function sendViaDocusignNow(dealId: string): Promise<{ error?: string }> {
   const { where } = await dealVisibilityFilter();
   const workspaceId = await requireWorkspaceId();
   const deal = await prisma.deal.findFirst({
     where: { id: dealId, workspaceId, ...where },
     include: { client: true, template: true, contract: true, workspace: true },
   });
-  if (!deal || !deal.contract || !deal.template) throw new Error("Deal not found");
-  if (!deal.workspace.docusignEnabled) throw new Error("DocuSign isn't connected for this workspace");
-  if (!deal.client.email) throw new Error("This client has no email on file yet. Add one first");
+  if (!deal || !deal.contract || !deal.template) return { error: "Deal not found" };
+  if (!deal.workspace.docusignEnabled) return { error: "DocuSign isn't connected for this workspace" };
+  if (!deal.client.email) return { error: "This client has no email on file yet. Add one first" };
 
   await prisma.contract.update({ where: { id: deal.contract.id }, data: { deliveryMethod: "docusign" } });
 
@@ -55,9 +55,14 @@ export async function sendViaDocusignNow(dealId: string) {
   const message = `Hi ${deal.client.name.split(" ")[0]},\n\nHere's the ${deal.template.name.toLowerCase()} we just discussed. Take a look and sign whenever you're ready.`;
 
   const session = await auth();
-  await requestOrSendReview(dealId, { to: deal.client.email, subject, message }, session?.user?.email);
+  try {
+    await requestOrSendReview(dealId, { to: deal.client.email, subject, message }, session?.user?.email);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Couldn't send via DocuSign" };
+  }
 
   revalidatePath(`/deals/${dealId}`);
+  return {};
 }
 
 export async function generateContract(dealId: string) {
@@ -176,11 +181,13 @@ export async function applyVoiceFieldCorrection(dealId: string, fieldKey: string
   revalidatePath(`/deals/${dealId}`);
 }
 
-export async function sendContractEmail(dealId: string, formData: FormData) {
+type SendContractResult = Awaited<ReturnType<typeof requestOrSendReview>> | { status: "error"; error: string };
+
+export async function sendContractEmail(dealId: string, formData: FormData): Promise<SendContractResult> {
   const to = String(formData.get("to") ?? "").trim();
   const subject = String(formData.get("subject") ?? "").trim();
   const message = String(formData.get("message") ?? "").trim();
-  if (!to || !subject || !message) throw new Error("To, subject, and message are all required");
+  if (!to || !subject || !message) return { status: "error", error: "To, subject, and message are all required" };
 
   const ccRaw = String(formData.get("cc") ?? "").trim();
   const ccList = ccRaw
@@ -197,7 +204,7 @@ export async function sendContractEmail(dealId: string, formData: FormData) {
   const { where } = await dealVisibilityFilter();
   const workspaceId = await requireWorkspaceId();
   const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId, ...where }, include: { contract: true } });
-  if (!deal || !deal.contract) throw new Error("Deal not found");
+  if (!deal || !deal.contract) return { status: "error", error: "Deal not found" };
 
   const deliveryMethod = String(formData.get("deliveryMethod") ?? "sealme") === "docusign" ? "docusign" : "sealme";
 
@@ -226,8 +233,8 @@ export async function sendContractEmail(dealId: string, formData: FormData) {
   let result: Awaited<ReturnType<typeof requestOrSendReview>>;
   try {
     result = await requestOrSendReview(dealId, { to, subject, message }, session?.user?.email);
-  } catch {
-    throw new Error("Couldn't send the email. Check your Resend setup and try again.");
+  } catch (err) {
+    return { status: "error", error: err instanceof Error ? err.message : "Couldn't send the email. Check your Resend setup and try again." };
   }
 
   return result;
@@ -288,11 +295,11 @@ export async function startRenewal(dealId: string) {
   redirect(`/deals/${newDeal.id}/contract`);
 }
 
-export async function toggleActionItem(dealId: string, itemId: string) {
+export async function toggleActionItem(dealId: string, itemId: string): Promise<{ error?: string }> {
   const { where } = await dealVisibilityFilter();
   const workspaceId = await requireWorkspaceId();
   const item = await prisma.actionItem.findFirst({ where: { id: itemId, dealId, deal: { workspaceId, ...where } } });
-  if (!item) throw new Error("Action item not found");
+  if (!item) return { error: "Action item not found" };
 
   const done = item.status !== "done";
   await prisma.actionItem.update({
@@ -301,39 +308,42 @@ export async function toggleActionItem(dealId: string, itemId: string) {
   });
 
   revalidatePath(`/deals/${dealId}`);
+  return {};
 }
 
 // Internal-only note thread on a deal — never shown to the client, unlike
 // ClauseComment (client-authored, tied to one clause) or an approval
 // step's note (tied to one decision). This is just "the team left context
 // here," the gap a real CRM's activity feed fills.
-export async function addDealNote(dealId: string, body: string) {
+export async function addDealNote(dealId: string, body: string): Promise<{ error?: string }> {
   const text = body.trim();
-  if (!text) throw new Error("Note can't be empty");
+  if (!text) return { error: "Note can't be empty" };
 
   const { where } = await dealVisibilityFilter();
   const workspaceId = await requireWorkspaceId();
   const currentUser = await currentUserWithRole();
   const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId, ...where } });
-  if (!deal) throw new Error("Deal not found");
+  if (!deal) return { error: "Deal not found" };
 
   await prisma.dealNote.create({
     data: { dealId, authorEmail: currentUser.email, authorName: currentUser.name, body: text },
   });
 
   revalidatePath(`/deals/${dealId}`);
+  return {};
 }
 
-export async function deleteDealNote(dealId: string, noteId: string) {
+export async function deleteDealNote(dealId: string, noteId: string): Promise<{ error?: string }> {
   const { where } = await dealVisibilityFilter();
   const workspaceId = await requireWorkspaceId();
   const currentUser = await currentUserWithRole();
   const note = await prisma.dealNote.findFirst({ where: { id: noteId, dealId, deal: { workspaceId, ...where } } });
-  if (!note) throw new Error("Note not found");
+  if (!note) return { error: "Note not found" };
   if (note.authorEmail !== currentUser.email && !currentUser.role?.canManageWorkspace) {
-    throw new Error("Only the author or a workspace admin can delete this note");
+    return { error: "Only the author or a workspace admin can delete this note" };
   }
 
   await prisma.dealNote.delete({ where: { id: noteId } });
   revalidatePath(`/deals/${dealId}`);
+  return {};
 }

@@ -11,6 +11,7 @@ const MAX_ROWS = 1000;
 const VALID_STATUSES = new Set(["signed", "sent", "ready", "missing_info"]);
 
 export type ImportResult = {
+  error?: string;
   created: number;
   skipped: number;
   errors: { row: number; message: string }[];
@@ -29,11 +30,11 @@ export async function importClientsAndDeals(formData: FormData): Promise<ImportR
   const user = await requirePermission("canManageWorkspace");
   const currentUser = await currentUserWithRole();
   const text = String(formData.get("csv") ?? "");
-  if (!text.trim()) throw new Error("Paste or upload CSV data first");
+  if (!text.trim()) return { error: "Paste or upload CSV data first", created: 0, skipped: 0, errors: [] };
 
   const rows = parseCsvWithHeader(text);
-  if (rows.length === 0) throw new Error("No data rows found. Check the header row is included");
-  if (rows.length > MAX_ROWS) throw new Error(`Too many rows (${rows.length}). Split into batches of ${MAX_ROWS} or fewer`);
+  if (rows.length === 0) return { error: "No data rows found. Check the header row is included", created: 0, skipped: 0, errors: [] };
+  if (rows.length > MAX_ROWS) return { error: `Too many rows (${rows.length}). Split into batches of ${MAX_ROWS} or fewer`, created: 0, skipped: 0, errors: [] };
 
   const result: ImportResult = { created: 0, skipped: 0, errors: [] };
 

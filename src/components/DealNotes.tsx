@@ -28,8 +28,8 @@ export default function DealNotes({
   dealId: string;
   notes: Note[];
   currentUserEmail: string;
-  addAction: (dealId: string, body: string) => Promise<void>;
-  deleteAction: (dealId: string, noteId: string) => Promise<void>;
+  addAction: (dealId: string, body: string) => Promise<{ error?: string }>;
+  deleteAction: (dealId: string, noteId: string) => Promise<{ error?: string }>;
 }) {
   const router = useRouter();
   const [draft, setDraft] = useState("");
@@ -41,24 +41,24 @@ export default function DealNotes({
     if (!body) return;
     setError(null);
     startTransition(async () => {
-      try {
-        await addAction(dealId, body);
-        setDraft("");
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Couldn't add that note");
+      const result = await addAction(dealId, body);
+      if (result.error) {
+        setError(result.error);
+        return;
       }
+      setDraft("");
+      router.refresh();
     });
   }
 
   function handleDelete(noteId: string) {
     startTransition(async () => {
-      try {
-        await deleteAction(dealId, noteId);
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Couldn't delete that note");
+      const result = await deleteAction(dealId, noteId);
+      if (result.error) {
+        setError(result.error);
+        return;
       }
+      router.refresh();
     });
   }
 

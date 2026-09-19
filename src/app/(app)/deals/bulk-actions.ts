@@ -20,17 +20,17 @@ import { dealVisibilityFilter } from "@/lib/deal-visibility";
 // silently no-op'ing, so the board can tell the user why it didn't move.
 const DRAGGABLE_STATUSES = ["processing", "missing_info", "changes_requested", "ready"] as const;
 
-export async function updateDealStatus(dealId: string, newStatus: string): Promise<void> {
+export async function updateDealStatus(dealId: string, newStatus: string): Promise<{ error?: string }> {
   if (!DRAGGABLE_STATUSES.includes(newStatus as (typeof DRAGGABLE_STATUSES)[number])) {
-    throw new Error("That status can only be reached through its real action (send, approve, sign), not by dragging.");
+    return { error: "That status can only be reached through its real action (send, approve, sign), not by dragging." };
   }
 
   const { where } = await dealVisibilityFilter();
   const workspaceId = await requireWorkspaceId();
   const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId, ...where } });
-  if (!deal) throw new Error("Deal not found");
+  if (!deal) return { error: "Deal not found" };
   if (!DRAGGABLE_STATUSES.includes(deal.status as (typeof DRAGGABLE_STATUSES)[number])) {
-    throw new Error("This deal has already moved past manual review. Its status can't be dragged anymore.");
+    return { error: "This deal has already moved past manual review. Its status can't be dragged anymore." };
   }
 
   await prisma.deal.update({ where: { id: dealId }, data: { status: newStatus } });
@@ -39,6 +39,7 @@ export async function updateDealStatus(dealId: string, newStatus: string): Promi
   await logAudit({ workspaceId, actorEmail: session?.user?.email, action: "deal.status_dragged", targetType: "Deal", targetId: dealId, metadata: { from: deal.status, to: newStatus } });
 
   revalidatePath("/deals");
+  return {};
 }
 
 // An explicit manual nudge, not the automated 3-day cron — bypasses that

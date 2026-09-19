@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 
 type ImportResult = {
+  error?: string;
   created: number;
   skipped: number;
   errors: { row: number; message: string }[];
@@ -33,14 +34,14 @@ export default function BulkImportForm({
     setError(null);
     setResult(null);
     startTransition(async () => {
-      try {
-        const formData = new FormData();
-        formData.set("csv", csv);
-        const res = await importAction(formData);
-        setResult(res);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
+      const formData = new FormData();
+      formData.set("csv", csv);
+      const res = await importAction(formData);
+      if (res.error) {
+        setError(res.error);
+        return;
       }
+      setResult(res);
     });
   }
 
