@@ -13,6 +13,7 @@ type ReviewStepItem = {
   decidedByName: string | null;
   decidedOnBehalfOfName: string | null;
   decidedAt: Date | null;
+  createdAt: Date;
   note: string | null;
   priority: string; // low | normal | high | urgent
   dueAt: Date | null;
@@ -20,11 +21,25 @@ type ReviewStepItem = {
   comments: Comment[];
 };
 type TeammateOption = { id: string; name: string };
-type ReviewState = { contractStatus: string; dealStatus: string; steps: ReviewStepItem[] };
+type ReviewState = {
+  contractStatus: string;
+  dealStatus: string;
+  contractCreatedAt: Date;
+  contractSentAt: Date | null;
+  contractSignedAt: Date | null;
+  steps: ReviewStepItem[];
+};
 
 const POLL_INTERVAL_MS = 5000;
 
-function formatDate(date: Date): string {
+// Same-day: an exact clock time ("4:32 PM") is more useful than a relative
+// "now" once there's more than one timestamp on screen — the whole point of
+// this timeline is answering "when was it sent, when did they act on it."
+// Older than today: falls back to a short date, same as the rest of the app.
+function formatWhen(date: Date): string {
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+  if (sameDay) return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
@@ -38,7 +53,86 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-type Row = { step: ReviewStepItem; kind: "done" | "active" | "upcoming" };
+type TimelineRow = {
+  id: string;
+  kind: "done" | "active" | "upcoming";
+  title: string;
+  subtitle: string;
+  time: Date | null;
+  failed?: boolean;
+  step?: ReviewStepItem;
+};
+
+// The full contract journey as one fixed-shape line — drafted, through
+// however many human review steps are actually configured (zero or more),
+// to sent-to-client, to signed. A single-reviewer contract used to render
+// as one lone row with nothing to connect a line to, which is exactly what
+// read as "nothing visually changes" even though the row's own content was
+// updating correctly. Always including the "Contract drafted" and
+// "sent/signed" ends means there's always at least one connecting line on
+// screen, and it visibly grows as the deal moves — the same shape as the
+// reference ClickUp timeline, not just a single status label.
+function buildTimeline(params: {
+  steps: ReviewStepItem[];
+  contractStatus: string;
+  dealStatus: string;
+  contractCreatedAt: Date;
+  contractSentAt: Date | null;
+  contractSignedAt: Date | null;
+  clientName: string;
+}): { rows: TimelineRow[]; activeStep: ReviewStepItem | null; mostRecentDecided: ReviewStepItem | null } {
+  const sorted = [...params.steps].sort((a, b) => a.order - b.order);
+  const activeStep = sorted.find((s) => s.status === "pending") ?? null;
+  const mostRecentDecided = [...sorted].filter((s) => s.status !== "pending").sort((a, b) => b.order - a.order)[0] ?? null;
+
+  const rows: TimelineRow[] = [
+    { id: "created", kind: "done", title: "Contract", subtitle: "drafted", time: params.contractCreatedAt },
+  ];
+
+  for (const step of sorted) {
+    const kind: TimelineRow["kind"] = step.status !== "pending" ? "done" : step.id === activeStep?.id ? "active" : "upcoming";
+    rows.push({
+      id: step.id,
+      kind,
+      title: step.assigneeName,
+      subtitle: kind === "done" ? (step.status === "approved" ? "approved" : "requested changes") : kind === "active" ? "reviewing now" : "up next",
+      time: kind === "done" ? step.decidedAt : kind === "active" ? step.createdAt : null,
+      failed: step.status === "rejected",
+      step,
+    });
+  }
+
+  const hasBeenSent =
+    params.contractStatus === "sent" ||
+    params.contractStatus === "partially_signed" ||
+    params.contractStatus === "signed" ||
+    params.dealStatus === "sent" ||
+    params.dealStatus === "signed";
+  const isSigned = params.dealStatus === "signed";
+
+  const sentKind: TimelineRow["kind"] = !hasBeenSent ? "upcoming" : isSigned ? "done" : "active";
+  rows.push({
+    id: "sent",
+    kind: sentKind,
+    title: params.clientName,
+    subtitle: sentKind === "upcoming" ? "up next" : sentKind === "active" ? "awaiting signature" : "sent",
+    time: hasBeenSent ? params.contractSentAt : null,
+  });
+
+  rows.push({
+    id: "signed",
+    kind: isSigned ? "done" : "upcoming",
+    title: params.clientName,
+    subtitle: isSigned ? "signed" : "up next",
+    time: isSigned ? params.contractSignedAt : null,
+  });
+
+  return { rows, activeStep, mostRecentDecided };
+}
+
+function rowSnapshotKey(row: TimelineRow): string {
+  return row.step ? `${row.step.status}|${row.step.assigneeId}` : row.kind;
+}
 
 function SendIcon() {
   return (
@@ -76,14 +170,19 @@ function CheckIcon() {
 // The timeline itself is the confirmation: there's no separate "sent!"
 // takeover card. Every mutation (ours or, via polling, a teammate's on
 // their own device) flows through the same refresh() -> applyState() path,
-// which diffs the incoming steps against what was last shown and marks
-// whichever rows are new or changed status so they animate in place —
-// so the tracking line is always on screen and always current, instead of
-// being hidden behind a modal moment you could miss.
+// which diffs the incoming rows (drafted / each reviewer / sent / signed)
+// against what was last shown and marks whichever ones are new or changed
+// so they animate in place — so the tracking line is always on screen and
+// always current, instead of being hidden behind a modal moment you could
+// miss.
 export default function ReviewPanel({
   dealId,
+  clientName,
   initialContractStatus,
   initialDealStatus,
+  initialContractCreatedAt,
+  initialContractSentAt,
+  initialContractSignedAt,
   initialSteps,
   teammates,
   currentUserId,
@@ -102,8 +201,12 @@ export default function ReviewPanel({
   onSync,
 }: {
   dealId: string;
+  clientName: string;
   initialContractStatus: string;
   initialDealStatus: string;
+  initialContractCreatedAt: Date;
+  initialContractSentAt: Date | null;
+  initialContractSignedAt: Date | null;
   initialSteps: ReviewStepItem[];
   teammates: TeammateOption[];
   currentUserId: string;
@@ -135,33 +238,59 @@ export default function ReviewPanel({
 
   const [contractStatus, setContractStatus] = useState(initialContractStatus);
   const [dealStatus, setDealStatus] = useState(initialDealStatus);
+  const [contractSentAt, setContractSentAt] = useState(initialContractSentAt);
+  const [contractSignedAt, setContractSignedAt] = useState(initialContractSignedAt);
   const [steps, setSteps] = useState(initialSteps);
   const [newRowIds, setNewRowIds] = useState<Set<string>>(new Set());
   const [changedRowIds, setChangedRowIds] = useState<Set<string>>(new Set());
   const [justSent, setJustSent] = useState(false);
-  // Keyed on status + assignee together — a reassignment to a different
-  // person (the manual "Send to" override) doesn't change a step's status,
-  // so keying on status alone would let a genuine reassignment slip by
-  // with no row flash at all, same as the "nothing happened" bug this fixes.
+
+  const initialTimeline = buildTimeline({
+    steps: initialSteps,
+    contractStatus: initialContractStatus,
+    dealStatus: initialDealStatus,
+    contractCreatedAt: initialContractCreatedAt,
+    contractSentAt: initialContractSentAt,
+    contractSignedAt: initialContractSignedAt,
+    clientName,
+  });
+  // Keyed on the same snapshot every row is diffed against — a reassignment
+  // to a different person (the manual "Send to" override) doesn't change a
+  // step's status, so keying on status alone would let a genuine
+  // reassignment slip by with no row flash at all, same as the "nothing
+  // happened" bug this fixes. Synthetic rows (drafted/sent/signed) key on
+  // their own kind, so they flash too the moment they actually progress.
   const prevSnapshotRef = useRef<Map<string, string>>(
-    new Map(initialSteps.map((s) => [s.id, `${s.status}|${s.assigneeId}`]))
+    new Map(initialTimeline.rows.map((r) => [r.id, rowSnapshotKey(r)]))
   );
   const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sentTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function applyState(data: ReviewState) {
+    const nextTimeline = buildTimeline({
+      steps: data.steps,
+      contractStatus: data.contractStatus,
+      dealStatus: data.dealStatus,
+      contractCreatedAt: initialContractCreatedAt,
+      contractSentAt: data.contractSentAt,
+      contractSignedAt: data.contractSignedAt,
+      clientName,
+    });
+
     const nextNew = new Set<string>();
     const nextChanged = new Set<string>();
-    for (const s of data.steps) {
-      const prevSnapshot = prevSnapshotRef.current.get(s.id);
-      const snapshot = `${s.status}|${s.assigneeId}`;
-      if (prevSnapshot === undefined) nextNew.add(s.id);
-      else if (prevSnapshot !== snapshot) nextChanged.add(s.id);
+    for (const row of nextTimeline.rows) {
+      const prevSnapshot = prevSnapshotRef.current.get(row.id);
+      const snapshot = rowSnapshotKey(row);
+      if (prevSnapshot === undefined) nextNew.add(row.id);
+      else if (prevSnapshot !== snapshot) nextChanged.add(row.id);
     }
-    prevSnapshotRef.current = new Map(data.steps.map((s) => [s.id, `${s.status}|${s.assigneeId}`]));
+    prevSnapshotRef.current = new Map(nextTimeline.rows.map((r) => [r.id, rowSnapshotKey(r)]));
 
     setContractStatus(data.contractStatus);
     setDealStatus(data.dealStatus);
+    setContractSentAt(data.contractSentAt);
+    setContractSignedAt(data.contractSignedAt);
     setSteps(data.steps);
     onSync?.(data.contractStatus, data.dealStatus);
 
@@ -194,13 +323,15 @@ export default function ReviewPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dealId]);
 
-  const sorted = [...steps].sort((a, b) => a.order - b.order);
-  const activeStep = sorted.find((s) => s.status === "pending") ?? null;
-  const rows: Row[] = sorted.map((step) => ({
-    step,
-    kind: step.status !== "pending" ? "done" : step.id === activeStep?.id ? "active" : "upcoming",
-  }));
-  const mostRecentDecided = [...sorted].filter((s) => s.status !== "pending").sort((a, b) => b.order - a.order)[0] ?? null;
+  const { rows, activeStep, mostRecentDecided } = buildTimeline({
+    steps,
+    contractStatus,
+    dealStatus,
+    contractCreatedAt: initialContractCreatedAt,
+    contractSentAt,
+    contractSignedAt,
+    clientName,
+  });
 
   const actingAsDelegate = Boolean(activeStep && delegatedAssigneeIds.includes(activeStep.assigneeId));
   const canDecideCurrent = Boolean(activeStep && (activeStep.assigneeId === currentUserId || actingAsDelegate));
@@ -319,190 +450,177 @@ export default function ReviewPanel({
         </div>
       )}
 
-      {rows.length > 0 && (
-        <div className="flex flex-col">
-          {rows.map((row, i) => {
-            const isLast = i === rows.length - 1;
-            const timeLabel =
-              row.kind === "done"
-                ? row.step.decidedAt ? formatDate(row.step.decidedAt) : ""
-                : row.kind === "active"
-                  ? "now"
-                  : "next";
-            const rowAnimation = newRowIds.has(row.step.id)
-              ? "review-row-in 0.35s ease-out"
-              : changedRowIds.has(row.step.id)
-                ? "review-row-flash 1.6s ease-out"
-                : undefined;
-            return (
-              <div key={row.step.id} className="flex gap-2.5 rounded-[8px]" style={{ animation: rowAnimation }}>
-                <div
-                  className="flex-none pt-[3px] text-right text-[11px] font-medium"
-                  style={{ width: 32, color: row.kind === "active" ? "var(--accent-blue)" : "var(--ink-muted)" }}
-                >
-                  {timeLabel}
-                </div>
+      <div className="flex flex-col">
+        {rows.map((row, i) => {
+          const isLast = i === rows.length - 1;
+          const timeLabel = row.kind === "upcoming" ? "next" : row.time ? formatWhen(row.time) : "now";
+          const rowAnimation = newRowIds.has(row.id)
+            ? "review-row-in 0.35s ease-out"
+            : changedRowIds.has(row.id)
+              ? "review-row-flash 1.6s ease-out"
+              : undefined;
+          return (
+            <div key={row.id} className="flex gap-2.5 rounded-[8px]" style={{ animation: rowAnimation }}>
+              <div
+                className="flex-none pt-[3px] text-right text-[11px] font-medium"
+                style={{ width: 46, color: row.kind === "active" ? "var(--accent-blue)" : "var(--ink-muted)" }}
+              >
+                {timeLabel}
+              </div>
 
-                <div className="flex flex-none flex-col items-center" style={{ width: 18 }}>
+              <div className="flex flex-none flex-col items-center" style={{ width: 18 }}>
+                <span
+                  className="flex flex-none items-center justify-center rounded-full text-[10px] font-bold"
+                  style={
+                    row.kind === "done"
+                      ? { width: 18, height: 18, background: row.failed ? "#c0392b" : "var(--accent-blue)", color: "#fff" }
+                      : row.kind === "active"
+                        ? { width: 10, height: 10, marginTop: 4, border: "2px solid var(--accent-blue)", background: "var(--surface-1)" }
+                        : { width: 8, height: 8, marginTop: 5, border: "1.5px solid var(--hairline)", background: "transparent" }
+                  }
+                >
+                  {row.kind === "done" ? (row.failed ? "✕" : "✓") : null}
+                </span>
+                {!isLast && (
+                  <div className="w-0 flex-1" style={{ minHeight: 14, borderLeft: "1.5px dashed var(--hairline)" }} />
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1 pb-5">
+                <div className="flex flex-wrap items-baseline gap-1.5">
                   <span
-                    className="flex flex-none items-center justify-center rounded-full text-[10px] font-bold"
+                    className="text-[13px] font-medium"
                     style={
-                      row.kind === "done"
-                        ? { width: 18, height: 18, background: row.step.status === "approved" ? "var(--accent-blue)" : "#c0392b", color: "#fff" }
-                        : row.kind === "active"
-                          ? { width: 10, height: 10, marginTop: 4, border: "2px solid var(--accent-blue)", background: "var(--surface-1)" }
-                          : { width: 8, height: 8, marginTop: 5, border: "1.5px solid var(--hairline)", background: "transparent" }
+                      row.kind === "upcoming"
+                        ? { color: "var(--ink-muted)" }
+                        : row.kind === "done"
+                          ? { color: "var(--ink-muted)", textDecoration: "line-through" }
+                          : undefined
                     }
                   >
-                    {row.kind === "done" ? (row.step.status === "approved" ? "✓" : "✕") : null}
+                    {row.title}
                   </span>
-                  {!isLast && (
-                    <div className="w-0 flex-1" style={{ minHeight: 14, borderLeft: "1.5px dashed var(--hairline)" }} />
-                  )}
+                  <span className="text-[12px]" style={{ color: "var(--ink-muted)" }}>{row.subtitle}</span>
                 </div>
 
-                <div className="min-w-0 flex-1 pb-5">
-                  <div className="flex flex-wrap items-baseline gap-1.5">
-                    <span
-                      className="text-[13px] font-medium"
-                      style={
-                        row.kind === "upcoming"
-                          ? { color: "var(--ink-muted)" }
-                          : row.kind === "done"
-                            ? { color: "var(--ink-muted)", textDecoration: "line-through" }
-                            : undefined
-                      }
-                    >
-                      {row.step.assigneeName}
-                    </span>
-                    <span className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
-                      {row.kind === "done"
-                        ? row.step.status === "approved" ? "approved" : "requested changes"
-                        : row.kind === "active"
-                          ? "reviewing now"
-                          : "up next"}
-                    </span>
-                  </div>
-
-                  {row.kind === "active" && (
-                    <div className="mt-2.5 flex min-w-0 flex-col gap-3">
-                      {actingAsDelegate && (
-                        <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
-                          You&apos;re acting as a review backup, not directly as {activeStep!.assigneeName}.
-                        </div>
-                      )}
-
-                      {canEditMeta && (
-                        <select
-                          value={activeStep!.priority}
-                          onChange={(e) => updatePriority(e.target.value)}
-                          disabled={isPending}
-                          className="input w-full"
-                          style={{ fontSize: "12px", padding: "5px 8px" }}
-                        >
-                          <option value="low">Low priority</option>
-                          <option value="normal">Normal priority</option>
-                          <option value="high">High priority</option>
-                          <option value="urgent">Urgent</option>
-                        </select>
-                      )}
-
-                      <div className="flex flex-col gap-1.5">
-                        {activeStep!.checklistItems.map((item) => (
-                          <div key={item.id} className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={item.done}
-                              disabled={!canDecideCurrent || isPending}
-                              onChange={(e) => run(() => toggleChecklistItemAction(dealId, item.id, e.target.checked))}
-                            />
-                            <span className="flex-1 text-[13px]" style={item.done ? { color: "var(--ink-muted)", textDecoration: "line-through" } : undefined}>
-                              {item.label}
-                            </span>
-                            {canDecideCurrent && (
-                              <button type="button" disabled={isPending} onClick={() => run(() => removeChecklistItemAction(dealId, item.id))} className="text-[11px]" style={{ color: "var(--ink-muted)" }}>
-                                Remove
-                              </button>
-                            )}
-                          </div>
-                        ))}
+                {row.kind === "active" && row.step && (
+                  <div className="mt-2.5 flex min-w-0 flex-col gap-3">
+                    {actingAsDelegate && (
+                      <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
+                        You&apos;re acting as a review backup, not directly as {activeStep!.assigneeName}.
                       </div>
-                      {canDecideCurrent && (
-                        <div className="flex gap-2">
+                    )}
+
+                    {canEditMeta && (
+                      <select
+                        value={activeStep!.priority}
+                        onChange={(e) => updatePriority(e.target.value)}
+                        disabled={isPending}
+                        className="input w-full"
+                        style={{ fontSize: "12px", padding: "5px 8px" }}
+                      >
+                        <option value="low">Low priority</option>
+                        <option value="normal">Normal priority</option>
+                        <option value="high">High priority</option>
+                        <option value="urgent">Urgent</option>
+                      </select>
+                    )}
+
+                    <div className="flex flex-col gap-1.5">
+                      {activeStep!.checklistItems.map((item) => (
+                        <div key={item.id} className="flex items-center gap-2">
                           <input
-                            value={newItemLabel}
-                            onChange={(e) => setNewItemLabel(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addItem(); } }}
-                            placeholder="Add a checklist item…"
-                            disabled={isPending}
-                            className="input flex-1"
-                            style={{ fontSize: "12.5px", padding: "6px 9px" }}
+                            type="checkbox"
+                            checked={item.done}
+                            disabled={!canDecideCurrent || isPending}
+                            onChange={(e) => run(() => toggleChecklistItemAction(dealId, item.id, e.target.checked))}
                           />
-                          <button type="button" disabled={isPending || !newItemLabel.trim()} onClick={addItem} className="btn btn-secondary btn-sm">
-                            Add
-                          </button>
+                          <span className="flex-1 text-[13px]" style={item.done ? { color: "var(--ink-muted)", textDecoration: "line-through" } : undefined}>
+                            {item.label}
+                          </span>
+                          {canDecideCurrent && (
+                            <button type="button" disabled={isPending} onClick={() => run(() => removeChecklistItemAction(dealId, item.id))} className="text-[11px]" style={{ color: "var(--ink-muted)" }}>
+                              Remove
+                            </button>
+                          )}
                         </div>
-                      )}
-
-                      <div className="flex flex-col gap-2">
-                        {activeStep!.comments.map((c) => (
-                          <div key={c.id} className="rounded-[8px] px-2.5 py-2" style={{ background: "var(--surface-1)" }}>
-                            <div className="mb-0.5 flex items-center justify-between gap-2">
-                              <span className="text-[12px] font-medium">{c.authorName}</span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10.5px]" style={{ color: "var(--ink-muted)" }}>{timeAgo(c.createdAt)}</span>
-                                {c.authorEmail === currentUserEmail && (
-                                  <button type="button" disabled={isPending} onClick={() => run(() => deleteCommentAction(dealId, c.id))} className="text-[10.5px]" style={{ color: "var(--ink-muted)" }}>
-                                    Delete
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                            <p className="text-[12.5px] leading-relaxed" style={{ whiteSpace: "pre-wrap" }}>{c.body}</p>
-                          </div>
-                        ))}
-                      </div>
+                      ))}
+                    </div>
+                    {canDecideCurrent && (
                       <div className="flex gap-2">
-                        <textarea
-                          value={commentDraft}
-                          onChange={(e) => setCommentDraft(e.target.value)}
-                          placeholder="Leave a comment…"
-                          rows={2}
+                        <input
+                          value={newItemLabel}
+                          onChange={(e) => setNewItemLabel(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addItem(); } }}
+                          placeholder="Add a checklist item…"
                           disabled={isPending}
                           className="input flex-1"
                           style={{ fontSize: "12.5px", padding: "6px 9px" }}
                         />
-                        <button type="button" disabled={isPending || !commentDraft.trim()} onClick={addComment} className="btn btn-secondary btn-sm self-end">
-                          Post
+                        <button type="button" disabled={isPending || !newItemLabel.trim()} onClick={addItem} className="btn btn-secondary btn-sm">
+                          Add
                         </button>
                       </div>
+                    )}
 
-                      {canDecideCurrent && (
-                        <div>
-                          <textarea
-                            value={note}
-                            onChange={(e) => setNote(e.target.value)}
-                            placeholder="Add a note (optional)"
-                            rows={2}
-                            className="input mb-2.5 w-full"
-                            style={{ fontSize: "13px", padding: "8px 11px" }}
-                          />
-                          <button type="button" disabled={isPending} onClick={() => decide("approve")} className="btn btn-primary w-full justify-center">
-                            {isPending ? "Working…" : "✓ Mark as done"}
-                          </button>
-                          <button type="button" disabled={isPending} onClick={() => decide("reject")} className="mt-2 w-full text-center text-[12.5px] font-medium" style={{ color: "var(--ink-muted)" }}>
-                            {isPending ? "Working…" : "Request changes instead"}
-                          </button>
+                    <div className="flex flex-col gap-2">
+                      {activeStep!.comments.map((c) => (
+                        <div key={c.id} className="rounded-[8px] px-2.5 py-2" style={{ background: "var(--surface-1)" }}>
+                          <div className="mb-0.5 flex items-center justify-between gap-2">
+                            <span className="text-[12px] font-medium">{c.authorName}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10.5px]" style={{ color: "var(--ink-muted)" }}>{timeAgo(c.createdAt)}</span>
+                              {c.authorEmail === currentUserEmail && (
+                                <button type="button" disabled={isPending} onClick={() => run(() => deleteCommentAction(dealId, c.id))} className="text-[10.5px]" style={{ color: "var(--ink-muted)" }}>
+                                  Delete
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-[12.5px] leading-relaxed" style={{ whiteSpace: "pre-wrap" }}>{c.body}</p>
                         </div>
-                      )}
+                      ))}
                     </div>
-                  )}
-                </div>
+                    <div className="flex gap-2">
+                      <textarea
+                        value={commentDraft}
+                        onChange={(e) => setCommentDraft(e.target.value)}
+                        placeholder="Leave a comment…"
+                        rows={2}
+                        disabled={isPending}
+                        className="input flex-1"
+                        style={{ fontSize: "12.5px", padding: "6px 9px" }}
+                      />
+                      <button type="button" disabled={isPending || !commentDraft.trim()} onClick={addComment} className="btn btn-secondary btn-sm self-end">
+                        Post
+                      </button>
+                    </div>
+
+                    {canDecideCurrent && (
+                      <div>
+                        <textarea
+                          value={note}
+                          onChange={(e) => setNote(e.target.value)}
+                          placeholder="Add a note (optional)"
+                          rows={2}
+                          className="input mb-2.5 w-full"
+                          style={{ fontSize: "13px", padding: "8px 11px" }}
+                        />
+                        <button type="button" disabled={isPending} onClick={() => decide("approve")} className="btn btn-primary w-full justify-center">
+                          {isPending ? "Working…" : "✓ Mark as done"}
+                        </button>
+                        <button type="button" disabled={isPending} onClick={() => decide("reject")} className="mt-2 w-full text-center text-[12.5px] font-medium" style={{ color: "var(--ink-muted)" }}>
+                          {isPending ? "Working…" : "Request changes instead"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            );
-          })}
-        </div>
-      )}
+            </div>
+          );
+        })}
+      </div>
 
       {teammates.length > 0 && (
         <div className="flex items-center gap-1.5 rounded-full p-1.5" style={{ background: "var(--surface-2)" }}>

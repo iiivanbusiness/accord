@@ -37,6 +37,7 @@ type ReviewStepItem = {
   decidedByName: string | null;
   decidedOnBehalfOfName: string | null;
   decidedAt: Date | null;
+  createdAt: Date;
   note: string | null;
   priority: string;
   dueAt: Date | null;
@@ -162,12 +163,22 @@ export default function LiveDealView({
   sendViaDocusignNowAction: (dealId: string) => Promise<{ error?: string }>;
   reviewPanel: {
     initialContractStatus: string;
+    initialContractCreatedAt: Date;
+    initialContractSentAt: Date | null;
+    initialContractSignedAt: Date | null;
     initialSteps: ReviewStepItem[];
     teammates: TeammateOption[];
     currentUserId: string;
     delegatedAssigneeIds: string[];
     currentUserCanManageWorkspace: boolean;
-    getReviewStateAction: (dealId: string) => Promise<{ contractStatus: string; dealStatus: string; steps: ReviewStepItem[] } | null>;
+    getReviewStateAction: (dealId: string) => Promise<{
+      contractStatus: string;
+      dealStatus: string;
+      contractCreatedAt: Date;
+      contractSentAt: Date | null;
+      contractSignedAt: Date | null;
+      steps: ReviewStepItem[];
+    } | null>;
     decideAction: (dealId: string, reviewStepId: string, decision: "approve" | "reject", formData: FormData) => Promise<{ error?: string }>;
     addChecklistItemAction: (dealId: string, reviewStepId: string, formData: FormData) => Promise<{ error?: string }>;
     toggleChecklistItemAction: (dealId: string, itemId: string, done: boolean) => Promise<{ error?: string }>;
@@ -328,8 +339,12 @@ export default function LiveDealView({
           {reviewPanel && (
             <ReviewPanel
               dealId={dealId}
+              clientName={clientName}
               initialContractStatus={reviewPanel.initialContractStatus}
               initialDealStatus={status}
+              initialContractCreatedAt={reviewPanel.initialContractCreatedAt}
+              initialContractSentAt={reviewPanel.initialContractSentAt}
+              initialContractSignedAt={reviewPanel.initialContractSignedAt}
               initialSteps={reviewPanel.initialSteps}
               teammates={reviewPanel.teammates}
               currentUserId={reviewPanel.currentUserId}

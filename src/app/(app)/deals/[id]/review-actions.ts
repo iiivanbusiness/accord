@@ -41,6 +41,7 @@ export type ReviewStepData = {
   decidedByName: string | null;
   decidedOnBehalfOfName: string | null;
   decidedAt: Date | null;
+  createdAt: Date;
   note: string | null;
   priority: string;
   dueAt: Date | null;
@@ -54,7 +55,14 @@ export type ReviewStepData = {
 // already revalidatePath, but that only refreshes the page for whoever just
 // acted. This is the read side that makes the state visible live to
 // everyone else without them having to reload.
-export async function getReviewState(dealId: string): Promise<{ contractStatus: string; dealStatus: string; steps: ReviewStepData[] } | null> {
+export async function getReviewState(dealId: string): Promise<{
+  contractStatus: string;
+  dealStatus: string;
+  contractCreatedAt: Date;
+  contractSentAt: Date | null;
+  contractSignedAt: Date | null;
+  steps: ReviewStepData[];
+} | null> {
   const { where } = await dealVisibilityFilter();
   const workspaceId = await requireWorkspaceId();
   const deal = await prisma.deal.findFirst({
@@ -81,6 +89,9 @@ export async function getReviewState(dealId: string): Promise<{ contractStatus: 
   return {
     contractStatus: deal.contract.status,
     dealStatus: deal.status,
+    contractCreatedAt: deal.contract.createdAt,
+    contractSentAt: deal.contract.sentAt,
+    contractSignedAt: deal.contract.signedAt,
     steps: deal.contract.reviewSteps.map((s) => ({
       id: s.id,
       order: s.order,
@@ -90,6 +101,7 @@ export async function getReviewState(dealId: string): Promise<{ contractStatus: 
       decidedByName: s.decidedByUser?.name ?? null,
       decidedOnBehalfOfName: s.decidedOnBehalfOfUser?.name ?? null,
       decidedAt: s.decidedAt,
+      createdAt: s.createdAt,
       note: s.note,
       priority: s.priority,
       dueAt: s.dueAt,

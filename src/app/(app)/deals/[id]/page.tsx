@@ -120,6 +120,9 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         deal.contract
           ? {
               initialContractStatus: deal.contract.status,
+              initialContractCreatedAt: deal.contract.createdAt,
+              initialContractSentAt: deal.contract.sentAt,
+              initialContractSignedAt: deal.contract.signedAt,
               initialSteps: deal.contract.reviewSteps.map((s) => ({
                 id: s.id,
                 order: s.order,
@@ -129,6 +132,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                 decidedByName: s.decidedByUser?.name ?? null,
                 decidedOnBehalfOfName: s.decidedOnBehalfOfUser?.name ?? null,
                 decidedAt: s.decidedAt,
+                createdAt: s.createdAt,
                 note: s.note,
                 priority: s.priority,
                 dueAt: s.dueAt,
