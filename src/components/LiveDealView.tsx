@@ -79,6 +79,20 @@ function callPreview(transcript: string): string {
   return clean.length > 160 ? `${clean.slice(0, 160)}…` : clean || "No transcript captured.";
 }
 
+// A local recording's transcript is two channels merged into "Speaker: ..."
+// lines (system audio = "Client", mic = "You" — see deepgram.ts). Neither
+// the native capture nor the transcription pipeline has any amplitude/
+// silence check, so if the system-audio channel goes dead for the whole
+// call (a known real-world failure mode with some headset/output setups),
+// nothing errors anywhere — it looks exactly like a call where the client
+// just didn't say anything. This is the one place that distinction becomes
+// visible to the person who recorded it.
+function channelHasWords(transcript: string, label: string): boolean {
+  return transcript
+    .split("\n")
+    .some((line) => line.startsWith(`${label}:`) && line.slice(label.length + 1).trim().length > 0);
+}
+
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
   if (seconds < 60) return "just now";
@@ -312,6 +326,11 @@ export default function LiveDealView({
                     <p className="text-[12.5px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>
                       {callPreview(call.transcript)}
                     </p>
+                    {call.source === "local" && call.endedAt && channelHasWords(call.transcript, "You") && !channelHasWords(call.transcript, "Client") && (
+                      <div className="mt-2 rounded-[8px] px-3 py-2 text-[12px]" style={{ background: "var(--surface-2)", color: "#c0392b" }}>
+                        We didn&apos;t pick up anything from the other side of this call — only your own mic came through. If you were on headphones or an external mic, try switching back to your Mac&apos;s built-in speakers and microphone and recording again.
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
