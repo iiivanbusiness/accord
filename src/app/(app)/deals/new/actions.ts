@@ -14,17 +14,6 @@ import { notifySlack } from "@/lib/slack";
 import { syncDealToHubspot } from "@/lib/hubspot";
 import { syncDealToSalesforce } from "@/lib/salesforce";
 
-// Every path here costs real money one way or another (Anthropic tokens for
-// extraction, Deepgram minutes for local recordings) — callsLimit was tracked
-// and shown in the UI but never actually enforced, so a workspace could run
-// past its plan indefinitely. This is the one place all entry points funnel
-// through before doing anything billable.
-function assertUnderCallLimit(workspace: { callsUsedThisMonth: number; callsLimit: number }) {
-  if (workspace.callsUsedThisMonth >= workspace.callsLimit) {
-    redirect(`/deals/new?error=${encodeURIComponent("You've used all your calls for this billing period. Upgrade your plan to start more.")}`);
-  }
-}
-
 export async function createDeal(formData: FormData) {
   const clientName = String(formData.get("clientName") ?? "").trim();
   const company = String(formData.get("company") ?? "").trim() || clientName;
@@ -38,7 +27,6 @@ export async function createDeal(formData: FormData) {
   }
 
   const [workspace, user] = await Promise.all([requireWorkspace(), currentUserWithRole()]);
-  assertUnderCallLimit(workspace);
   const workspaceId = workspace.id;
 
   const client = await prisma.client.create({
@@ -87,7 +75,6 @@ export async function createDealFromTranscript(formData: FormData) {
   if (!templateId) throw new Error("Choose a template");
 
   const [workspace, user] = await Promise.all([requireWorkspace(), currentUserWithRole()]);
-  assertUnderCallLimit(workspace);
   const workspaceId = workspace.id;
 
   const template = await prisma.contractTemplate.findFirst({ where: { id: templateId, workspaceId } });
@@ -169,9 +156,6 @@ export async function startLocalCapture(formData: FormData): Promise<{ dealId: s
   if (!templateId) return { error: "Choose a template" };
 
   const [workspace, user] = await Promise.all([requireWorkspace(), currentUserWithRole()]);
-  if (workspace.callsUsedThisMonth >= workspace.callsLimit) {
-    return { error: "You've used all your calls for this billing period. Upgrade your plan to start more." };
-  }
   const workspaceId = workspace.id;
 
   const client = await prisma.client.create({
@@ -232,9 +216,6 @@ async function mintLocalCaptureToken(workspaceId: string, dealId: string, callId
 // same negotiation. Reuses the deal's existing template.
 export async function continueLocalCapture(dealId: string): Promise<{ dealId: string; token: string } | { error: string }> {
   const workspace = await requireWorkspace();
-  if (workspace.callsUsedThisMonth >= workspace.callsLimit) {
-    return { error: "You've used all your calls for this billing period. Upgrade your plan to start more." };
-  }
 
   const deal = await prisma.deal.findFirst({ where: { id: dealId, workspaceId: workspace.id } });
   if (!deal) return { error: "Deal not found" };
