@@ -57,6 +57,14 @@ function Spinner() {
   );
 }
 
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path d="M5 13l4 4L19 7" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 // Persistent review status card for the Deal page's sidebar — always
 // visible once a contract exists, not just while a chain-triggered review
 // happens to be in flight. "Send to" is the manual override: it always
@@ -124,18 +132,27 @@ export default function ReviewPanel({
   const [steps, setSteps] = useState(initialSteps);
   const [newRowIds, setNewRowIds] = useState<Set<string>>(new Set());
   const [changedRowIds, setChangedRowIds] = useState<Set<string>>(new Set());
-  const prevStatusRef = useRef<Map<string, string>>(new Map(initialSteps.map((s) => [s.id, s.status])));
+  const [justSent, setJustSent] = useState(false);
+  // Keyed on status + assignee together — a reassignment to a different
+  // person (the manual "Send to" override) doesn't change a step's status,
+  // so keying on status alone would let a genuine reassignment slip by
+  // with no row flash at all, same as the "nothing happened" bug this fixes.
+  const prevSnapshotRef = useRef<Map<string, string>>(
+    new Map(initialSteps.map((s) => [s.id, `${s.status}|${s.assigneeId}`]))
+  );
   const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sentTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function applyState(data: ReviewState) {
     const nextNew = new Set<string>();
     const nextChanged = new Set<string>();
     for (const s of data.steps) {
-      const prevStatus = prevStatusRef.current.get(s.id);
-      if (prevStatus === undefined) nextNew.add(s.id);
-      else if (prevStatus !== s.status) nextChanged.add(s.id);
+      const prevSnapshot = prevSnapshotRef.current.get(s.id);
+      const snapshot = `${s.status}|${s.assigneeId}`;
+      if (prevSnapshot === undefined) nextNew.add(s.id);
+      else if (prevSnapshot !== snapshot) nextChanged.add(s.id);
     }
-    prevStatusRef.current = new Map(data.steps.map((s) => [s.id, s.status]));
+    prevSnapshotRef.current = new Map(data.steps.map((s) => [s.id, `${s.status}|${s.assigneeId}`]));
 
     setContractStatus(data.contractStatus);
     setDealStatus(data.dealStatus);
@@ -165,6 +182,7 @@ export default function ReviewPanel({
     return () => {
       clearInterval(interval);
       if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+      if (sentTimeoutRef.current) clearTimeout(sentTimeoutRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dealId]);
@@ -209,6 +227,14 @@ export default function ReviewPanel({
         return;
       }
       await refresh();
+      // Guaranteed feedback on the button itself — resending to whoever's
+      // already the active reviewer (a "nudge") never changes their row's
+      // status or assignee, so the diff-driven row flash never fires for
+      // it. Without this, clicking Send in that case looked like it did
+      // nothing at all.
+      setJustSent(true);
+      if (sentTimeoutRef.current) clearTimeout(sentTimeoutRef.current);
+      sentTimeoutRef.current = setTimeout(() => setJustSent(false), 1700);
     });
   }
 
@@ -488,9 +514,15 @@ export default function ReviewPanel({
             onClick={sendTo}
             aria-label="Send for review"
             className="flex flex-none items-center justify-center rounded-full"
-            style={{ width: 30, height: 30, background: "var(--accent-blue)", opacity: isSending || !sendToId ? 0.6 : 1 }}
+            style={{
+              width: 30,
+              height: 30,
+              background: justSent ? "var(--success)" : "var(--accent-blue)",
+              opacity: isSending || !sendToId ? 0.6 : 1,
+              transition: "background 0.2s ease-out",
+            }}
           >
-            {isSending ? <Spinner /> : <SendIcon />}
+            {isSending ? <Spinner /> : justSent ? <CheckIcon /> : <SendIcon />}
           </button>
         </div>
       )}
