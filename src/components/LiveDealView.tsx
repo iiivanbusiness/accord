@@ -126,7 +126,7 @@ export default function LiveDealView({
   applyVoiceFieldCorrectionAction,
   sendForReviewToAction,
   docusignEnabled,
-  contractIsDraft,
+  contractIsDraft: initialContractIsDraft,
   clientHasEmail,
   sendViaDocusignNowAction,
   reviewPanel,
@@ -183,7 +183,21 @@ export default function LiveDealView({
   const [calls, setCalls] = useState(initialCalls);
   const [actionItems, setActionItems] = useState(initialActionItems);
   const [callHighlights, setCallHighlights] = useState(initialCallHighlights);
+  const [contractIsDraft, setContractIsDraft] = useState(initialContractIsDraft);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ReviewPanel polls its own review state independently (contractStatus/
+  // dealStatus), but the call-progress poll above only runs while a call is
+  // actually live — once it's over (the normal case for reviewing/sending a
+  // contract), it never fires again, so this page's own `status` (the top
+  // badge, the generate/send-to-docusign gating) would otherwise stay frozen
+  // at whatever it was on page load even as the review moves through its
+  // whole lifecycle. ReviewPanel calls this on every one of its own polls so
+  // this page's status tracks the review's without needing a second timer.
+  function handleReviewSync(contractStatus: string, dealStatus: string) {
+    setStatus(dealStatus);
+    setContractIsDraft(contractStatus === "draft");
+  }
 
   function isLive(s: string, callList: CallItem[]): boolean {
     if (s === "processing") return true;
@@ -331,6 +345,7 @@ export default function LiveDealView({
               addCommentAction={reviewPanel.addCommentAction}
               deleteCommentAction={reviewPanel.deleteCommentAction}
               updateStepMetaAction={reviewPanel.updateStepMetaAction}
+              onSync={handleReviewSync}
             />
           )}
 

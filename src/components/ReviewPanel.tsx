@@ -99,6 +99,7 @@ export default function ReviewPanel({
   addCommentAction,
   deleteCommentAction,
   updateStepMetaAction,
+  onSync,
 }: {
   dealId: string;
   initialContractStatus: string;
@@ -110,6 +111,11 @@ export default function ReviewPanel({
   delegatedAssigneeIds: string[];
   currentUserCanManageWorkspace: boolean;
   getReviewStateAction: (dealId: string) => Promise<ReviewState | null>;
+  // Lets an embedding page (LiveDealView) keep its own status-driven UI
+  // — the top badge, docusign-send gating — in step with this panel's
+  // polling, since that page's own poll only runs during a live call and
+  // would otherwise never learn the review moved forward.
+  onSync?: (contractStatus: string, dealStatus: string) => void;
   sendToAction: (dealId: string, assigneeId: string) => Promise<{ error?: string }>;
   decideAction: (dealId: string, reviewStepId: string, decision: "approve" | "reject", formData: FormData) => Promise<{ error?: string }>;
   addChecklistItemAction: (dealId: string, reviewStepId: string, formData: FormData) => Promise<{ error?: string }>;
@@ -157,6 +163,7 @@ export default function ReviewPanel({
     setContractStatus(data.contractStatus);
     setDealStatus(data.dealStatus);
     setSteps(data.steps);
+    onSync?.(data.contractStatus, data.dealStatus);
 
     if (nextNew.size > 0 || nextChanged.size > 0) {
       setNewRowIds(nextNew);
