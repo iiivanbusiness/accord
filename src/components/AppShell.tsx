@@ -9,7 +9,6 @@ import BrandLogo from "./BrandLogo";
 import MobileNav from "./MobileNav";
 import AppFooter from "./AppFooter";
 import SidebarNav from "./SidebarNav";
-import UpgradeCard from "./UpgradeCard";
 import ScreenLabel from "./ScreenLabel";
 import GlassPanel from "./GlassPanel";
 import EmailVerifyBanner from "./EmailVerifyBanner";
@@ -90,7 +89,6 @@ export default async function AppShell({ children }: { children: React.ReactNode
             <BrandLogo height={20} />
           </div>
           {navLinks}
-          <UpgradeCard />
           {workspaceFooter}
         </GlassPanel>
 
@@ -129,7 +127,6 @@ export default async function AppShell({ children }: { children: React.ReactNode
               <BrandLogo height={20} />
             </div>
             {navLinks}
-            <UpgradeCard />
             {workspaceFooter}
           </>
         }

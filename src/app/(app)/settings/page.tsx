@@ -30,7 +30,6 @@ import {
   inviteTeammate,
   removeLogo,
   removeTeammate,
-  requestUpgrade,
   revokeScimToken,
   toggleSso,
   toggleWorkspaceFlag,
@@ -84,14 +83,11 @@ export default async function SettingsPage({
       orderBy: { order: "asc" },
     }),
   ]);
-  const usagePct = workspace ? Math.round((workspace.callsUsedThisMonth / workspace.callsLimit) * 100) : 0;
-  const aiChatUsagePct = workspace ? Math.round((workspace.aiChatMessagesUsedThisMonth / workspace.aiChatMessagesLimit) * 100) : 0;
   if (!workspace) return null;
   const currentUser = workspace.users.find((u) => u.email === session?.user?.email);
   const canManageTeam = Boolean(currentUser?.role?.canManageTeam);
   const canManageWorkspacePerm = Boolean(currentUser?.role?.canManageWorkspace);
   const notifyEmail = workspace.users.map((u) => u.email).join(", ") || "your account email";
-  const pendingUpgrade = await prisma.upgradeRequest.findFirst({ where: { workspaceId, status: "pending" } });
   const roleOptions = roles.map((r) => ({ id: r.id, name: r.name }));
   const teammateOptions = workspace.users.map((u) => ({ id: u.id, name: u.name }));
   const teamOptions = teams.map((t) => ({ id: t.id, name: t.name }));
@@ -483,54 +479,6 @@ export default async function SettingsPage({
         </div>
       </div>
     )}
-
-    <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
-      <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
-        <h2 className="text-[15px] font-medium">Plan &amp; usage</h2>
-      </div>
-      <div className="px-[22px] py-[18px]">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <div className="text-[13.5px] font-medium">{workspace.plan}</div>
-            <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-              {workspace.callsUsedThisMonth} of {workspace.callsLimit} calls used this month
-            </div>
-          </div>
-          <span className="chip chip-neutral">{usagePct}%</span>
-        </div>
-        <div className="mt-3 h-2 w-full overflow-hidden rounded-full" style={{ background: "var(--surface-2)" }}>
-          <div className="h-full rounded-full" style={{ width: `${Math.min(100, usagePct)}%`, background: usagePct >= 100 ? "#ff6b57" : "var(--primary)" }} />
-        </div>
-
-        <div className="mt-4 flex items-center justify-between gap-4">
-          <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            {workspace.aiChatMessagesUsedThisMonth} of {workspace.aiChatMessagesLimit} AI chat messages used this month
-          </div>
-          <span className="chip chip-neutral">{aiChatUsagePct}%</span>
-        </div>
-        <div className="mt-2 h-2 w-full overflow-hidden rounded-full" style={{ background: "var(--surface-2)" }}>
-          <div className="h-full rounded-full" style={{ width: `${Math.min(100, aiChatUsagePct)}%`, background: aiChatUsagePct >= 100 ? "#ff6b57" : "var(--primary)" }} />
-        </div>
-
-        <div className="mt-4 border-t pt-4" style={{ borderColor: "var(--hairline-soft)" }}>
-          {pendingUpgrade ? (
-            <div className="chip chip-warn w-full justify-start px-3.5 py-2.5 text-[12.5px]">
-              Upgrade requested. We&apos;ll be in touch soon.
-            </div>
-          ) : (
-            <form action={requestUpgrade} className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <input
-                name="note"
-                placeholder="What do you need? (optional)"
-                className="input flex-1"
-                style={{ fontSize: "13px", padding: "8px 11px" }}
-              />
-              <button type="submit" className="btn btn-primary btn-sm">Request upgrade</button>
-            </form>
-          )}
-        </div>
-      </div>
-    </div>
 
     <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
       <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>

@@ -139,7 +139,7 @@ export default async function DealsPage({
         Record any call locally, then let SealMe draft the contract
         {workspace && (
           <span className="ml-2" style={{ color: "var(--ink-muted)" }}>
-            · {workspace.callsUsedThisMonth} of {workspace.callsLimit} calls used this month
+            · {workspace.callsUsedThisMonth} calls this month
           </span>
         )}
       </div>
