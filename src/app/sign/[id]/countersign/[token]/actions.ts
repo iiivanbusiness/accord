@@ -8,17 +8,17 @@ import { logAudit } from "@/lib/audit";
 import { notifyChangesRequested } from "@/lib/review";
 import { advanceSigningOrFinalize } from "@/lib/signing";
 
-export async function signAsCountersigner(contractId: string, token: string, formData: FormData) {
+export async function signAsCountersigner(contractId: string, token: string, formData: FormData): Promise<{ error?: string }> {
   const signatureImage = String(formData.get("signatureImage") ?? "").trim();
-  if (!signatureImage) throw new Error("Draw your signature before signing");
+  if (!signatureImage) return { error: "Draw your signature before signing" };
 
   const hdrs = await headers();
   const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ?? hdrs.get("x-real-ip") ?? "unknown";
   const allowed = await checkRateLimit(`countersign:${token}`, 10, 60 * 60 * 1000);
-  if (!allowed) throw new Error("Too many attempts. Try again later.");
+  if (!allowed) return { error: "Too many attempts. Try again later." };
 
   const signer = await prisma.contractSigner.findFirst({ where: { contractId, token } });
-  if (!signer) throw new Error("Not found");
+  if (!signer) return { error: "Not found" };
 
   // Same atomic-guard pattern as the client's own signContract — a
   // pending-only filter means a double-submit or an already-decided
@@ -47,16 +47,16 @@ export async function signAsCountersigner(contractId: string, token: string, for
   redirect(`/sign/${contractId}/countersign/${token}`);
 }
 
-export async function declineToSign(contractId: string, token: string, formData: FormData) {
+export async function declineToSign(contractId: string, token: string, formData: FormData): Promise<{ error?: string }> {
   const reason = String(formData.get("reason") ?? "").trim();
 
   const hdrs = await headers();
   const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ?? hdrs.get("x-real-ip") ?? "unknown";
   const allowed = await checkRateLimit(`countersign-decline:${token}`, 10, 60 * 60 * 1000);
-  if (!allowed) throw new Error("Too many attempts. Try again later.");
+  if (!allowed) return { error: "Too many attempts. Try again later." };
 
   const signer = await prisma.contractSigner.findFirst({ where: { contractId, token } });
-  if (!signer) throw new Error("Not found");
+  if (!signer) return { error: "Not found" };
 
   const result = await prisma.contractSigner.updateMany({
     where: { id: signer.id, status: "pending" },

@@ -3,7 +3,8 @@ import { prisma } from "@/lib/db";
 import { fillClauses } from "@/lib/contract";
 import { signContract, requestClauseChange } from "./actions";
 import BrandLogo from "@/components/BrandLogo";
-import SignaturePad from "@/components/SignaturePad";
+import SignForm from "@/components/SignForm";
+import ClauseChangeForm from "@/components/ClauseChangeForm";
 import DownloadContractButton from "@/components/DownloadContractButton";
 
 export default async function SignPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ feedbackSent?: string }> }) {
@@ -97,11 +98,7 @@ export default async function SignPage({ params, searchParams }: { params: Promi
                   <summary className="cursor-pointer text-[12px] font-medium" style={{ color: "var(--accent-blue)" }}>
                     Request a change to this clause
                   </summary>
-                  <form action={requestClauseChange.bind(null, contract.id, clause.title)} className="mt-2.5 flex flex-col gap-2 rounded-[10px] p-3.5" style={{ background: "var(--surface-2)" }}>
-                    <input name="fromName" placeholder="Your name (optional)" className="input" style={{ fontSize: "13px", padding: "8px 11px" }} />
-                    <textarea name="comment" required rows={2} placeholder="What would you like changed here?" className="input" style={{ fontSize: "13px", padding: "8px 11px" }} />
-                    <button type="submit" className="btn btn-secondary btn-sm w-fit">Send feedback</button>
-                  </form>
+                  <ClauseChangeForm contractId={contract.id} clauseTitle={clause.title} requestChangeAction={requestClauseChange} />
                 </details>
               )}
             </div>
@@ -114,20 +111,7 @@ export default async function SignPage({ params, searchParams }: { params: Promi
             <p className="mb-4 text-[13px]" style={{ color: "var(--ink-muted)" }}>
               Draw your signature below and click Sign to complete this agreement.
             </p>
-            <form action={signContract.bind(null, contract.id)} className="flex flex-col gap-3">
-              <label className="flex flex-col gap-1.5">
-                <span className="text-[13px] font-medium">Full name</span>
-                <input name="signerName" required placeholder="Type your full name" className="input" />
-              </label>
-              <SignaturePad name="signatureImage" />
-              <label className="flex items-start gap-2 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-                <input type="checkbox" required className="mt-0.5" />
-                I have reviewed the agreement above and agree to its terms.
-              </label>
-              <button type="submit" className="btn btn-primary mt-1 w-full justify-center">
-                Sign &amp; complete
-              </button>
-            </form>
+            <SignForm contractId={contract.id} signAction={signContract} />
           </div>
         ) : clientSigned ? (
           <div className="mt-5 text-center text-[12px]" style={{ color: "var(--ink-muted)" }}>
