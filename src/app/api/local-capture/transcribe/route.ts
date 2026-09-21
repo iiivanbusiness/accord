@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { transcribeWav, isDeepgramConfigured } from "@/lib/deepgram";
@@ -100,6 +101,12 @@ export async function POST(req: Request) {
       }
       await logAudit({ workspaceId: deal.workspaceId, action: "deal.local_capture_transcribed", targetType: "deal", targetId: deal.id });
     }
+
+    // Doesn't push anything to an already-open tab (the deal page polls
+    // getLiveDealState for that), but keeps any OTHER navigation to this
+    // deal — a second tab, the deals list, the rep re-opening this page —
+    // from serving a stale cached render mid-call.
+    revalidatePath(`/deals/${deal.id}`);
 
     return NextResponse.json({ ok: true, dealId: deal.id, final: isFinal });
   } catch (err) {

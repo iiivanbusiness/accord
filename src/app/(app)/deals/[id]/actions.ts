@@ -13,6 +13,70 @@ import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import { currentUserWithRole } from "@/lib/permissions";
 import { randomBytes } from "crypto";
 
+export type LiveDealState = {
+  status: string;
+  summary: string | null;
+  fields: {
+    id: string;
+    groupLabel: string;
+    label: string;
+    value: string | null;
+    status: string;
+    sourceQuote: string | null;
+    history: { oldValue: string | null; newValue: string | null; changedBy: string; changedAt: Date }[];
+  }[];
+  calls: { id: string; source: string; startedAt: Date; endedAt: Date | null; transcript: string }[];
+  actionItems: { id: string; description: string; ownerType: string; dueDate: Date | null; status: string; sourceQuote: string | null }[];
+  callHighlights: { id: string; type: string; body: string; sourceQuote: string | null }[];
+};
+
+// Polled by LiveDealView (a client component) every few seconds while a
+// call is actively being recorded, so the extracted terms/summary/action
+// items that a background upload-and-extract pass (see
+// src/app/api/local-capture/transcribe/route.ts) writes to the DB show up
+// on an already-open deal page without the rep having to navigate away and
+// back — the same live-without-reload pattern ReviewPanel already uses for
+// review state (src/app/(app)/deals/[id]/review-actions.ts's
+// getReviewState).
+export async function getLiveDealState(dealId: string): Promise<LiveDealState | null> {
+  const { where } = await dealVisibilityFilter();
+  const workspaceId = await requireWorkspaceId();
+  const deal = await prisma.deal.findFirst({
+    where: { id: dealId, workspaceId, ...where },
+    include: {
+      fields: { orderBy: { orderIndex: "asc" } },
+      calls: { orderBy: { startedAt: "asc" } },
+      fieldChanges: { orderBy: { changedAt: "asc" } },
+      actionItems: { orderBy: { createdAt: "asc" } },
+      callHighlights: { orderBy: { createdAt: "asc" } },
+    },
+  });
+  if (!deal) return null;
+
+  const historyByKey = new Map<string, typeof deal.fieldChanges>();
+  for (const change of deal.fieldChanges) {
+    if (!historyByKey.has(change.fieldKey)) historyByKey.set(change.fieldKey, []);
+    historyByKey.get(change.fieldKey)!.push(change);
+  }
+
+  return {
+    status: deal.status,
+    summary: deal.summary,
+    fields: deal.fields.map((f) => ({
+      id: f.id,
+      groupLabel: f.groupLabel,
+      label: f.label,
+      value: f.value,
+      status: f.status,
+      sourceQuote: f.sourceQuote,
+      history: (historyByKey.get(f.fieldKey) ?? []).map((h) => ({ oldValue: h.oldValue, newValue: h.newValue, changedBy: h.changedBy, changedAt: h.changedAt })),
+    })),
+    calls: deal.calls.map((c) => ({ id: c.id, source: c.source, startedAt: c.startedAt, endedAt: c.endedAt, transcript: c.transcript })),
+    actionItems: deal.actionItems.map((a) => ({ id: a.id, description: a.description, ownerType: a.ownerType, dueDate: a.dueDate, status: a.status, sourceQuote: a.sourceQuote })),
+    callHighlights: deal.callHighlights.map((h) => ({ id: h.id, type: h.type, body: h.body, sourceQuote: h.sourceQuote })),
+  };
+}
+
 export async function retryExtraction(dealId: string) {
   const { where } = await dealVisibilityFilter();
   const workspaceId = await requireWorkspaceId();
