@@ -11,5 +11,8 @@
   "devDependencies": {
     "@tauri-apps/cli": "^2",
     "@choochmeque/tauri-windows-bundle": "^0.1.29"
+  },
+  "allowScripts": {
+    "skia-canvas@3.0.8": true
   }
 }
