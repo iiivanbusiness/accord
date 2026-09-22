@@ -19,5 +19,18 @@
 	     prompt), but the mic tap needs this one. -->
 	<key>com.apple.security.device.audio-input</key>
 	<true/>
+
+	<!-- Only needed because we sign manually (raw `codesign`, no Xcode
+	     managed signing) — Xcode would inject these automatically to match
+	     the provisioning profile. Without them, the signed binary's
+	     entitlements don't carry the same app/team identifier the profile
+	     embeds, which Transporter rejects ("missing an application
+	     identifier but has an application identifier in the provisioning
+	     profile", error 90886). Tied to this specific Apple Developer
+	     account/Team ID (Y6NYKGZKY8) — update if the account ever changes. -->
+	<key>com.apple.application-identifier</key>
+	<string>Y6NYKGZKY8.net.sealme.desktop</string>
+	<key>com.apple.developer.team-identifier</key>
+	<string>Y6NYKGZKY8</string>
 </dict>
 </plist>
