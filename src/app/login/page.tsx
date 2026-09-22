@@ -9,6 +9,7 @@ import GoogleIcon from "@/components/GoogleIcon";
 const ERROR_MESSAGE: Record<string, string> = {
   CredentialsSignin: "Wrong email, password, or 2FA code.",
 };
+const DEFAULT_ERROR_MESSAGE = "Something went wrong signing you in. Please try again.";
 
 export default async function LoginPage({
   searchParams,
@@ -58,7 +59,7 @@ export default async function LoginPage({
 
         {error && (
           <div className="chip chip-warn mb-4 w-full justify-center py-2.5 text-[12.5px]">
-            {ERROR_MESSAGE[error] ?? error}
+            {ERROR_MESSAGE[error] ?? DEFAULT_ERROR_MESSAGE}
           </div>
         )}
         {reset && (
