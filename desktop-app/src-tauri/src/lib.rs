@@ -3,7 +3,7 @@ mod audio;
 mod audio_windows;
 
 use std::sync::atomic::{AtomicBool, Ordering};
-#[cfg(not(feature = "mas"))]
+#[cfg(all(not(feature = "mas"), not(target_os = "windows")))]
 use tauri::window::{Effect, EffectsBuilder};
 #[cfg(all(not(feature = "mas"), target_os = "macos"))]
 use tauri::window::EffectState;
@@ -17,14 +17,25 @@ const APP_BASE_URL: &str = "https://app.sealme.net";
 // The floating companion window's own route — a chrome-less view of the
 // same app.sealme.net session (see src/app/companion/page.tsx), not the
 // full sidebared app. The rail is a second, separate route/window — see
-// src/app/companion/rail/page.tsx.
+// src/app/companion/rail/page.tsx. Not offered on Windows yet (see the
+// Windows arms of toggle_companion_rail/select_companion_view below), so
+// none of this — the URLs, sizing, positioning, or window-building — is
+// compiled into a Windows build at all.
+#[cfg(not(target_os = "windows"))]
 const COMPANION_URL: &str = "https://app.sealme.net/companion";
+#[cfg(not(target_os = "windows"))]
 const RAIL_URL: &str = "https://app.sealme.net/companion/rail";
+#[cfg(not(target_os = "windows"))]
 const COMPANION_WIDTH: f64 = 340.0;
+#[cfg(not(target_os = "windows"))]
 const COMPANION_HEIGHT: f64 = 520.0;
+#[cfg(not(target_os = "windows"))]
 const RAIL_WIDTH: f64 = 44.0;
+#[cfg(not(target_os = "windows"))]
 const RAIL_HEIGHT: f64 = 172.0;
+#[cfg(not(target_os = "windows"))]
 const COMPANION_MARGIN: f64 = 16.0;
+#[cfg(not(target_os = "windows"))]
 const COMPANION_GAP: f64 = 8.0;
 #[cfg(all(not(feature = "mas"), target_os = "macos"))]
 const COMPANION_RADIUS: f64 = 16.0;
@@ -78,6 +89,7 @@ fn is_local_capturing() -> bool {
 // opening on. Falls back to a fixed spot if the OS can't tell us about a
 // primary monitor (shouldn't normally happen, but the builder still needs
 // *some* position rather than failing the whole toggle).
+#[cfg(not(target_os = "windows"))]
 fn rail_position(app: &tauri::AppHandle) -> (f64, f64) {
     if let Ok(Some(monitor)) = app.primary_monitor() {
         let scale = monitor.scale_factor();
@@ -95,6 +107,7 @@ fn rail_position(app: &tauri::AppHandle) -> (f64, f64) {
 // with it — computed independently from the same monitor geometry (not by
 // querying the rail's live position) so the two always line up consistently
 // even if this runs before the rail has actually been shown yet.
+#[cfg(not(target_os = "windows"))]
 fn content_position(app: &tauri::AppHandle) -> (f64, f64) {
     let (rail_x, rail_y) = rail_position(app);
     (rail_x - COMPANION_GAP - COMPANION_WIDTH, rail_y)
@@ -108,13 +121,12 @@ fn content_position(app: &tauri::AppHandle) -> (f64, f64) {
 // — see the tauri dependency comment in Cargo.toml for why the Cargo feature
 // itself still has to stay unconditionally on regardless.
 //
-// macOS and Windows need different `Effect` variants — Tauri's Windows
-// vibrancy backend (tauri::vibrancy::windows::apply_effects) only recognizes
-// Mica/Acrylic/Blur/Tabbed and silently no-ops on anything else (including
-// HudWindow), which combined with transparent(true) left the window with no
-// backdrop at all. Anything that isn't macOS or Windows (Linux) falls back
-// to the same opaque plain background the `mas` build uses, since this repo
-// has no Linux vibrancy story.
+// Windows-only builds never call this at all (the companion/rail windows
+// aren't offered there — see the Windows arms of toggle_companion_rail/
+// select_companion_view below), so this only has to choose between macOS's
+// HudWindow vibrancy and the plain opaque fallback `mas` (and Linux, which
+// has no vibrancy story here) use.
+#[cfg(not(target_os = "windows"))]
 fn apply_glass_or_plain<'a>(
     builder: tauri::WebviewWindowBuilder<'a, tauri::Wry, tauri::AppHandle>,
 ) -> tauri::WebviewWindowBuilder<'a, tauri::Wry, tauri::AppHandle> {
@@ -128,18 +140,13 @@ fn apply_glass_or_plain<'a>(
                 .build(),
         )
     }
-    #[cfg(all(not(feature = "mas"), target_os = "windows"))]
-    {
-        builder
-            .transparent(true)
-            .effects(EffectsBuilder::new().effect(Effect::Acrylic).build())
-    }
-    #[cfg(any(feature = "mas", not(any(target_os = "macos", target_os = "windows"))))]
+    #[cfg(any(feature = "mas", not(target_os = "macos")))]
     {
         builder.background_color(tauri::webview::Color(245, 245, 247, 255))
     }
 }
 
+#[cfg(not(target_os = "windows"))]
 fn build_rail_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow, String> {
     let (x, y) = rail_position(app);
     eprintln!("[companion] creating rail window at ({x}, {y}), url={RAIL_URL}");
@@ -174,6 +181,7 @@ fn build_rail_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow, Str
     }
 }
 
+#[cfg(not(target_os = "windows"))]
 fn build_content_window(app: &tauri::AppHandle, view: &str) -> Result<tauri::WebviewWindow, String> {
     let (x, y) = content_position(app);
     let full_url = format!("{COMPANION_URL}?view={view}");
@@ -205,6 +213,23 @@ fn build_content_window(app: &tauri::AppHandle, view: &str) -> Result<tauri::Web
     }
 }
 
+// Not offered on Windows yet — CompanionToggleButton.tsx hides the only UI
+// entry point there already, but this refuses at the command level too
+// (rather than just leaving the button hidden and trusting nothing else
+// ever calls it), so nothing downstream — window creation, positioning,
+// the vibrancy code — ever runs on Windows regardless of caller.
+#[cfg(target_os = "windows")]
+#[tauri::command]
+fn toggle_companion_rail() -> Result<(), String> {
+    Err("The floating companion panel isn't available on Windows yet".to_string())
+}
+
+#[cfg(target_os = "windows")]
+#[tauri::command]
+fn select_companion_view(_view: String) -> Result<(), String> {
+    Err("The floating companion panel isn't available on Windows yet".to_string())
+}
+
 // Manual toggle only — not tied to call start/stop. Shows/hides the small
 // persistent rail (and the content window along with it, if one happens to
 // be open) in sync with the main window — exactly one of "main" / "rail" is
@@ -214,6 +239,7 @@ fn build_content_window(app: &tauri::AppHandle, view: &str) -> Result<tauri::Web
 // control on the rail itself and inside the content window's header. Logs
 // every step to stderr (visible in the `tauri dev` terminal) since this has
 // no other feedback channel if something in here fails.
+#[cfg(not(target_os = "windows"))]
 #[tauri::command]
 fn toggle_companion_rail(app: tauri::AppHandle) -> Result<(), String> {
     eprintln!("[companion] rail toggle invoked");
@@ -274,6 +300,7 @@ fn toggle_companion_rail(app: tauri::AppHandle) -> Result<(), String> {
 // time — WebviewWindow::navigate() changes its URL in place. Picking the
 // view that's already showing collapses the window back to rail-only, the
 // same "tap the active icon again to close" the rail itself uses.
+#[cfg(not(target_os = "windows"))]
 #[tauri::command]
 fn select_companion_view(app: tauri::AppHandle, view: String) -> Result<(), String> {
     eprintln!("[companion] select_companion_view({view})");
