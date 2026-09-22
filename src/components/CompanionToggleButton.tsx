@@ -7,16 +7,20 @@ import { useEffect, useState } from "react";
 // small always-on-top rail instead (content only opens once you pick
 // something from it), or the reverse if it's already showing. Only
 // rendered inside the desktop app; same isTauri detection pattern as
-// ContinueCallButton/LocalCaptureForm.
+// ContinueCallButton/LocalCaptureForm. Windows-only hidden for now — not
+// offering the floating rail there yet, so this stays macOS-only until
+// that changes.
 export default function CompanionToggleButton() {
   const [isTauri, setIsTauri] = useState(false);
+  const [isWindows, setIsWindows] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setIsTauri(typeof window !== "undefined" && "__TAURI_INTERNALS__" in window);
+    setIsWindows(typeof navigator !== "undefined" && navigator.userAgent.includes("Windows"));
   }, []);
 
-  if (!isTauri) return null;
+  if (!isTauri || isWindows) return null;
 
   async function handleClick() {
     setError(null);
