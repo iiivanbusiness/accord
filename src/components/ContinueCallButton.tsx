@@ -62,7 +62,7 @@ export default function ContinueCallButton({ dealId }: { dealId: string }) {
       <button type="button" disabled={busy} onClick={handleClick} className="btn btn-secondary btn-sm w-full justify-center">
         {busy ? "Starting…" : "Record another call"}
       </button>
-      {error && <div className="chip chip-warn w-fit px-3 py-2 text-[12.5px]">{error}</div>}
+      {error && <div className="chip chip-warn max-w-full whitespace-normal break-words px-3 py-2 text-[12.5px]">{error}</div>}
     </div>
   );
 }

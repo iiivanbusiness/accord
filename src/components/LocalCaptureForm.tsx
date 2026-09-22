@@ -104,7 +104,7 @@ export default function LocalCaptureForm({ templates }: { templates: Template[] 
         </select>
       </label>
 
-      {error && <div className="chip chip-warn w-fit px-3 py-2 text-[12.5px]">{error}</div>}
+      {error && <div className="chip chip-warn max-w-full whitespace-normal break-words px-3 py-2 text-[12.5px]">{error}</div>}
 
       <button type="submit" disabled={busy} className="btn btn-primary mt-2 w-full justify-center">
         {busy ? "Starting…" : "Start recording"}

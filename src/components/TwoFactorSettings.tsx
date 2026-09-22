@@ -122,7 +122,7 @@ export default function TwoFactorSettings({ enabled }: { enabled: boolean }) {
           <span className="text-[13px] font-medium">6-digit code</span>
           <input name="code" required inputMode="numeric" maxLength={6} placeholder="123456" className="input" style={{ maxWidth: 160 }} />
         </label>
-        {error && <div className="chip chip-warn w-fit px-3 py-2 text-[12.5px]">{error}</div>}
+        {error && <div className="chip chip-warn max-w-full whitespace-normal break-words px-3 py-2 text-[12.5px]">{error}</div>}
         <div className="flex gap-2">
           <button type="submit" disabled={busy} className="btn btn-primary btn-sm">
             {busy ? "Confirming…" : "Confirm & enable"}
@@ -151,7 +151,7 @@ export default function TwoFactorSettings({ enabled }: { enabled: boolean }) {
           Confirm your password to turn off two-factor authentication.
         </p>
         <input name="password" type="password" required placeholder="Current password" className="input" style={{ maxWidth: 260 }} />
-        {error && <div className="chip chip-warn w-fit px-3 py-2 text-[12.5px]">{error}</div>}
+        {error && <div className="chip chip-warn max-w-full whitespace-normal break-words px-3 py-2 text-[12.5px]">{error}</div>}
         <div className="flex gap-2">
           <button type="submit" disabled={busy} className="btn btn-secondary btn-sm">
             {busy ? "Disabling…" : "Disable 2FA"}
@@ -179,7 +179,7 @@ export default function TwoFactorSettings({ enabled }: { enabled: boolean }) {
           Confirm your password to generate a fresh set of backup codes. Your old ones stop working.
         </p>
         <input name="password" type="password" required placeholder="Current password" className="input" style={{ maxWidth: 260 }} />
-        {error && <div className="chip chip-warn w-fit px-3 py-2 text-[12.5px]">{error}</div>}
+        {error && <div className="chip chip-warn max-w-full whitespace-normal break-words px-3 py-2 text-[12.5px]">{error}</div>}
         <div className="flex gap-2">
           <button type="submit" disabled={busy} className="btn btn-secondary btn-sm">
             {busy ? "Generating…" : "Generate new codes"}
@@ -224,7 +224,7 @@ export default function TwoFactorSettings({ enabled }: { enabled: boolean }) {
           </button>
         </>
       )}
-      {error && mode === "idle" && <div className="chip chip-warn w-fit px-3 py-2 text-[12.5px]">{error}</div>}
+      {error && mode === "idle" && <div className="chip chip-warn max-w-full whitespace-normal break-words px-3 py-2 text-[12.5px]">{error}</div>}
     </div>
   );
 }

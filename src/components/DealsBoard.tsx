@@ -88,7 +88,7 @@ export default function DealsBoard({
   return (
     <div className="flex flex-col gap-2">
       {error && (
-        <div className="chip chip-warn w-fit px-3.5 py-2 text-[12.5px]">{error}</div>
+        <div className="chip chip-warn max-w-full whitespace-normal break-words px-3.5 py-2 text-[12.5px]">{error}</div>
       )}
       <div
         className="flex gap-3.5 overflow-x-auto pb-2"
