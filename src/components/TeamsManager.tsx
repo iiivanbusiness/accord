@@ -10,20 +10,17 @@ export default function TeamsManager({
   deleteTeamAction,
 }: {
   teams: TeamItem[];
-  createTeamAction: (formData: FormData) => Promise<void>;
-  deleteTeamAction: (teamId: string) => Promise<void>;
+  createTeamAction: (formData: FormData) => Promise<{ error?: string }>;
+  deleteTeamAction: (teamId: string) => Promise<{ error?: string }>;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function run(fn: () => Promise<void>) {
+  function run(fn: () => Promise<{ error?: string }>) {
     setError(null);
     startTransition(async () => {
-      try {
-        await fn();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
-      }
+      const result = await fn();
+      if (result.error) setError(result.error);
     });
   }
 
@@ -37,7 +34,7 @@ export default function TeamsManager({
 
       {teams.length === 0 && (
         <div className="py-3 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-          No teams yet — create one to give a segment of your org (e.g. &ldquo;Sales EMEA&rdquo;) its own approval rules.
+          No teams yet. Create one to give a segment of your org (e.g. &ldquo;Sales EMEA&rdquo;) its own approval rules.
         </div>
       )}
 

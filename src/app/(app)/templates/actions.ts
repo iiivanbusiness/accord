@@ -88,7 +88,7 @@ export async function updateTemplate(templateId: string, formData: FormData) {
   const template = await prisma.contractTemplate.findFirst({ where: { id: templateId, workspaceId } });
   if (!template) throw new Error("Template not found");
   if (template.locked && !user.role?.canApproveTemplates) {
-    throw new Error("This template is locked — ask someone who can approve templates to unlock it first");
+    throw new Error("This template is locked. Ask someone who can approve templates to unlock it first");
   }
 
   await prisma.contractTemplate.updateMany({
@@ -111,7 +111,7 @@ export async function deleteTemplate(templateId: string) {
   const template = await prisma.contractTemplate.findFirst({ where: { id: templateId, workspaceId } });
   if (!template) throw new Error("Template not found");
   if (template.locked && !user.role?.canApproveTemplates) {
-    throw new Error("This template is locked — ask someone who can approve templates to unlock it first");
+    throw new Error("This template is locked. Ask someone who can approve templates to unlock it first");
   }
 
   const inUse = await prisma.deal.count({ where: { templateId } });

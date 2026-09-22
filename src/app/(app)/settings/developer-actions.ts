@@ -23,10 +23,10 @@ export async function createApiKey(formData: FormData): Promise<string> {
   return raw;
 }
 
-export async function revokeApiKey(keyId: string): Promise<void> {
+export async function revokeApiKey(keyId: string): Promise<{ error?: string }> {
   const user = await requirePermission("canManageWorkspace");
   const key = await prisma.apiKey.findFirst({ where: { id: keyId, workspaceId: user.workspaceId } });
-  if (!key) throw new Error("Key not found");
+  if (!key) return { error: "Key not found" };
 
   await prisma.apiKey.update({ where: { id: keyId }, data: { revokedAt: new Date() } });
 
@@ -34,15 +34,16 @@ export async function revokeApiKey(keyId: string): Promise<void> {
   await logAudit({ workspaceId: user.workspaceId, actorEmail: session?.user?.email, action: "api_key.revoked", metadata: { name: key.name } });
 
   revalidatePath("/settings/developers");
+  return {};
 }
 
-export async function createWebhookEndpoint(formData: FormData): Promise<void> {
+export async function createWebhookEndpoint(formData: FormData): Promise<{ error?: string }> {
   const user = await requirePermission("canManageWorkspace");
   const url = String(formData.get("url") ?? "").trim();
-  if (!/^https:\/\//.test(url)) throw new Error("Webhook URL must be an https:// address");
+  if (!/^https:\/\//.test(url)) return { error: "Webhook URL must be an https:// address" };
 
   const events = formData.getAll("events").map(String).filter(isWebhookEvent);
-  if (events.length === 0) throw new Error("Choose at least one event");
+  if (events.length === 0) return { error: "Choose at least one event" };
 
   const secret = `whsec_${randomBytes(24).toString("hex")}`;
   await prisma.webhookEndpoint.create({ data: { workspaceId: user.workspaceId, url, events: JSON.stringify(events), secret } });
@@ -51,21 +52,23 @@ export async function createWebhookEndpoint(formData: FormData): Promise<void> {
   await logAudit({ workspaceId: user.workspaceId, actorEmail: session?.user?.email, action: "webhook.created", metadata: { url, events } });
 
   revalidatePath("/settings/developers");
+  return {};
 }
 
-export async function toggleWebhookEndpoint(endpointId: string): Promise<void> {
+export async function toggleWebhookEndpoint(endpointId: string): Promise<{ error?: string }> {
   const user = await requirePermission("canManageWorkspace");
   const endpoint = await prisma.webhookEndpoint.findFirst({ where: { id: endpointId, workspaceId: user.workspaceId } });
-  if (!endpoint) throw new Error("Endpoint not found");
+  if (!endpoint) return { error: "Endpoint not found" };
 
   await prisma.webhookEndpoint.update({ where: { id: endpointId }, data: { enabled: !endpoint.enabled } });
   revalidatePath("/settings/developers");
+  return {};
 }
 
-export async function deleteWebhookEndpoint(endpointId: string): Promise<void> {
+export async function deleteWebhookEndpoint(endpointId: string): Promise<{ error?: string }> {
   const user = await requirePermission("canManageWorkspace");
   const endpoint = await prisma.webhookEndpoint.findFirst({ where: { id: endpointId, workspaceId: user.workspaceId } });
-  if (!endpoint) throw new Error("Endpoint not found");
+  if (!endpoint) return { error: "Endpoint not found" };
 
   await prisma.webhookEndpoint.delete({ where: { id: endpointId } });
 
@@ -73,13 +76,15 @@ export async function deleteWebhookEndpoint(endpointId: string): Promise<void> {
   await logAudit({ workspaceId: user.workspaceId, actorEmail: session?.user?.email, action: "webhook.deleted", metadata: { url: endpoint.url } });
 
   revalidatePath("/settings/developers");
+  return {};
 }
 
-export async function sendTestWebhookEvent(endpointId: string): Promise<void> {
+export async function sendTestWebhookEvent(endpointId: string): Promise<{ error?: string }> {
   const user = await requirePermission("canManageWorkspace");
   const endpoint = await prisma.webhookEndpoint.findFirst({ where: { id: endpointId, workspaceId: user.workspaceId } });
-  if (!endpoint) throw new Error("Endpoint not found");
+  if (!endpoint) return { error: "Endpoint not found" };
 
   await sendTestWebhook(endpointId);
   revalidatePath("/settings/developers");
+  return {};
 }

@@ -108,24 +108,29 @@ export async function disconnectSenderDomain() {
   revalidatePath("/settings");
 }
 
-export async function inviteTeammate(formData: FormData) {
+// Returns the error as data instead of throwing — a thrown Error's message
+// gets stripped to a generic "#441" digest by Next.js in production
+// (deliberate: it won't leak arbitrary server-side exception text to the
+// client), so a validation failure like "already tied to another workspace"
+// would otherwise never actually reach the user. See InviteTeammateForm.
+export async function inviteTeammate(formData: FormData): Promise<{ error: string } | undefined> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  if (!email) throw new Error("Enter an email address");
+  if (!email) return { error: "Enter an email address" };
 
   await requirePermission("canManageTeam");
   const workspace = await requireWorkspace();
   const session = await auth();
 
   if (workspace.allowedEmailDomain && !email.endsWith(`@${workspace.allowedEmailDomain}`)) {
-    throw new Error(`This workspace only accepts @${workspace.allowedEmailDomain} email addresses`);
+    return { error: `This workspace only accepts @${workspace.allowedEmailDomain} email addresses` };
   }
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     if (existing.workspaceId === workspace.id) {
-      throw new Error("They're already on this workspace");
+      return { error: "They're already on this workspace" };
     }
-    throw new Error("That email is already tied to another SealMe workspace");
+    return { error: "That email is already tied to another SealMe workspace" };
   }
 
   await prisma.user.create({
@@ -238,7 +243,7 @@ export async function updateAllowedDomain(formData: FormData) {
   const raw = String(formData.get("domain") ?? "").trim().toLowerCase();
   const domain = raw.replace(/^@/, "") || null;
   if (domain && !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) {
-    throw new Error("That doesn't look like a domain, e.g. acme.com");
+    throw new Error("That doesn't look like a domain, e.g. yourcompany.com");
   }
 
   const user = await requirePermission("canManageWorkspace");
@@ -303,16 +308,16 @@ export async function updateSsoConfig(formData: FormData) {
   revalidatePath("/settings");
 }
 
-export async function toggleSso(): Promise<void> {
+export async function toggleSso(): Promise<{ error?: string }> {
   const user = await requirePermission("canManageWorkspace");
   const workspace = await prisma.workspace.findUniqueOrThrow({ where: { id: user.workspaceId } });
 
   if (!workspace.ssoEnabled) {
     if (!workspace.ssoIssuer || !workspace.ssoClientId || !workspace.ssoClientSecret) {
-      throw new Error("Set an issuer, client ID, and client secret before enabling SSO");
+      return { error: "Set an issuer, client ID, and client secret before enabling SSO" };
     }
     if (!workspace.allowedEmailDomain) {
-      throw new Error("Set an allowed email domain above first — it's how sign-ins get matched to this workspace");
+      return { error: "Set an allowed email domain above first. It's how sign-ins get matched to this workspace" };
     }
   }
 
@@ -325,4 +330,5 @@ export async function toggleSso(): Promise<void> {
     action: workspace.ssoEnabled ? "workspace.sso_disabled" : "workspace.sso_enabled",
   });
   revalidatePath("/settings");
+  return {};
 }

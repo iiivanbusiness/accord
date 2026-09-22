@@ -21,21 +21,18 @@ export default function ApprovalDelegatesPanel({
   teammates: Teammate[];
   delegations: Delegation[]; // workspace-wide if isAdmin, otherwise just ones involving the current user
   isAdmin: boolean;
-  createDelegationAction: (formData: FormData) => Promise<void>;
-  revokeDelegationAction: (delegationId: string) => Promise<void>;
+  createDelegationAction: (formData: FormData) => Promise<{ error?: string }>;
+  revokeDelegationAction: (delegationId: string) => Promise<{ error?: string }>;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const others = teammates.filter((t) => t.id !== currentUserId);
 
-  function run(fn: () => Promise<void>) {
+  function run(fn: () => Promise<{ error?: string }>) {
     setError(null);
     startTransition(async () => {
-      try {
-        await fn();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
-      }
+      const result = await fn();
+      if (result.error) setError(result.error);
     });
   }
 

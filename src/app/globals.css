@@ -480,6 +480,7 @@ a {
 .chip-active { background: var(--surface-2); color: var(--ink); }
 .chip-warn { background: var(--warn-soft); color: var(--warn); }
 .chip-success { background: var(--success-soft); color: var(--success); }
+.chip-danger { background: rgba(192, 57, 43, 0.10); color: #c0392b; }
 @media (prefers-reduced-motion: no-preference) {
   .chip-live .chip-dot { animation: pulse 1.4s ease-in-out infinite; }
 }
@@ -495,6 +496,38 @@ a {
   55% { transform: translate(4px, -6px) rotate(6deg); opacity: 1; }
   100% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
 }
+
+/* ---------- review panel timeline (ReviewPanel) ---------- */
+@keyframes review-row-in { 0% { opacity: 0; transform: translateY(-6px); } 100% { opacity: 1; transform: translateY(0); } }
+@keyframes review-row-flash {
+  0% { background: rgba(0,153,255,0.16); }
+  70% { background: rgba(0,153,255,0.16); }
+  100% { background: transparent; }
+}
+
+/* ---------- FAQ chat widget: animated assistant avatar orb ---------- */
+.faq-orb {
+  background: radial-gradient(circle at 30% 30%, #d6ecff, #6ea8ff 45%, #3b5bdb 75%);
+  background-size: 180% 180%;
+  transition: transform .18s ease;
+}
+.faq-orb:hover { transform: scale(1.18); }
+@media (prefers-reduced-motion: no-preference) {
+  .faq-orb { animation: faq-orb-drift 5s ease-in-out infinite; }
+}
+@keyframes faq-orb-drift {
+  0%, 100% { background-position: 20% 20%; }
+  50% { background-position: 80% 80%; }
+}
+
+/* Larger, glowing variant for the AI tab's empty-state hero (before the
+   first real exchange) — same gradient/animation, just bigger and blurred
+   at the edges so it reads as a soft glowing sphere like the reference. */
+.faq-orb-hero {
+  filter: blur(1px);
+  box-shadow: 0 0 32px 6px rgba(59, 91, 219, 0.35);
+}
+.faq-orb-hero:hover { transform: none; }
 
 /* ---------- inputs ---------- */
 .input {

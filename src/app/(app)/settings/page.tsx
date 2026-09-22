@@ -9,8 +9,9 @@ import RolesManager from "@/components/RolesManager";
 import RoleSelect from "@/components/RoleSelect";
 import TeamSelect from "@/components/TeamSelect";
 import TeamsManager from "@/components/TeamsManager";
-import ApprovalChainManager from "@/components/ApprovalChainManager";
+import ReviewChainManager from "@/components/ReviewChainManager";
 import ApprovalDelegatesPanel from "@/components/ApprovalDelegatesPanel";
+import InviteTeammateForm from "@/components/InviteTeammateForm";
 import ScimSettingsPanel from "@/components/ScimSettingsPanel";
 import SsoSettingsPanel from "@/components/SsoSettingsPanel";
 import DeveloperSettingsLink from "@/components/DeveloperSettingsLink";
@@ -29,7 +30,6 @@ import {
   inviteTeammate,
   removeLogo,
   removeTeammate,
-  requestUpgrade,
   revokeScimToken,
   toggleSso,
   toggleWorkspaceFlag,
@@ -41,7 +41,7 @@ import {
 } from "./actions";
 import { assignUserRole, createRole, deleteRole, updateRole } from "./roles-actions";
 import { createTeam, deleteTeam, assignUserTeam } from "./team-actions";
-import { createApprovalChain, deleteApprovalChain, moveApprovalChain, addApprovalStep, moveApprovalStep, removeApprovalStep } from "./approval-actions";
+import { createReviewChain, deleteReviewChain, moveReviewChain, addReviewChainStep, moveReviewChainStep, removeReviewChainStep } from "./review-chain-actions";
 import { createDelegation, revokeDelegation } from "./delegation-actions";
 import { setSlackChannel, toggleSlack, disconnectSlack } from "./slack-actions";
 import { connectHubspot, toggleHubspot, disconnectHubspot } from "./hubspot-actions";
@@ -68,30 +68,28 @@ function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notify
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; slack_connected?: string }>;
+  searchParams: Promise<{ error?: string; error_detail?: string; slack_connected?: string }>;
 }) {
-  const { error: connectError, slack_connected } = await searchParams;
+  const { error: connectError, error_detail: connectErrorDetail, slack_connected } = await searchParams;
   const workspaceId = await requireWorkspaceId();
-  const [workspace, session, roles, teams, approvalChains] = await Promise.all([
+  const [workspace, session, roles, teams, reviewChains] = await Promise.all([
     prisma.workspace.findUnique({ where: { id: workspaceId }, include: { users: { include: { role: true, team: true } } } }),
     auth(),
     prisma.role.findMany({ where: { workspaceId }, include: { _count: { select: { users: true } } }, orderBy: [{ isOwner: "desc" }, { createdAt: "asc" }] }),
     prisma.team.findMany({ where: { workspaceId }, include: { _count: { select: { users: true } } }, orderBy: { createdAt: "asc" } }),
-    prisma.approvalChain.findMany({
+    prisma.reviewChain.findMany({
       where: { workspaceId },
-      include: { team: true, steps: { include: { role: true }, orderBy: { order: "asc" } } },
+      include: { team: true, steps: { include: { assignee: true }, orderBy: { order: "asc" } } },
       orderBy: { order: "asc" },
     }),
   ]);
-  const usagePct = workspace ? Math.round((workspace.callsUsedThisMonth / workspace.callsLimit) * 100) : 0;
   if (!workspace) return null;
   const currentUser = workspace.users.find((u) => u.email === session?.user?.email);
   const canManageTeam = Boolean(currentUser?.role?.canManageTeam);
   const canManageWorkspacePerm = Boolean(currentUser?.role?.canManageWorkspace);
   const notifyEmail = workspace.users.map((u) => u.email).join(", ") || "your account email";
-  const pendingUpgrade = await prisma.upgradeRequest.findFirst({ where: { workspaceId, status: "pending" } });
   const roleOptions = roles.map((r) => ({ id: r.id, name: r.name }));
-  const eligibleApproverRoles = roles.filter((r) => r.canApproveContracts).map((r) => ({ id: r.id, name: r.name }));
+  const teammateOptions = workspace.users.map((u) => ({ id: u.id, name: u.name }));
   const teamOptions = teams.map((t) => ({ id: t.id, name: t.name }));
 
   const delegationsRaw = await prisma.approvalDelegate.findMany({
@@ -138,59 +136,16 @@ export default async function SettingsPage({
     </div>
 
     {connectError && (
-      <div className="chip chip-warn mb-4 max-w-[600px] justify-start px-3.5 py-2.5 text-[12.5px]">
-        {connectError.replace(/_/g, " ")}
+      <div className="chip chip-warn mb-4 max-w-[600px] flex-col items-start justify-start gap-1 whitespace-normal px-3.5 py-2.5 text-[12.5px]">
+        <span>{connectError.replace(/_/g, " ")}</span>
+        {connectErrorDetail && <span style={{ color: "var(--ink-muted)" }}>{connectErrorDetail}</span>}
       </div>
     )}
     {slack_connected && (
       <div className="chip chip-success mb-4 max-w-[600px] justify-start px-3.5 py-2.5 text-[12.5px]">
-        Slack connected — pick a channel below.
+        Slack connected. Pick a channel below.
       </div>
     )}
-
-    <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
-      <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
-        <h2 className="text-[15px] font-medium">Call integrations</h2>
-      </div>
-      <div className="px-[22px] py-2">
-        <div className="flex items-center justify-between gap-3.5 border-b py-3.5" style={{ borderColor: "var(--hairline-soft)" }}>
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-[10px] font-display text-[14px] font-semibold" style={{ background: "var(--surface-2)", color: "var(--ink)" }}>Z</div>
-            <div>
-              <div className="text-[13.5px] font-medium">Zoom</div>
-              <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>Real-time call analysis via Zoom RTMS</div>
-            </div>
-          </div>
-          <form action={toggleWorkspaceFlag.bind(null, "zoomConnected")}>
-            <button
-              type="submit"
-              className="btn btn-secondary btn-sm"
-              style={workspace.zoomConnected ? { background: "var(--success-soft)", color: "var(--success)", borderColor: "transparent" } : undefined}
-            >
-              {workspace.zoomConnected ? "Connected ✓" : "Connect"}
-            </button>
-          </form>
-        </div>
-        <div className="flex items-center justify-between gap-3.5 py-3.5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-[10px] font-display text-[14px] font-semibold" style={{ background: "var(--surface-2)", color: "var(--ink)" }}>G</div>
-            <div>
-              <div className="text-[13.5px] font-medium">Google Meet</div>
-              <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>Not prioritized yet — upload calls manually for now</div>
-            </div>
-          </div>
-          <form action={toggleWorkspaceFlag.bind(null, "meetConnected")}>
-            <button
-              type="submit"
-              className="btn btn-secondary btn-sm"
-              style={workspace.meetConnected ? { background: "var(--success-soft)", color: "var(--success)", borderColor: "transparent" } : undefined}
-            >
-              {workspace.meetConnected ? "Connected ✓" : "Connect"}
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
 
     <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px] px-[22px] py-2">
       <div className="flex items-center justify-between gap-4 py-[15px]">
@@ -264,19 +219,9 @@ export default async function SettingsPage({
             </div>
           </div>
         ))}
-        <form action={inviteTeammate} className="flex flex-col gap-2 py-3.5 sm:flex-row sm:items-center">
-          <input
-            name="email"
-            type="email"
-            required
-            placeholder="teammate@company.com"
-            className="input flex-1"
-            style={{ fontSize: "13px", padding: "8px 11px" }}
-          />
-          <button type="submit" className="btn btn-secondary btn-sm">Invite</button>
-        </form>
+        <InviteTeammateForm inviteAction={inviteTeammate} />
         <div className="pb-3 text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
-          They&apos;ll get an email — they need to sign in with Google using that address (no password yet for invited teammates).
+          They&apos;ll get an email. They need to sign in with Google using that address (no password yet for invited teammates).
         </div>
       </div>
     </div>
@@ -286,7 +231,7 @@ export default async function SettingsPage({
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Roles &amp; permissions</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            Owner always has every permission. Custom roles control what teammates can do — and can later gate steps in a contract approval chain.
+            Owner always has every permission. Custom roles control what teammates can do elsewhere in the workspace.
           </div>
         </div>
         <RolesManager
@@ -297,7 +242,6 @@ export default async function SettingsPage({
             canManageWorkspace: r.canManageWorkspace,
             canManageTeam: r.canManageTeam,
             canManageTemplates: r.canManageTemplates,
-            canApproveContracts: r.canApproveContracts,
             canApproveTemplates: r.canApproveTemplates,
             canViewAllDeals: r.canViewAllDeals,
             memberCount: r._count.users,
@@ -314,7 +258,7 @@ export default async function SettingsPage({
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Teams</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            Organizational segments (e.g. &ldquo;Sales EMEA&rdquo;, &ldquo;Sales US&rdquo;) — assign teammates to one above, then give a team its own approval chain below.
+            Organizational segments (e.g. &ldquo;Sales EMEA&rdquo;, &ldquo;Sales US&rdquo;). Assign teammates to one above, then give a team its own review chain below.
           </div>
         </div>
         <TeamsManager
@@ -328,29 +272,29 @@ export default async function SettingsPage({
     {canManageWorkspacePerm && (
       <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
-          <h2 className="text-[15px] font-medium">Approval chains</h2>
+          <h2 className="text-[15px] font-medium">Review chains</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            Contracts wait for every role in the matching chain to approve, in order, before they go out to the client. Small deals can move fast, while big or team-specific ones pick up extra steps.
+            Contracts wait for every named reviewer in the matching chain to mark their step done, in order, before they go out to the client. Small deals can move fast, while big or team-specific ones pick up extra steps.
           </div>
         </div>
-        <ApprovalChainManager
-          chains={approvalChains.map((c) => ({
+        <ReviewChainManager
+          chains={reviewChains.map((c) => ({
             id: c.id,
             name: c.name,
             order: c.order,
             teamId: c.teamId,
             teamName: c.team?.name ?? null,
             minDealValue: c.minDealValue,
-            steps: c.steps.map((s) => ({ id: s.id, order: s.order, roleId: s.roleId, roleName: s.role.name })),
+            steps: c.steps.map((s) => ({ id: s.id, order: s.order, assigneeId: s.assigneeId, assigneeName: s.assignee.name })),
           }))}
-          eligibleRoles={eligibleApproverRoles}
+          teammates={teammateOptions}
           teams={teamOptions}
-          createChainAction={createApprovalChain}
-          deleteChainAction={deleteApprovalChain}
-          moveChainAction={moveApprovalChain}
-          addStepAction={addApprovalStep}
-          removeStepAction={removeApprovalStep}
-          moveStepAction={moveApprovalStep}
+          createChainAction={createReviewChain}
+          deleteChainAction={deleteReviewChain}
+          moveChainAction={moveReviewChain}
+          addStepAction={addReviewChainStep}
+          removeStepAction={removeReviewChainStep}
+          moveStepAction={moveReviewChainStep}
         />
       </div>
     )}
@@ -446,7 +390,7 @@ export default async function SettingsPage({
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">HubSpot</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            Push clients and deals to HubSpot automatically as Contacts and Deals — one-directional, SealMe stays the source of truth.
+            Push clients and deals to HubSpot automatically as Contacts and Deals. One-directional, SealMe stays the source of truth.
           </div>
         </div>
         <HubspotSettingsPanel
@@ -465,7 +409,7 @@ export default async function SettingsPage({
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">DocuSign</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            Hand a contract straight to your own DocuSign account for signing instead of SealMe&apos;s built-in flow — offered as a choice on the Send page once connected.
+            Hand a contract straight to your own DocuSign account for signing instead of SealMe&apos;s built-in flow. Offered as a choice on the Send page once connected.
           </div>
         </div>
         <DocusignSettingsPanel
@@ -484,7 +428,7 @@ export default async function SettingsPage({
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Salesforce</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            Push clients and deals to your own Salesforce org as Contacts and Opportunities — one-directional, SealMe stays the source of truth until a contract is signed.
+            Push clients and deals to your own Salesforce org as Contacts and Opportunities. One-directional, SealMe stays the source of truth until a contract is signed.
           </div>
         </div>
         <SalesforceSettingsPanel
@@ -535,44 +479,6 @@ export default async function SettingsPage({
         </div>
       </div>
     )}
-
-    <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
-      <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
-        <h2 className="text-[15px] font-medium">Plan &amp; usage</h2>
-      </div>
-      <div className="px-[22px] py-[18px]">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <div className="text-[13.5px] font-medium">{workspace.plan}</div>
-            <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-              {workspace.callsUsedThisMonth} of {workspace.callsLimit} calls used this month
-            </div>
-          </div>
-          <span className="chip chip-neutral">{usagePct}%</span>
-        </div>
-        <div className="mt-3 h-2 w-full overflow-hidden rounded-full" style={{ background: "var(--surface-2)" }}>
-          <div className="h-full rounded-full" style={{ width: `${Math.min(100, usagePct)}%`, background: usagePct >= 100 ? "#ff6b57" : "var(--primary)" }} />
-        </div>
-
-        <div className="mt-4 border-t pt-4" style={{ borderColor: "var(--hairline-soft)" }}>
-          {pendingUpgrade ? (
-            <div className="chip chip-warn w-full justify-start px-3.5 py-2.5 text-[12.5px]">
-              Upgrade requested — we&apos;ll be in touch soon.
-            </div>
-          ) : (
-            <form action={requestUpgrade} className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <input
-                name="note"
-                placeholder="What do you need? (optional)"
-                className="input flex-1"
-                style={{ fontSize: "13px", padding: "8px 11px" }}
-              />
-              <button type="submit" className="btn btn-primary btn-sm">Request upgrade</button>
-            </form>
-          )}
-        </div>
-      </div>
-    </div>
 
     <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
       <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>

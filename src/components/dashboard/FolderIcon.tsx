@@ -27,19 +27,19 @@ export default function FolderIcon({ id, size = 64 }: { id: string; size?: numbe
         </filter>
       </defs>
       <g filter={`url(#${shadowId})`}>
-        {/* back panel — the folder silhouette including the small tab */}
+        {/* back panel. The folder silhouette including the small tab */}
         <path
           d="M6,9 a3,3 0 0 1 3,-3 H17 L21.5,10.5 H39 a3,3 0 0 1 3,3 V33 a3,3 0 0 1 -3,3 H9 a3,3 0 0 1 -3,-3 Z"
           style={{ fill: "var(--folder-back)" }}
         />
         {/* paper corner peeking out from behind the front flap */}
         <path d="M12,11 L28,9 L29.5,14.5 L13.5,16.5 Z" style={{ fill: "var(--folder-paper)" }} opacity="0.92" />
-        {/* front flap — offset down, glossy multi-stop gradient */}
+        {/* front flap. Offset down, glossy multi-stop gradient */}
         <path
           d="M6,15 a3,3 0 0 1 3,-3 H39 a3,3 0 0 1 3,3 V33 a3,3 0 0 1 -3,3 H9 a3,3 0 0 1 -3,-3 Z"
           fill={`url(#${gradId})`}
         />
-        {/* glossy sheen — a soft highlight blob, not a flat fill */}
+        {/* glossy sheen. A soft highlight blob, not a flat fill */}
         <path
           d="M6,15 a3,3 0 0 1 3,-3 H39 a3,3 0 0 1 3,3 V33 a3,3 0 0 1 -3,3 H9 a3,3 0 0 1 -3,-3 Z"
           fill={`url(#${sheenId})`}

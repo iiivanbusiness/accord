@@ -32,7 +32,7 @@ export default function AiDisclosureModal({ show }: { show: boolean }) {
         <p className="mt-2.5 text-[13px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>
           When you record or connect a sales call, SealMe sends the audio and transcript to{" "}
           <strong style={{ color: "var(--ink)" }}>Anthropic</strong> (Claude) to extract deal terms, contract
-          details, and call notes. This happens for every call SealMe processes — turning it off isn&apos;t
+          details, and call notes. This happens for every call SealMe processes. Turning it off isn&apos;t
           possible without turning off that feature entirely.
         </p>
         <p className="mt-2 text-[13px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>

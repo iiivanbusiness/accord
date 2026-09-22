@@ -20,7 +20,7 @@ export default async function BulkImportPage() {
       <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
         <h2 className="text-[15px] font-medium">Import from CSV</h2>
         <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-          A client that already exists (matched by email, or by name + company) is reused rather than duplicated — safe to include the same client across several rows, or re-run a file with new rows added.
+          A client that already exists (matched by email, or by name + company) is reused rather than duplicated. Safe to include the same client across several rows, or re-run a file with new rows added.
         </div>
       </div>
       <BulkImportForm importAction={importClientsAndDeals} />

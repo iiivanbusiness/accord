@@ -7,7 +7,7 @@ export default function SendToDocusignButton({
   sendAction,
 }: {
   dealId: string;
-  sendAction: (dealId: string) => Promise<void>;
+  sendAction: (dealId: string) => Promise<{ error?: string }>;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -16,12 +16,12 @@ export default function SendToDocusignButton({
   function handleClick() {
     setError(null);
     startTransition(async () => {
-      try {
-        await sendAction(dealId);
-        setSent(true);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Couldn't send to DocuSign");
+      const result = await sendAction(dealId);
+      if (result.error) {
+        setError(result.error);
+        return;
       }
+      setSent(true);
     });
   }
 
@@ -44,7 +44,7 @@ export default function SendToDocusignButton({
         {isPending ? "Sending…" : "Send via DocuSign now"}
       </button>
       <span className="text-center text-[12px]" style={{ color: "var(--ink-muted)" }}>
-        Sends immediately with a standard message — client signs on DocuSign, right while you&apos;re still on the call.
+        Sends immediately with a standard message. Client signs on DocuSign, right while you&apos;re still on the call.
       </span>
     </div>
   );

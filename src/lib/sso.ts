@@ -79,7 +79,7 @@ export async function verifySsoState(token: string): Promise<SsoState | null> {
 export async function verifyIdToken(idToken: string, jwksUri: string, issuer: string, clientId: string, nonce: string) {
   const jwks = createRemoteJWKSet(new URL(jwksUri));
   const { payload } = await jwtVerify(idToken, jwks, { issuer, audience: clientId });
-  if (payload.nonce !== nonce) throw new Error("ID token nonce mismatch — possible replay");
+  if (payload.nonce !== nonce) throw new Error("ID token nonce mismatch. Possible replay");
   const email = typeof payload.email === "string" ? payload.email : null;
   if (!email) throw new Error("ID token has no email claim");
   const name = typeof payload.name === "string" ? payload.name : email;

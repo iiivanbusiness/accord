@@ -84,7 +84,7 @@ export default async function FeedbackPage({
       <div className="mb-6 max-w-[560px]">
         <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Feedback</h1>
         <div className="mt-1 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-          Tell us what to build next — upvote what matters most to you.
+          Tell us what to build next. Upvote what matters most to you.
         </div>
       </div>
 
@@ -119,7 +119,7 @@ export default async function FeedbackPage({
             : posts.length === 0
               ? (
                 <div className="glass-card glass-card-solid card-hover p-6 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-                  No feedback yet — be the first to suggest something.
+                  No feedback yet. Be the first to suggest something.
                 </div>
               )
               : posts.map((post) => (

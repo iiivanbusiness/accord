@@ -89,19 +89,19 @@ export type SlackNotifyEvent =
   | { type: "deal.created"; dealId: string; clientName: string; service: string }
   | { type: "contract.sent"; dealId: string; clientName: string }
   | { type: "contract.signed"; dealId: string; clientName: string; signerName: string }
-  | { type: "approval.requested"; dealId: string; clientName: string; roleName: string };
+  | { type: "review.assigned"; dealId: string; clientName: string; assigneeName: string };
 
 function formatMessage(event: SlackNotifyEvent): string {
   const dealUrl = `${appUrl()}/deals/${event.dealId}`;
   switch (event.type) {
     case "deal.created":
-      return `📄 New deal — *${event.clientName}* (${event.service || "no service set yet"}) <${dealUrl}|View>`;
+      return `📄 New deal - *${event.clientName}* (${event.service || "no service set yet"}) <${dealUrl}|View>`;
     case "contract.sent":
       return `📤 Contract sent to *${event.clientName}* <${dealUrl}/contract|View>`;
     case "contract.signed":
-      return `✅ *${event.clientName}* signed — by ${event.signerName} <${dealUrl}/contract|View>`;
-    case "approval.requested":
-      return `⏳ Approval needed from *${event.roleName}* for *${event.clientName}* <${dealUrl}/contract|Review>`;
+      return `✅ *${event.clientName}* signed. By ${event.signerName} <${dealUrl}/contract|View>`;
+    case "review.assigned":
+      return `⏳ Review needed from *${event.assigneeName}* for *${event.clientName}* <${dealUrl}/contract|Review>`;
   }
 }
 

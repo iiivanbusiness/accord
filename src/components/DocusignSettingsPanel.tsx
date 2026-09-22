@@ -35,7 +35,7 @@ export default function DocusignSettingsPanel({
   if (!configured) {
     return (
       <div className="px-[22px] py-[18px] text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-        DocuSign isn&apos;t set up for this deployment yet — a DOCUSIGN_CLIENT_ID/SECRET needs to be configured first.
+        DocuSign isn&apos;t set up for this deployment yet. A DOCUSIGN_CLIENT_ID/SECRET needs to be configured first.
       </div>
     );
   }

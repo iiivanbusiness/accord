@@ -14,10 +14,10 @@ export async function GET(req: Request) {
 
   const code = url.searchParams.get("code");
   const stateParam = url.searchParams.get("state");
-  if (!code || !stateParam) return loginError("Missing sign-in parameters — try again");
+  if (!code || !stateParam) return loginError("Missing sign-in parameters. Try again");
 
   const state = await verifySsoState(stateParam);
-  if (!state) return loginError("That sign-in link expired — try again");
+  if (!state) return loginError("That sign-in link expired. Try again");
 
   const workspace = await prisma.workspace.findUnique({ where: { id: state.workspaceId } });
   if (!workspace || !workspace.ssoEnabled || !workspace.ssoClientSecret) {
@@ -78,7 +78,7 @@ export async function GET(req: Request) {
 
   if (user.deactivatedAt) {
     await logAudit({ workspaceId: workspace.id, actorEmail: claims.email, action: "login.failure", metadata: { reason: "deactivated", provider: "sso" } });
-    return loginError("Your account has been deactivated — contact your IT team");
+    return loginError("Your account has been deactivated. Contact your IT team");
   }
 
   const cookie = await mintSessionCookie({ id: user.id, name: user.name, email: user.email, workspaceId: workspace.id });

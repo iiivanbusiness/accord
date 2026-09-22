@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 
-export type Permission = "canManageWorkspace" | "canManageTeam" | "canManageTemplates" | "canApproveContracts" | "canApproveTemplates";
+export type Permission = "canManageWorkspace" | "canManageTeam" | "canManageTemplates" | "canApproveTemplates";
 
 // Every user has a role since the migration that introduced roles backfilled
 // one onto every existing account — role is only ever actually null in the
@@ -40,7 +40,6 @@ export async function createOwnerRole(workspaceId: string) {
       canManageWorkspace: true,
       canManageTeam: true,
       canManageTemplates: true,
-      canApproveContracts: true,
       canApproveTemplates: true,
       canViewAllDeals: true,
     },

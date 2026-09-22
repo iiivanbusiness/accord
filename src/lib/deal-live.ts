@@ -104,7 +104,7 @@ export async function applyExtractionToDeal(
 // correction) was updating DealField.value alone, silently leaving those
 // copies stale. That's not just cosmetic: deal lists/boards, dashboard and
 // analytics totals, the Client profile page, the HubSpot/Salesforce sync,
-// and — most importantly — resolveApprovalChain's minDealValue matching
+// and — most importantly — resolveReviewChain's minDealValue matching
 // all read deal.feeDisplay directly rather than joining through
 // DealField, so an edited fee could keep matching the chain picked for
 // its original (lower) value. Call this after any such hand-edit so those

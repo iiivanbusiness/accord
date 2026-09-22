@@ -32,7 +32,7 @@ export default async function VerifyEmailPage({ params }: { params: Promise<{ to
             <>
               <h1 className="mb-1 text-[20px] font-medium" style={{ letterSpacing: "-0.5px" }}>Email verified</h1>
               <p className="mb-5 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-                Your email is confirmed — you&apos;re all set.
+                Your email is confirmed. You&apos;re all set.
               </p>
             </>
           ) : (

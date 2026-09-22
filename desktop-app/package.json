@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "tauri": "tauri",
-    "build:mas": "tauri build --config src-tauri/tauri.macos-mas.conf.json --features mas",
+    "build:mas": "bash scripts/build-mas.sh",
     "tauri:windows:build": "tauri-windows-bundle build"
   },
   "devDependencies": {

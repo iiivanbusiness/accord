@@ -1,6 +1,7 @@
 import { renderToBuffer } from "@react-pdf/renderer";
 import { prisma } from "@/lib/db";
-import { sendContractEmail, sendApprovalRequestedEmail, sendChangesRequestedEmail } from "@/lib/email";
+import { sendContractEmail, sendReviewAssignedEmail, sendChangesRequestedEmail } from "@/lib/email";
+import { createNotification } from "@/lib/notifications";
 import { logAudit } from "@/lib/audit";
 import { getOrMintPortalToken } from "@/lib/client-portal";
 import { parseFee } from "@/lib/money";
@@ -18,15 +19,15 @@ function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? "";
 }
 
-// Picks which of the workspace's ApprovalChains applies to this deal.
-// Chains are checked in `order` (lower first); the first one whose
+// Picks which of the workspace's ReviewChains applies to this deal. Chains
+// are checked in `order` (lower first); the first one whose
 // teamId/minDealValue conditions both match wins. A chain with no
 // conditions at all matches everything, so it's meant to sit last as a
-// catch-all — see the doc comment on the ApprovalChain model. Returns null
+// catch-all — see the doc comment on the ReviewChain model. Returns null
 // when the workspace has no chains configured (send immediately, same as
 // before per-chain conditions existed).
-export async function resolveApprovalChain(deal: { workspaceId: string; teamId: string | null; feeDisplay: string }) {
-  const chains = await prisma.approvalChain.findMany({
+export async function resolveReviewChain(deal: { workspaceId: string; teamId: string | null; feeDisplay: string }) {
+  const chains = await prisma.reviewChain.findMany({
     where: { workspaceId: deal.workspaceId },
     orderBy: { order: "asc" },
     include: { steps: { orderBy: { order: "asc" } } },
@@ -42,21 +43,21 @@ export async function resolveApprovalChain(deal: { workspaceId: string; teamId: 
 }
 
 // Called anywhere a contract is about to leave the workspace's control —
-// the manual Send page and the "no approval needed" auto-send path both
-// go through here. If a chain resolves for this deal, the contract is held
-// in "pending_approval" and the composed email is stored verbatim until
-// the chain finishes; otherwise it's sent immediately, exactly like before
-// this feature existed.
-export async function requestOrSendContract(
+// the manual Send page and the "no review needed" auto-send path both go
+// through here. If a chain resolves for this deal, the contract is held in
+// "pending_approval" and the composed email is stored verbatim until the
+// chain finishes; otherwise it's sent immediately, exactly like before this
+// feature existed.
+export async function requestOrSendReview(
   dealId: string,
   pending: PendingEmail,
   actorEmail?: string | null
-): Promise<{ status: "sent" } | { status: "pending_approval"; approverRoleName: string }> {
+): Promise<{ status: "sent" } | { status: "pending_approval"; assigneeName: string }> {
   const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { contract: true } });
   if (!deal || !deal.contract) throw new Error("Deal not found");
   const contractId = deal.contract.id;
 
-  const chain = await resolveApprovalChain(deal);
+  const chain = await resolveReviewChain(deal);
 
   if (!chain || chain.steps.length === 0) {
     await performActualSend(contractId, pending);
@@ -64,14 +65,16 @@ export async function requestOrSendContract(
     return { status: "sent" };
   }
 
-  // A contract re-entering approval after a rejection gets a fresh
-  // snapshot — always mirrors the chain as currently configured (and
-  // re-resolved against the deal's current team/value), never a stale one
-  // left over from a previous round.
-  await prisma.contractApproval.deleteMany({ where: { contractId } });
-  await prisma.contractApproval.createMany({
-    data: chain.steps.map((s) => ({ contractId, roleId: s.roleId, order: s.order, status: "pending" })),
-  });
+  // A contract re-entering review after a rejection gets a fresh snapshot —
+  // always mirrors the chain as currently configured (and re-resolved
+  // against the deal's current team/value), never a stale one left over
+  // from a previous round.
+  await prisma.reviewStep.deleteMany({ where: { contractId } });
+  const createdSteps = await Promise.all(
+    chain.steps.map((s) =>
+      prisma.reviewStep.create({ data: { contractId, assigneeId: s.assigneeId, order: s.order, status: "pending" } })
+    )
+  );
   await prisma.contract.update({
     where: { id: contractId },
     data: {
@@ -85,15 +88,16 @@ export async function requestOrSendContract(
 
   await logAudit({ workspaceId: deal.workspaceId, actorEmail, action: "contract.approval_requested", targetType: "Deal", targetId: dealId, metadata: { chain: chain.name } });
 
-  await notifyStepApprovers(dealId, chain.steps[0].roleId);
+  const firstStep = createdSteps.find((s) => s.order === chain.steps[0].order) ?? createdSteps[0];
+  await notifyStepAssignee(dealId, firstStep.id);
 
-  const firstRole = await prisma.role.findUnique({ where: { id: chain.steps[0].roleId } });
-  return { status: "pending_approval", approverRoleName: firstRole?.name ?? "the approver" };
+  const firstAssignee = await prisma.user.findUnique({ where: { id: chain.steps[0].assigneeId } });
+  return { status: "pending_approval", assigneeName: firstAssignee?.name ?? "the reviewer" };
 }
 
 // Actually emails the client — either right away (no chain configured) or
-// once the last approval step has signed off. pendingOverride lets the
-// immediate-send path skip a DB round-trip; the approval path relies on
+// once the last review step has signed off. pendingOverride lets the
+// immediate-send path skip a DB round-trip; the review path relies on
 // what's already stored on the contract. When the contract's
 // deliveryMethod is "docusign", the client never gets a SealMe email at
 // all — DocuSign sends its own, this just creates and sends the envelope.
@@ -176,30 +180,50 @@ export async function performActualSend(contractId: string, pendingOverride?: Pe
   await syncDealToSalesforce(workspace.id, deal.id);
 }
 
-// Notifies whoever currently holds the given role that a contract needs
-// their decision. A failure here should never block the approval-chain
-// state change that already happened — it's just a nudge.
-export async function notifyStepApprovers(dealId: string, roleId: string): Promise<void> {
-  const [deal, role, approvers] = await Promise.all([
+// Notifies the named assignee that a contract needs their review — the
+// "jako je bitno" hook: fires the instant a contract reaches someone,
+// either because the chain just started or because the person before them
+// just finished their step. Both channels (email, in-app) are independent
+// try/catches so one failing never silently drops the other, and neither
+// blocks the state change that already happened — this is a nudge, not a
+// gate.
+export async function notifyStepAssignee(dealId: string, reviewStepId: string): Promise<void> {
+  const [deal, reviewStep] = await Promise.all([
     prisma.deal.findUnique({ where: { id: dealId }, include: { client: true, template: true } }),
-    prisma.role.findUnique({ where: { id: roleId } }),
-    prisma.user.findMany({ where: { roleId }, select: { email: true } }),
+    prisma.reviewStep.findUnique({ where: { id: reviewStepId }, include: { assignee: true } }),
   ]);
-  if (!deal || !role || approvers.length === 0) return;
+  if (!deal || !reviewStep) return;
+  const dealUrl = `${appUrl()}/deals/${dealId}`;
 
   try {
-    await sendApprovalRequestedEmail({
-      to: approvers.map((u) => u.email),
+    await sendReviewAssignedEmail({
+      to: reviewStep.assignee.email,
       clientName: deal.client.name,
       templateName: deal.template?.name ?? "contract",
-      dealUrl: `${appUrl()}/deals/${dealId}/contract`,
-      roleName: role.name,
+      dealUrl,
     });
   } catch (err) {
-    console.error("Failed to send approval-requested email", err);
+    console.error("Failed to send review-assigned email", err);
   }
 
-  await notifySlack(deal.workspaceId, { type: "approval.requested", dealId, clientName: deal.client.name, roleName: role.name });
+  try {
+    await createNotification({
+      workspaceId: deal.workspaceId,
+      userId: reviewStep.assigneeId,
+      type: "review.assigned",
+      title: `Review needed: ${deal.client.name}`,
+      body: `${deal.template?.name ?? "A contract"} is waiting on your review.`,
+      linkUrl: dealUrl,
+    });
+  } catch (err) {
+    console.error("Failed to create in-app notification", err);
+  }
+
+  try {
+    await notifySlack(deal.workspaceId, { type: "review.assigned", dealId, clientName: deal.client.name, assigneeName: reviewStep.assignee.name });
+  } catch (err) {
+    console.error("Failed to send Slack review-assigned notification", err);
+  }
 }
 
 // No per-deal owner is tracked, so a rejection notifies the whole team —
@@ -217,7 +241,7 @@ export async function notifyChangesRequested(dealId: string, decidedByName: stri
       to: deal.workspace.users.map((u) => u.email),
       clientName: deal.client.name,
       templateName: deal.template?.name ?? "contract",
-      dealUrl: `${appUrl()}/deals/${dealId}/contract`,
+      dealUrl: `${appUrl()}/deals/${dealId}`,
       decidedByName,
       note,
     });

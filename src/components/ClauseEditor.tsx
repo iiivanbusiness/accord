@@ -36,7 +36,7 @@ export default function ClauseEditor({ initialClauses, libraryClauses }: { initi
       <input type="hidden" name="clausesJson" value={JSON.stringify(clauses)} />
       <div className="mb-1.5 text-[13px] font-medium">Clauses</div>
       <div className="mb-2 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-        Use {"{fieldKey}"} placeholders (e.g. {"{clientName}"}, {"{fee}"}, {"{startDate}"}) — they&apos;re filled from the call automatically.
+        Use {"{fieldKey}"} placeholders (e.g. {"{clientName}"}, {"{fee}"}, {"{startDate}"}). They&apos;re filled from the call automatically.
       </div>
       <div className="flex flex-col gap-3">
         {clauses.map((clause, i) => (

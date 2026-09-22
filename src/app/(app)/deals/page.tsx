@@ -5,7 +5,7 @@ import { parseFee } from "@/lib/money";
 import DealsBulkTable from "@/components/DealsBulkTable";
 import DealsBoard from "@/components/DealsBoard";
 import DealsFilterBar from "@/components/DealsFilterBar";
-import { bulkRemind, bulkSend, updateDealStatus } from "./bulk-actions";
+import { bulkRemind, bulkSend, bulkTrash, updateDealStatus } from "./bulk-actions";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import { STATUS_LABEL, STATUS_CHIP, BOARD_COLUMNS } from "@/lib/deal-status";
 
@@ -62,14 +62,15 @@ export default async function DealsPage({
       : {}),
   };
 
-  const [workspace, deals, owners] = await Promise.all([
+  const [workspace, deals, owners, trashedCount] = await Promise.all([
     requireWorkspace(),
     prisma.deal.findMany({
-      where: { workspaceId, ...visibility, ...filterWhere },
+      where: { workspaceId, ...visibility, ...filterWhere, trashedAt: null },
       include: { client: true, contract: true, owner: true },
       orderBy: { updatedAt: "desc" },
     }),
     canViewAll ? prisma.user.findMany({ where: { workspaceId }, select: { id: true, name: true }, orderBy: { name: "asc" } }) : Promise.resolve([]),
+    prisma.deal.count({ where: { workspaceId, ...visibility, trashedAt: { not: null } } }),
   ]);
 
   const tableRows = deals.map((deal) => ({
@@ -107,21 +108,38 @@ export default async function DealsPage({
       <div>
         <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Deals</h1>
         <div className="mt-1 text-[14px]" style={{ color: "var(--ink-muted)" }}>
-          {deals.length} {deals.length === 1 ? "deal" : "deals"} — from first call to signed contract
+          {deals.length} {deals.length === 1 ? "deal" : "deals"}. From first call to signed contract
         </div>
       </div>
-      <Link href="/deals/new" className="btn btn-primary">
-        + Start a call
-      </Link>
+      <div className="flex items-center gap-2">
+        <Link
+          href="/deals/trash"
+          className="btn btn-sm relative"
+          style={{ background: "var(--surface-1)", border: "1px solid var(--hairline)", color: "var(--ink-muted)" }}
+          title="Trash"
+        >
+          <TrashIcon />
+          {trashedCount > 0 && (
+            <span
+              className="font-mono-tab absolute -right-1.5 -top-1.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full px-1 text-[10px] font-semibold"
+              style={{ background: "var(--primary)", color: "var(--on-primary)" }}
+            >
+              {trashedCount}
+            </span>
+          )}
+        </Link>
+        <Link href="/deals/new" className="btn btn-primary">
+          + Start a call
+        </Link>
+      </div>
     </div>
 
     <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-1.5 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-        <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--success)" }} />
-        Connected to Zoom — new calls are picked up and analyzed automatically
+        Record any call locally, then let SealMe draft the contract
         {workspace && (
           <span className="ml-2" style={{ color: "var(--ink-muted)" }}>
-            · {workspace.callsUsedThisMonth} of {workspace.callsLimit} calls used this month
+            · {workspace.callsUsedThisMonth} calls this month
           </span>
         )}
       </div>
@@ -136,8 +154,17 @@ export default async function DealsPage({
     {isBoard ? (
       <DealsBoard byColumn={byColumn} updateStatusAction={updateDealStatus} />
     ) : (
-      <DealsBulkTable rows={tableRows} remindAction={bulkRemind} sendAction={bulkSend} showOwnerColumn={canViewAll} />
+      <DealsBulkTable rows={tableRows} remindAction={bulkRemind} sendAction={bulkSend} trashAction={bulkTrash} showOwnerColumn={canViewAll} />
     )}
     </>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" width="16" height="16">
+      <path d="M4 6h12M8 6V4.5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1V6M6 6l.6 9.4a1 1 0 0 0 1 .9h4.8a1 1 0 0 0 1-.9L14 6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8.3 9v4.2M11.7 9v4.2" strokeLinecap="round" />
+    </svg>
   );
 }

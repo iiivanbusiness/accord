@@ -13,7 +13,7 @@ export default function TeamSelect({
   userId: string;
   currentTeamId: string | null;
   teams: TeamOption[];
-  action: (userId: string, formData: FormData) => Promise<void>;
+  action: (userId: string, formData: FormData) => Promise<{ error?: string }>;
 }) {
   const [value, setValue] = useState(currentTeamId ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -24,13 +24,12 @@ export default function TeamSelect({
     setValue(nextTeamId);
     setError(null);
     startTransition(async () => {
-      try {
-        const formData = new FormData();
-        formData.set("teamId", nextTeamId);
-        await action(userId, formData);
-      } catch (err) {
+      const formData = new FormData();
+      formData.set("teamId", nextTeamId);
+      const result = await action(userId, formData);
+      if (result.error) {
         setValue(previous);
-        setError(err instanceof Error ? err.message : "Couldn't change team");
+        setError(result.error);
       }
     });
   }

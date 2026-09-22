@@ -2,9 +2,9 @@
 // Handles both US grouping ("$2,500.00") and European grouping ("€2.500,00")
 // — a plain `replace(/,/g, "")` treats "150.000,00" (150k, European) as
 // "150.000" -> 150, silently understating the fee by 1000x. That number
-// feeds straight into ApprovalChain.minDealValue gating and the HubSpot
+// feeds straight into ReviewChain.minDealValue gating and the HubSpot
 // sync, so misreading the format doesn't just show a wrong label — it can
-// skip a required approval step entirely.
+// skip a required review step entirely.
 export function parseFee(feeDisplay: string): number {
   const match = feeDisplay.match(/[\d.,]+/);
   if (!match) return 0;

@@ -10,7 +10,6 @@ const PERMISSION_FIELDS = [
   "canManageWorkspace",
   "canManageTeam",
   "canManageTemplates",
-  "canApproveContracts",
   "canApproveTemplates",
   "canViewAllDeals",
 ] as const;
@@ -20,7 +19,6 @@ function readPermissions(formData: FormData) {
     canManageWorkspace: false,
     canManageTeam: false,
     canManageTemplates: false,
-    canApproveContracts: false,
     canApproveTemplates: false,
     canViewAllDeals: false,
   };
@@ -28,13 +26,13 @@ function readPermissions(formData: FormData) {
   return data;
 }
 
-export async function createRole(formData: FormData) {
+export async function createRole(formData: FormData): Promise<{ error?: string }> {
   const user = await requirePermission("canManageTeam");
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) throw new Error("Role name is required");
+  if (!name) return { error: "Role name is required" };
 
   const existing = await prisma.role.findFirst({ where: { workspaceId: user.workspaceId, name } });
-  if (existing) throw new Error("A role with that name already exists");
+  if (existing) return { error: "A role with that name already exists" };
 
   await prisma.role.create({
     data: { workspaceId: user.workspaceId, name, ...readPermissions(formData) },
@@ -44,24 +42,25 @@ export async function createRole(formData: FormData) {
   await logAudit({ workspaceId: user.workspaceId, actorEmail: session?.user?.email, action: "role.created", metadata: { name } });
 
   revalidatePath("/settings");
+  return {};
 }
 
 // The Owner role is the workspace's safety net — it's created by the system,
 // always holds every permission, and can't be deleted. Locking its
 // permissions too (name is still editable) means there's always at least
 // one role nobody can misconfigure into a lockout.
-export async function updateRole(roleId: string, formData: FormData) {
+export async function updateRole(roleId: string, formData: FormData): Promise<{ error?: string }> {
   const user = await requirePermission("canManageTeam");
   const role = await prisma.role.findFirst({ where: { id: roleId, workspaceId: user.workspaceId } });
-  if (!role) throw new Error("Role not found");
+  if (!role) return { error: "Role not found" };
 
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) throw new Error("Role name is required");
+  if (!name) return { error: "Role name is required" };
 
   if (role.isOwner) {
     await prisma.role.update({ where: { id: roleId }, data: { name } });
     revalidatePath("/settings");
-    return;
+    return {};
   }
 
   const permissions = readPermissions(formData);
@@ -74,7 +73,7 @@ export async function updateRole(roleId: string, formData: FormData) {
       where: { workspaceId: user.workspaceId, canManageTeam: true, id: { not: roleId } },
     });
     if (otherTeamManagers === 0) {
-      throw new Error("At least one role must be able to manage the team — edit another role first");
+      return { error: "At least one role must be able to manage the team. Edit another role first" };
     }
   }
 
@@ -84,14 +83,15 @@ export async function updateRole(roleId: string, formData: FormData) {
   await logAudit({ workspaceId: user.workspaceId, actorEmail: session?.user?.email, action: "role.updated", targetId: roleId, metadata: { name } });
 
   revalidatePath("/settings");
+  return {};
 }
 
-export async function deleteRole(roleId: string) {
+export async function deleteRole(roleId: string): Promise<{ error?: string }> {
   const user = await requirePermission("canManageTeam");
   const role = await prisma.role.findFirst({ where: { id: roleId, workspaceId: user.workspaceId }, include: { _count: { select: { users: true } } } });
-  if (!role) throw new Error("Role not found");
-  if (role.isOwner) throw new Error("The Owner role can't be deleted");
-  if (role._count.users > 0) throw new Error(`Reassign ${role._count.users} teammate(s) off this role before deleting it`);
+  if (!role) return { error: "Role not found" };
+  if (role.isOwner) return { error: "The Owner role can't be deleted" };
+  if (role._count.users > 0) return { error: `Reassign ${role._count.users} teammate(s) off this role before deleting it` };
 
   await prisma.role.delete({ where: { id: roleId } });
 
@@ -99,9 +99,10 @@ export async function deleteRole(roleId: string) {
   await logAudit({ workspaceId: user.workspaceId, actorEmail: session?.user?.email, action: "role.deleted", targetId: roleId, metadata: { name: role.name } });
 
   revalidatePath("/settings");
+  return {};
 }
 
-export async function assignUserRole(userId: string, formData: FormData) {
+export async function assignUserRole(userId: string, formData: FormData): Promise<{ error?: string }> {
   const roleId = String(formData.get("roleId") ?? "");
   const user = await requirePermission("canManageTeam");
 
@@ -109,8 +110,8 @@ export async function assignUserRole(userId: string, formData: FormData) {
     prisma.user.findFirst({ where: { id: userId, workspaceId: user.workspaceId }, include: { role: true } }),
     prisma.role.findFirst({ where: { id: roleId, workspaceId: user.workspaceId } }),
   ]);
-  if (!targetUser) throw new Error("Teammate not found");
-  if (!newRole) throw new Error("Role not found");
+  if (!targetUser) return { error: "Teammate not found" };
+  if (!newRole) return { error: "Role not found" };
 
   // Never let a reassignment leave the workspace with nobody who can manage
   // the team — that would be a permanent lockout with no way back in short
@@ -120,7 +121,7 @@ export async function assignUserRole(userId: string, formData: FormData) {
       where: { workspaceId: user.workspaceId, id: { not: userId }, role: { canManageTeam: true } },
     });
     if (otherTeamManagers === 0) {
-      throw new Error("This is the only teammate who can manage the team — assign someone else first");
+      return { error: "This is the only teammate who can manage the team. Assign someone else first" };
     }
   }
 
@@ -136,4 +137,5 @@ export async function assignUserRole(userId: string, formData: FormData) {
   });
 
   revalidatePath("/settings");
+  return {};
 }

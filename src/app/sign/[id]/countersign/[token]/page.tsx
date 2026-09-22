@@ -3,7 +3,8 @@ import { prisma } from "@/lib/db";
 import { fillClauses } from "@/lib/contract";
 import { signAsCountersigner, declineToSign } from "./actions";
 import BrandLogo from "@/components/BrandLogo";
-import SignaturePad from "@/components/SignaturePad";
+import CountersignForm from "@/components/CountersignForm";
+import DeclineToSignForm from "@/components/DeclineToSignForm";
 
 export default async function CountersignPage({ params }: { params: Promise<{ id: string; token: string }> }) {
   const { id, token } = await params;
@@ -45,7 +46,7 @@ export default async function CountersignPage({ params }: { params: Promise<{ id
 
       <main className="mx-auto max-w-[720px] px-6 py-10">
         <div className="chip chip-neutral mb-6 px-4 py-3 text-[13.5px]">
-          Signing as <strong>{signer.name}</strong> ({signer.role}) — after <strong>{contract.deal.client.name}</strong>
+          Signing as <strong>{signer.name}</strong> ({signer.role}). After <strong>{contract.deal.client.name}</strong>
         </div>
 
         {signer.status === "signed" && (
@@ -89,25 +90,13 @@ export default async function CountersignPage({ params }: { params: Promise<{ id
             <p className="mb-4 text-[13px]" style={{ color: "var(--ink-muted)" }}>
               Draw your signature below and click Sign to complete this agreement.
             </p>
-            <form action={signAsCountersigner.bind(null, contract.id, token)} className="flex flex-col gap-3">
-              <SignaturePad name="signatureImage" />
-              <label className="flex items-start gap-2 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-                <input type="checkbox" required className="mt-0.5" />
-                I have reviewed the agreement above and agree to its terms.
-              </label>
-              <button type="submit" className="btn btn-primary mt-1 w-full justify-center">
-                Sign &amp; complete
-              </button>
-            </form>
+            <CountersignForm contractId={contract.id} token={token} signAction={signAsCountersigner} />
 
             <details className="mt-4">
               <summary className="cursor-pointer text-[12px] font-medium" style={{ color: "var(--ink-muted)" }}>
                 I can&apos;t sign this
               </summary>
-              <form action={declineToSign.bind(null, contract.id, token)} className="mt-2.5 flex flex-col gap-2 rounded-[10px] p-3.5" style={{ background: "var(--surface-2)" }}>
-                <textarea name="reason" rows={2} placeholder="What needs to change? (optional)" className="input" style={{ fontSize: "13px", padding: "8px 11px" }} />
-                <button type="submit" className="btn btn-secondary btn-sm w-fit">Decline to sign</button>
-              </form>
+              <DeclineToSignForm contractId={contract.id} token={token} declineAction={declineToSign} />
             </details>
           </div>
         )}

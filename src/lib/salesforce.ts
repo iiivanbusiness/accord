@@ -107,12 +107,12 @@ export async function exchangeSalesforceCode(code: string, state: string): Promi
   workspaceId: string; accessToken: string; refreshToken: string; instanceUrl: string; accountEmail: string;
 }> {
   const parsedState = await verifyState(state);
-  if (!parsedState) throw new Error("That Salesforce login link expired or was tampered with — try connecting again");
+  if (!parsedState) throw new Error("That Salesforce login link expired or was tampered with. Try connecting again");
 
   const tokens = await requestToken(
     new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: redirectUri(), code_verifier: parsedState.codeVerifier })
   );
-  if (!tokens.refresh_token) throw new Error("Salesforce didn't return a refresh token — check the Connected App's OAuth scopes include 'refresh_token, offline_access'");
+  if (!tokens.refresh_token) throw new Error("Salesforce didn't return a refresh token. Check the Connected App's OAuth scopes include 'refresh_token, offline_access'");
   const identity = await fetchIdentity(tokens.id, tokens.access_token);
 
   return {

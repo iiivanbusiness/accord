@@ -63,7 +63,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
 
         {visibleDeals.length === 0 ? (
           <div className="card px-5 py-10 text-center text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-            Nothing here yet — agreements will appear once they&apos;re sent to you.
+            Nothing here yet. Agreements will appear once they&apos;re sent to you.
           </div>
         ) : (
           <div className="flex flex-col gap-3.5">
@@ -85,7 +85,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
                   {contract.status === "signed" && contract.renewalDate && (
                     <div className="mt-3 rounded-[8px] px-3 py-2.5 text-[12.5px]" style={{ background: "var(--surface-2)" }}>
                       {contract.autoRenews ? "Renews" : "Ends"} {contract.renewalDate.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
-                      {contract.renewalNote ? ` — ${contract.renewalNote}` : ""}
+                      {contract.renewalNote ? ` - ${contract.renewalNote}` : ""}
                     </div>
                   )}
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { sendAdminAlertEmail, sendRenewalReminderEmail } from "@/lib/email";
+import { sendAdminAlertEmail, sendRenewalReminderEmail, sendReviewOverdueEmail } from "@/lib/email";
+import { createNotification } from "@/lib/notifications";
 import { runStaleDealsDigest } from "@/lib/stale-deals";
 import { cleanupRateLimitHits } from "@/lib/rate-limit-cleanup";
 
@@ -13,7 +14,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // informational to the team, not client-facing, so there's no reason to
 // gate it.
 //
-// Also runs the stale-deals digest (see src/lib/stale-deals.ts) and the
+// Also runs the overdue-review reminder (a ReviewStep past its dueAt),
+// the stale-deals digest (see src/lib/stale-deals.ts), and the
 // RateLimitHit table cleanup (see src/lib/rate-limit-cleanup.ts) in the same
 // request — Vercel's Hobby plan caps a project at 2 cron jobs, and this
 // project already has 2 without them (remind, renewals), so extra daily
@@ -60,6 +62,49 @@ export async function GET(req: Request) {
       }
     }
 
+    let overdueReviewResult = { checked: 0, sent: 0 };
+    try {
+      const overdueSteps = await prisma.reviewStep.findMany({
+        where: { status: "pending", dueAt: { lte: now }, dueReminderSentAt: null },
+        include: { assignee: true, contract: { include: { deal: { include: { client: true, template: true, workspace: true } } } } },
+      });
+      let overdueSent = 0;
+      for (const step of overdueSteps) {
+        const dealUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/deals/${step.contract.deal.id}`;
+        try {
+          await sendReviewOverdueEmail({
+            to: step.assignee.email,
+            clientName: step.contract.deal.client.name,
+            templateName: step.contract.deal.template?.name ?? "contract",
+            dealUrl,
+          });
+          await createNotification({
+            workspaceId: step.contract.deal.workspaceId,
+            userId: step.assigneeId,
+            type: "review.overdue",
+            title: `Overdue: ${step.contract.deal.client.name}`,
+            body: "Your review is past its due date.",
+            linkUrl: dealUrl,
+          });
+          await prisma.reviewStep.update({ where: { id: step.id }, data: { dueReminderSentAt: new Date() } });
+          overdueSent++;
+        } catch (err) {
+          console.error(`Failed overdue reminder for review step ${step.id}`, err);
+        }
+      }
+      overdueReviewResult = { checked: overdueSteps.length, sent: overdueSent };
+    } catch (err) {
+      console.error("Overdue-review reminder (piggybacked on renewals cron) crashed", err);
+      try {
+        await sendAdminAlertEmail({
+          subject: "Overdue-review reminder crashed",
+          details: err instanceof Error ? (err.stack ?? err.message) : String(err),
+        });
+      } catch (alertErr) {
+        console.error("Failed to send admin alert email", alertErr);
+      }
+    }
+
     let staleResult = { checked: 0, sent: 0 };
     try {
       staleResult = await runStaleDealsDigest();
@@ -90,7 +135,7 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ renewals: { checked: dueContracts.length, sent }, staleDeals: staleResult, rateLimitCleanup: rateLimitResult });
+    return NextResponse.json({ renewals: { checked: dueContracts.length, sent }, overdueReviews: overdueReviewResult, staleDeals: staleResult, rateLimitCleanup: rateLimitResult });
   } catch (err) {
     console.error("Renewal reminder cron crashed", err);
     try {

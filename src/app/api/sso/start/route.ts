@@ -25,7 +25,7 @@ export async function GET(req: Request) {
     oidc = await discoverOidcConfig(workspace.ssoIssuer);
   } catch (err) {
     console.error("SSO discovery failed", err);
-    return loginError("Couldn't reach the identity provider — try again or contact your IT team");
+    return loginError("Couldn't reach the identity provider. Try again or contact your IT team");
   }
 
   const nonce = randomBytes(16).toString("hex");

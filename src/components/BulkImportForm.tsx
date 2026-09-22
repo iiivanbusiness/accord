@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 
 type ImportResult = {
+  error?: string;
   created: number;
   skipped: number;
   errors: { row: number; message: string }[];
@@ -33,14 +34,14 @@ export default function BulkImportForm({
     setError(null);
     setResult(null);
     startTransition(async () => {
-      try {
-        const formData = new FormData();
-        formData.set("csv", csv);
-        const res = await importAction(formData);
-        setResult(res);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
+      const formData = new FormData();
+      formData.set("csv", csv);
+      const res = await importAction(formData);
+      if (res.error) {
+        setError(res.error);
+        return;
       }
+      setResult(res);
     });
   }
 
@@ -49,7 +50,7 @@ export default function BulkImportForm({
       <div className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
         Columns (header row required): <code className="font-mono-tab">client_name, client_company, client_email, service, fee, status, signed_date</code>.
         Only <code className="font-mono-tab">client_name</code> (or <code className="font-mono-tab">client_company</code>), <code className="font-mono-tab">service</code>, and <code className="font-mono-tab">fee</code> are required.
-        <code className="font-mono-tab">status</code> is one of signed/sent/ready/missing_info — left blank, a row with a <code className="font-mono-tab">signed_date</code> is treated as signed, otherwise ready.
+        <code className="font-mono-tab">status</code> is one of signed/sent/ready/missing_info. Left blank, a row with a <code className="font-mono-tab">signed_date</code> is treated as signed, otherwise ready.
       </div>
 
       <pre className="overflow-x-auto rounded-[8px] px-3 py-2.5 font-mono-tab text-[11px]" style={{ background: "var(--surface-2)" }}>{EXAMPLE}</pre>

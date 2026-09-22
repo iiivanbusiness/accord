@@ -9,7 +9,7 @@ type Turn = {
 };
 
 const SCRIPT: Turn[] = [
-  { speaker: "agency", text: "Thanks for hopping on. Excited to talk through the social media package for Acme Fitness." },
+  { speaker: "agency", text: "Thanks for hopping on. Excited to talk through the social media package for Northgate Fitness." },
   { speaker: "client", text: "Happy to be here. We're really looking for someone to own our Instagram and TikTok." },
   { speaker: "agency", text: "Perfect, so on our end that would be full social media management.", fill: { label: "Service", value: "Social Media Management" } },
   { speaker: "client", text: "Exactly. How many reels are we talking per month?" },
@@ -17,7 +17,7 @@ const SCRIPT: Turn[] = [
   { speaker: "client", text: "That sounds great. And what would that run us?" },
   { speaker: "agency", text: "For that scope, we'd do twenty five hundred a month.", fill: { label: "Fee", value: "€2,500 / month" } },
   { speaker: "client", text: "Twenty five hundred works on our end." },
-  { speaker: "agency", text: "Great — and would you want that billed monthly, in advance?", fill: { label: "Payment terms", value: "Monthly, in advance" } },
+  { speaker: "agency", text: "Great, and would you want that billed monthly, in advance?", fill: { label: "Payment terms", value: "Monthly, in advance" } },
   { speaker: "client", text: "Yeah, monthly in advance is fine for us." },
   { speaker: "agency", text: "When would you want to kick things off?" },
   { speaker: "client", text: "If we could start May first, that would be ideal.", fill: { label: "Start date", value: "May 1, 2026" } },
@@ -106,7 +106,7 @@ export default function AICallDemo() {
       <div className="border-b px-5 py-4" style={{ borderColor: "var(--hairline)" }}>
         <h2 className="text-[15px] font-medium">Watch a call become a contract</h2>
         <div className="mt-0.5 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-          A real (synthesized) conversation — deal terms fill in the moment they're said.
+          A real (synthesized) conversation. Deal terms fill in the moment they're said.
         </div>
       </div>
 
@@ -127,9 +127,9 @@ export default function AICallDemo() {
                   className="flex h-[52px] w-[52px] items-center justify-center rounded-full font-display text-[16px] font-semibold"
                   style={{ background: "var(--surface-1)", color: "var(--ink)" }}
                 >
-                  {speaker === "agency" ? "HM" : "AF"}
+                  {speaker === "agency" ? "HM" : "NF"}
                 </div>
-                <span className="text-[12.5px] font-medium">{speaker === "agency" ? "Horizon Media" : "Acme Fitness"}</span>
+                <span className="text-[12.5px] font-medium">{speaker === "agency" ? "Horizon Media" : "Northgate Fitness"}</span>
                 {activeSpeaker === speaker && (
                   <span className="flex gap-0.5">
                     {[0, 1, 2].map((b) => (
@@ -147,11 +147,11 @@ export default function AICallDemo() {
 
           <div className="min-h-[52px] rounded-[10px] px-4 py-3 text-[13.5px]" style={{ background: "var(--canvas)", border: "1px solid var(--hairline-soft)", color: "var(--ink)" }}>
             {status === "unsupported" ? (
-              <span style={{ color: "var(--ink-muted)" }}>Your browser doesn&apos;t support speech synthesis — try this in Chrome.</span>
+              <span style={{ color: "var(--ink-muted)" }}>Your browser doesn&apos;t support speech synthesis. Try this in Chrome.</span>
             ) : current ? (
               <>
                 <span className="font-medium" style={{ color: "var(--ink-muted)" }}>
-                  {current.speaker === "agency" ? "Horizon Media: " : "Acme Fitness: "}
+                  {current.speaker === "agency" ? "Horizon Media: " : "Northgate Fitness: "}
                 </span>
                 {current.text}
               </>
@@ -178,7 +178,7 @@ export default function AICallDemo() {
             Deal terms captured live
           </div>
           {filled.length === 0 ? (
-            <div className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>Nothing yet — start the call.</div>
+            <div className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>Nothing yet. Start the call.</div>
           ) : (
             <div className="flex flex-col gap-2">
               {filled.map((f) => (

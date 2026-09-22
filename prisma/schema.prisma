@@ -16,6 +16,12 @@ model Workspace {
   plan               String   @default("Growth")
   callsUsedThisMonth Int      @default(0)
   callsLimit         Int      @default(15)
+  // Separate cap for the freeform AI support chat (see support-chat/route.ts)
+  // — each message is its own Anthropic call billed to SealMe's own account,
+  // not the workspace's, so this exists to bound that cost per workspace
+  // rather than to meter a customer-facing quota like callsLimit.
+  aiChatMessagesUsedThisMonth Int @default(0)
+  aiChatMessagesLimit         Int @default(50)
   requireApproval    Boolean  @default(true)
   notifyOnSigned     Boolean  @default(true)
   autoRemind         Boolean  @default(false)
@@ -141,7 +147,8 @@ model Workspace {
   auditLogs         AuditLog[]
   localCaptureTokens LocalCaptureToken[]
   roles              Role[]
-  approvalChains     ApprovalChain[]
+  reviewChains       ReviewChain[]
+  notifications      Notification[]
   clauseLibraryItems ClauseLibraryItem[]
   teams              Team[]
   approvalDelegates  ApprovalDelegate[]
@@ -151,11 +158,10 @@ model Workspace {
 
 // A workspace-defined organizational unit — "Sales EMEA", "Sales US" — kept
 // deliberately separate from Role: Role gates what someone can DO
-// (permissions, who can approve), Team is who they're ON, and an
-// ApprovalChain can be scoped to one so different teams get different
-// approval rules without needing different roles. Optional everywhere it's
-// referenced — a workspace that never creates a Team behaves exactly as
-// before this existed.
+// (permissions), Team is who they're ON, and a ReviewChain can be scoped to
+// one so different teams get different review rules. Optional everywhere
+// it's referenced — a workspace that never creates a Team behaves exactly
+// as before this existed.
 model Team {
   id          String    @id @default(cuid())
   workspaceId String
@@ -163,9 +169,9 @@ model Team {
   name        String
   createdAt   DateTime  @default(now())
 
-  users          User[]
-  deals          Deal[]
-  approvalChains ApprovalChain[]
+  users        User[]
+  deals        Deal[]
+  reviewChains ReviewChain[]
 
   @@unique([workspaceId, name])
 }
@@ -246,8 +252,11 @@ model User {
   teamId String?
   team   Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
-  contractApprovalsDecided ContractApproval[]
-  approvalsDecidedOnBehalfOf ContractApproval[] @relation("ApprovalDecidedOnBehalfOf")
+  reviewChainStepsAssigned ReviewChainStep[] @relation("ReviewChainStepAssignee")
+  reviewStepsAssigned      ReviewStep[]      @relation("ReviewStepAssignee")
+  reviewStepsDecided       ReviewStep[]      @relation("ReviewStepDecidedBy")
+  reviewStepsDecidedOnBehalfOf ReviewStep[]  @relation("ReviewStepDecidedOnBehalfOf")
+  notifications            Notification[]
   lockedTemplates          ContractTemplate[]
   ownedDeals               Deal[]
 
@@ -370,9 +379,9 @@ model Deal {
   owner   User?   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
 
   // Defaults to the owner's team at creation time (see createDeal etc.),
-  // editable afterward — this is what an ApprovalChain's teamId is matched
+  // editable afterward — this is what a ReviewChain's teamId is matched
   // against. A deal with no team only matches chains that also have no
-  // teamId set (or none at all — see resolveApprovalChain).
+  // teamId set (or none at all — see resolveReviewChain).
   teamId String?
   team   Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
@@ -398,6 +407,12 @@ model Deal {
   // a second time instead of going quiet forever after one email.
   staleReminderSentAt DateTime?
 
+  // Soft-delete: set when a deal is moved to trash from the deals table.
+  // Trashed deals are filtered out of the normal deals list/board but stay
+  // in the database until the trash is emptied (a real, irreversible
+  // delete) — the undo window the trash view exists for.
+  trashedAt DateTime?
+
   // Set once this deal has been pushed to HubSpot as a Deal object — lets
   // a later status change (sent, signed) update that same record.
   hubspotDealId String?
@@ -415,8 +430,8 @@ model Deal {
 }
 
 // A free-form internal note on a deal — the "leave a comment for a
-// colleague" gap ClauseComment/ApprovalStep notes don't cover (those are
-// both tied to a specific clause or approval decision, not a general
+// colleague" gap ClauseComment/ReviewStep notes don't cover (those are
+// both tied to a specific clause or review decision, not a general
 // place for the team to leave context). Visible only inside the
 // workspace, never to the client. authorEmail/authorName are denormalized
 // (same pattern as AuditLog) rather than a User relation, so a note
@@ -602,7 +617,7 @@ model Contract {
   pendingSubject String?
   pendingMessage String?
 
-  approvals      ContractApproval[]
+  reviewSteps    ReviewStep[]
   clauseComments ClauseComment[]
 }
 
@@ -655,10 +670,9 @@ model ClauseComment {
 }
 
 // A workspace-defined role — e.g. "Legal", "Finance", "Manager", or
-// whatever a given company actually calls its own teams. Two jobs at once:
-// (1) gates general app permissions below, (2) can be a step in an
-// ApprovalStep chain, where "the Legal role approves" rather than one named
-// person, so it still works if that specific person is out.
+// whatever a given company actually calls its own teams. Gates general app
+// permissions below. Contract review is person-based (see ReviewChainStep),
+// not role-based, so Role plays no part in it.
 //
 // Every workspace gets exactly one isOwner role, created alongside it —
 // full permissions, can't be deleted, exists so there's always at least one
@@ -673,14 +687,11 @@ model Role {
   canManageWorkspace  Boolean   @default(false) // settings, sender domain, logo, workspace name
   canManageTeam       Boolean   @default(false) // invite/remove teammates, create/edit/delete roles, assign roles
   canManageTemplates  Boolean   @default(false) // create/edit/delete UNLOCKED contract templates
-  canApproveContracts Boolean   @default(false) // eligible to be a step in an approval chain
   canApproveTemplates Boolean   @default(false) // lock/unlock templates, and edit/delete a locked one — the "legal approved this wording" gate
   canViewAllDeals     Boolean   @default(false) // see every deal/client in the workspace, not just ones this user started — a rep without it only sees their own (plus any deal with no owner)
   createdAt           DateTime  @default(now())
 
-  users         User[]
-  approvalSteps ApprovalStep[]
-  approvals     ContractApproval[]
+  users User[]
 
   @@unique([workspaceId, name])
 }
@@ -688,13 +699,13 @@ model Role {
 // One workspace can have several of these — "Default", "EMEA >€50k",
 // "US Standard" — instead of a single global chain. teamId/minDealValue are
 // match conditions: null means "matches anything" on that axis. When a
-// contract needs approval, every chain in the workspace is checked in
+// contract needs review, every chain in the workspace is checked in
 // `order`, and the FIRST one whose conditions both match wins — see
-// resolveApprovalChain. Put more specific chains (a team, a value floor,
-// or both) before a catch-all, or a catch-all will shadow them. A contract
-// already mid-approval keeps its own ContractApproval snapshot, so editing
-// chains never rewrites history for deals already in flight.
-model ApprovalChain {
+// resolveReviewChain. Put more specific chains (a team, a value floor, or
+// both) before a catch-all, or a catch-all will shadow them. A contract
+// already mid-review keeps its own ReviewStep snapshot, so editing chains
+// never rewrites history for deals already in flight.
+model ReviewChain {
   id          String    @id @default(cuid())
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -707,59 +718,101 @@ model ApprovalChain {
   order     Int // evaluation priority: lower is checked first
   createdAt DateTime @default(now())
 
-  steps ApprovalStep[]
+  steps ReviewChainStep[]
 
   @@unique([workspaceId, order])
 }
 
-model ApprovalStep {
-  id        String        @id @default(cuid())
-  chainId   String
-  chain     ApprovalChain @relation(fields: [chainId], references: [id], onDelete: Cascade)
-  roleId    String
-  role      Role          @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  order     Int
-  createdAt DateTime      @default(now())
+// A named teammate's place in a ReviewChain template — person-based, not
+// role-based, so a specific rep can be picked as a reviewer regardless of
+// what role they hold.
+model ReviewChainStep {
+  id         String      @id @default(cuid())
+  chainId    String
+  chain      ReviewChain @relation(fields: [chainId], references: [id], onDelete: Cascade)
+  assigneeId String
+  assignee   User        @relation("ReviewChainStepAssignee", fields: [assigneeId], references: [id], onDelete: Cascade)
+  order      Int
+  createdAt  DateTime    @default(now())
 
   @@unique([chainId, order])
 }
 
-// One row per approval step, per contract — a snapshot taken from whichever
-// ApprovalChain resolved for this deal the moment it entered
-// pending_approval. Anyone currently holding roleId can act on it (not one
-// named person, and see ApprovalDelegate for "act on X's behalf while
-// they're out"), but only once every lower-order step for the same
-// contract is already "approved".
-model ContractApproval {
+// One row per review step, per contract — a snapshot taken from whichever
+// ReviewChain resolved for this deal the moment it entered pending_approval.
+// Only the named assigneeId (or an ApprovalDelegate standing in for them)
+// can act on it, and only once every lower-order step for the same contract
+// is already "approved". Carries the ClickUp-style extras a reviewer sees
+// on their own step: a checklist, a comment thread, an optional due date,
+// and a priority — priority is a small fixed set of levels with preset
+// colors in the UI, never a free color picker, matching this app's
+// restrained palette elsewhere.
+model ReviewStep {
   id             String    @id @default(cuid())
   contractId     String
   contract       Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  roleId         String
-  role           Role      @relation(fields: [roleId], references: [id])
+  assigneeId     String
+  assignee       User      @relation("ReviewStepAssignee", fields: [assigneeId], references: [id])
   order          Int
   status         String    @default("pending") // pending | approved | rejected
   decidedByUserId String?
-  decidedByUser   User?     @relation(fields: [decidedByUserId], references: [id])
-  // Set only when decidedByUserId acted as a delegate rather than a direct
-  // holder of `role` — who they were standing in for, for the audit trail.
+  decidedByUser   User?     @relation("ReviewStepDecidedBy", fields: [decidedByUserId], references: [id])
+  // Set only when decidedByUserId acted as a delegate rather than the named
+  // assignee — who they were standing in for, for the audit trail.
   decidedOnBehalfOfUserId String?
-  decidedOnBehalfOfUser   User?   @relation("ApprovalDecidedOnBehalfOf", fields: [decidedOnBehalfOfUserId], references: [id])
+  decidedOnBehalfOfUser   User?   @relation("ReviewStepDecidedOnBehalfOf", fields: [decidedOnBehalfOfUserId], references: [id])
   note           String?
   decidedAt      DateTime?
   createdAt      DateTime  @default(now())
 
+  dueAt             DateTime? // optional deadline the assignee or an admin sets on this step
+  dueReminderSentAt DateTime? // dedup flag for the overdue-reminder cron, same idiom as Contract.reminderSentAt
+  priority          String    @default("normal") // low | normal | high | urgent
+
+  checklistItems ReviewChecklistItem[]
+  comments       ReviewComment[]
+
   @@unique([contractId, order])
 }
 
-// "While I'm on leave, X can approve on my behalf." Self-service: anyone
-// can hand their own approval authority to a colleague (fromUserId is
-// always the acting session user when created that way); canManageWorkspace
-// admins can also set one up for someone else (HR covering an unplanned
-// absence) or revoke any delegation. endsAt null means "until manually
-// revoked" rather than a fixed trip length. Decision eligibility in
-// decideApproval checks: does the current user hold the step's role
-// directly, OR is there a delegation, active right now, from someone who
-// does?
+// A reviewer's own sub-items for one review step — e.g. "check the pricing",
+// "confirm the start date" — checked off independently of the step's
+// overall approve/reject decision.
+model ReviewChecklistItem {
+  id           String     @id @default(cuid())
+  reviewStepId String
+  reviewStep   ReviewStep @relation(fields: [reviewStepId], references: [id], onDelete: Cascade)
+  label        String
+  done         Boolean    @default(false)
+  doneAt       DateTime?
+  createdAt    DateTime   @default(now())
+
+  @@index([reviewStepId])
+}
+
+// Comment/activity thread on one review step. authorEmail/authorName are
+// denormalized (not a User relation) — same pattern as DealNote — so a
+// comment survives the author leaving the workspace.
+model ReviewComment {
+  id           String     @id @default(cuid())
+  reviewStepId String
+  reviewStep   ReviewStep @relation(fields: [reviewStepId], references: [id], onDelete: Cascade)
+  authorEmail  String
+  authorName   String
+  body         String
+  createdAt    DateTime   @default(now())
+
+  @@index([reviewStepId, createdAt])
+}
+
+// "While I'm on leave, X can review on my behalf." Self-service: anyone can
+// hand their own review authority to a colleague (fromUserId is always the
+// acting session user when created that way); canManageWorkspace admins can
+// also set one up for someone else (HR covering an unplanned absence) or
+// revoke any delegation. endsAt null means "until manually revoked" rather
+// than a fixed trip length. Decision eligibility in decideReviewStep checks:
+// is the current user the step's named assigneeId directly, OR is there a
+// delegation, active right now, from the assignee to them?
 model ApprovalDelegate {
   id          String    @id @default(cuid())
   workspaceId String
@@ -774,6 +827,30 @@ model ApprovalDelegate {
 
   @@index([fromUserId])
   @@index([toUserId])
+}
+
+// A minimal in-app notification — the bell/badge signal in the header.
+// Always paired with an email for anything the recipient needs to act on
+// (see notifyStepAssignee) rather than relying on this alone, since nothing
+// pushes it to the client in real time — the UI polls for unread ones.
+// type is a closed string union checked in code (e.g. "review.assigned",
+// "review.overdue"), same pattern as Contract.status. linkUrl is where
+// clicking the notification goes.
+model Notification {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String
+  title       String
+  body        String
+  linkUrl     String?
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, readAt, createdAt])
+  @@index([workspaceId])
 }
 
 model UpgradeRequest {

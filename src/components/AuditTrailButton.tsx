@@ -29,7 +29,7 @@ export default function AuditTrailButton({ dealId, className }: { dealId: string
       a.remove();
       URL.revokeObjectURL(url);
     } catch {
-      setError("Couldn't export the audit trail — try again.");
+      setError("Couldn't export the audit trail. Try again.");
     } finally {
       setDownloading(false);
     }

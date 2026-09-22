@@ -15,7 +15,7 @@ export function isWebhookEvent(value: string): value is WebhookEvent {
 // subscribed to it. Fire-and-forget from the caller's point of view: each
 // endpoint gets its own try/catch, a failure here never blocks or throws
 // into whatever action triggered it (same pattern as the email-notify
-// helpers in src/lib/approval.ts). One attempt only — no retry queue in
+// helpers in src/lib/review.tsx). One attempt only — no retry queue in
 // v1, see the WebhookDelivery doc comment.
 export async function dispatchWebhookEvent(workspaceId: string, event: WebhookEvent, data: Record<string, unknown>): Promise<void> {
   const endpoints = await prisma.webhookEndpoint.findMany({ where: { workspaceId, enabled: true } });
@@ -56,6 +56,6 @@ export async function sendTestWebhook(endpointId: string): Promise<void> {
   const endpoint = await prisma.webhookEndpoint.findUnique({ where: { id: endpointId } });
   if (!endpoint) throw new Error("Webhook endpoint not found");
   await deliverToEndpoint(endpoint.id, endpoint.url, endpoint.secret, "test", {
-    message: "This is a test event from SealMe — no real deal was created.",
+    message: "This is a test event from SealMe. No real deal was created.",
   });
 }

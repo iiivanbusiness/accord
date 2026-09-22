@@ -15,7 +15,7 @@ export default function ApiKeysPanel({
 }: {
   keys: ApiKeyItem[];
   createAction: (formData: FormData) => Promise<string>;
-  revokeAction: (keyId: string) => Promise<void>;
+  revokeAction: (keyId: string) => Promise<{ error?: string }>;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [freshKey, setFreshKey] = useState<string | null>(null);
@@ -44,11 +44,8 @@ export default function ApiKeysPanel({
   function handleRevoke(keyId: string) {
     setError(null);
     startTransition(async () => {
-      try {
-        await revokeAction(keyId);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
-      }
+      const result = await revokeAction(keyId);
+      if (result.error) setError(result.error);
     });
   }
 
@@ -65,7 +62,7 @@ export default function ApiKeysPanel({
           <div className="rounded-[8px] px-3 py-2.5 font-mono-tab text-[12px]" style={{ background: "var(--surface-2)", wordBreak: "break-all" }}>
             {freshKey}
           </div>
-          <div className="text-[11.5px]" style={{ color: "var(--warn)" }}>⚠ Copy this now — it won&apos;t be shown again.</div>
+          <div className="text-[11.5px]" style={{ color: "var(--warn)" }}>⚠ Copy this now. It won&apos;t be shown again.</div>
         </div>
       )}
 

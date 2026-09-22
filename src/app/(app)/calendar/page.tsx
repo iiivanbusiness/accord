@@ -19,10 +19,10 @@ function formatTime(date: Date): string {
 }
 
 const ERROR_MESSAGE: Record<string, string> = {
-  google_not_configured: "Google Calendar isn't set up yet — add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env first.",
-  google_no_code: "Google didn't return an authorization code — try connecting again.",
-  google_token_exchange: "Couldn't complete the connection with Google — try again.",
-  google_sync_failed: "Couldn't sync your calendar — your connection may have expired. Try reconnecting.",
+  google_not_configured: "Google Calendar isn't set up yet. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env first.",
+  google_no_code: "Google didn't return an authorization code. Try connecting again.",
+  google_token_exchange: "Couldn't complete the connection with Google. Try again.",
+  google_sync_failed: "Couldn't sync your calendar. Your connection may have expired. Try reconnecting.",
   google_access_denied: "Access was declined on Google's side, so nothing was connected.",
 };
 
@@ -81,9 +81,9 @@ export default async function CalendarPage({
         <span className="h-1.5 w-1.5 rounded-full flex-none" style={{ background: isConnected ? "var(--success)" : "var(--ink-muted)" }} />
         <div className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
           {isConnected ? (
-            <>Connected to Google Calendar{workspace?.googleAccountEmail ? ` (${workspace.googleAccountEmail})` : ""} — events with a Zoom or Meet link sync automatically.</>
+            <>Connected to Google Calendar{workspace?.googleAccountEmail ? ` (${workspace.googleAccountEmail})` : ""}. Events with a Zoom or Meet link sync automatically.</>
           ) : configured ? (
-            "Not connected — link your Google Calendar to pull in upcoming calls automatically."
+            "Not connected. Link your Google Calendar to pull in upcoming calls automatically."
           ) : (
             "Google Calendar integration isn't configured yet (needs GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET)."
           )}

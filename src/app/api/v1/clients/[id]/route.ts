@@ -7,7 +7,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!auth) return apiError(401, "Invalid or missing API key");
 
   const allowed = await checkRateLimit(`api:${auth.apiKeyId}`, 120, 60_000);
-  if (!allowed) return apiError(429, "Rate limit exceeded — try again shortly");
+  if (!allowed) return apiError(429, "Rate limit exceeded. Try again shortly");
 
   const { id } = await params;
   const client = await prisma.client.findFirst({ where: { id, workspaceId: auth.workspaceId } });

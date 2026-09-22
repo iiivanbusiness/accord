@@ -31,7 +31,7 @@ export async function signup(formData: FormData) {
   const ip = await getClientIp();
   const allowed = await checkRateLimit(`signup:${ip}`, 5, 60 * 60 * 1000);
   if (!allowed) {
-    redirect(`/signup?error=${encodeURIComponent("Too many signups from this connection — try again in a bit.")}`);
+    redirect(`/signup?error=${encodeURIComponent("Too many signups from this connection. Try again in a bit.")}`);
   }
 
   const existing = await prisma.user.findUnique({ where: { email } });

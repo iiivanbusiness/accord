@@ -9,7 +9,6 @@ type Role = {
   canManageWorkspace: boolean;
   canManageTeam: boolean;
   canManageTemplates: boolean;
-  canApproveContracts: boolean;
   canApproveTemplates: boolean;
   canViewAllDeals: boolean;
   memberCount: number;
@@ -19,9 +18,8 @@ const PERMISSIONS: { field: keyof Role; label: string; hint: string }[] = [
   { field: "canManageWorkspace", label: "Manage workspace settings", hint: "Workspace name, logo, sending domain, integrations" },
   { field: "canManageTeam", label: "Manage team & roles", hint: "Invite/remove teammates, create/edit/delete roles, assign roles" },
   { field: "canManageTemplates", label: "Manage contract templates", hint: "Create, edit, and delete unlocked templates" },
-  { field: "canApproveContracts", label: "Approve contracts", hint: "Eligible to be a step in the approval chain" },
   { field: "canApproveTemplates", label: "Approve & lock templates", hint: "Lock templates as approved wording, and edit/delete a locked one" },
-  { field: "canViewAllDeals", label: "View all deals", hint: "See every deal and client in the workspace — without it, only deals this person started" },
+  { field: "canViewAllDeals", label: "View all deals", hint: "See every deal and client in the workspace. Without it, only deals this person started" },
 ];
 
 function PermissionCheckboxes({ role }: { role?: Role }) {
@@ -47,9 +45,9 @@ export default function RolesManager({
   deleteRoleAction,
 }: {
   roles: Role[];
-  createRoleAction: (formData: FormData) => Promise<void>;
-  updateRoleAction: (roleId: string, formData: FormData) => Promise<void>;
-  deleteRoleAction: (roleId: string) => Promise<void>;
+  createRoleAction: (formData: FormData) => Promise<{ error?: string }>;
+  updateRoleAction: (roleId: string, formData: FormData) => Promise<{ error?: string }>;
+  deleteRoleAction: (roleId: string) => Promise<{ error?: string }>;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -57,17 +55,17 @@ export default function RolesManager({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function runAction(fn: () => Promise<void>) {
+  function runAction(fn: () => Promise<{ error?: string }>) {
     setError(null);
     startTransition(async () => {
-      try {
-        await fn();
-        setEditingId(null);
-        setAdding(false);
-        setConfirmingDeleteId(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
+      const result = await fn();
+      if (result.error) {
+        setError(result.error);
+        return;
       }
+      setEditingId(null);
+      setAdding(false);
+      setConfirmingDeleteId(null);
     });
   }
 

@@ -159,11 +159,29 @@ export default function CompanionPanel({ upcomingEvents, fastPoll = false }: { u
     async function load() {
       try {
         const res = await fetch(`/api/companion/state?dealId=${session!.dealId}`);
-        if (!res.ok || cancelled) return;
+        if (cancelled) return;
+        // A failed poll used to fail completely silently — the panel just
+        // kept showing "Nothing captured yet. Keep talking." forever, which
+        // reads exactly like extraction genuinely isn't working even when
+        // the real cause is an expired session or a deal you've lost access
+        // to. Surface it instead of hiding it.
+        if (!res.ok) {
+          setError(
+            res.status === 401
+              ? "Signed out — reopen the app to sign back in."
+              : res.status === 404
+                ? "Can't find this deal — it may not be visible to you."
+                : "Couldn't load live deal data."
+          );
+          return;
+        }
         const data = (await res.json()) as DealState;
-        if (!cancelled) setDealState(data);
+        if (!cancelled) {
+          setDealState(data);
+          setError(null);
+        }
       } catch {
-        // Best-effort — a failed poll just leaves the last-known state up.
+        if (!cancelled) setError("Couldn't reach SealMe — check your connection.");
       }
     }
     load();
@@ -182,11 +200,21 @@ export default function CompanionPanel({ upcomingEvents, fastPoll = false }: { u
     (async () => {
       try {
         const res = await fetch("/api/companion/notes");
-        if (!res.ok || cancelled) return;
+        if (cancelled) return;
+        if (!res.ok) {
+          // Same as the live-state poll: leaving `notes` null lets this
+          // retry the next time the Notes tab is opened, but surface why
+          // it's stuck on "Loading…" instead of just leaving it there.
+          setError(res.status === 401 ? "Signed out — reopen the app to sign back in." : "Couldn't load notes.");
+          return;
+        }
         const data = (await res.json()) as { items: RecentNoteItem[] };
-        if (!cancelled) setNotes(data.items);
+        if (!cancelled) {
+          setNotes(data.items);
+          setError(null);
+        }
       } catch {
-        // Best-effort — leaves the tab showing its loading/empty state.
+        if (!cancelled) setError("Couldn't reach SealMe — check your connection.");
       }
     })();
     return () => {
@@ -353,7 +381,7 @@ export default function CompanionPanel({ upcomingEvents, fastPoll = false }: { u
                     Deal terms
                   </h2>
                   {groups.size === 0 ? (
-                    <p className="text-[12px]" style={{ color: glass.textDim }}>Nothing captured yet — keep talking.</p>
+                    <p className="text-[12px]" style={{ color: glass.textDim }}>Nothing captured yet. Keep talking.</p>
                   ) : (
                     <div className="flex flex-col">
                       {[...groups.entries()].map(([label, rows]) => (
@@ -404,7 +432,7 @@ export default function CompanionPanel({ upcomingEvents, fastPoll = false }: { u
               </h2>
               {upcomingEvents.length === 0 ? (
                 <p className="py-6 text-center text-[12.5px]" style={{ color: glass.textDim }}>
-                  Nothing scheduled — start a call from the main app to see it here.
+                  Nothing scheduled. Start a call from the main app to see it here.
                 </p>
               ) : (
                 <div className="flex flex-col">

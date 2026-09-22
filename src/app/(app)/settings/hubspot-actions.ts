@@ -7,12 +7,17 @@ import { requirePermission } from "@/lib/permissions";
 import { validateHubspotToken } from "@/lib/hubspot";
 import { logAudit } from "@/lib/audit";
 
-export async function connectHubspot(formData: FormData): Promise<void> {
+export async function connectHubspot(formData: FormData): Promise<{ error?: string }> {
   const user = await requirePermission("canManageWorkspace");
   const token = String(formData.get("token") ?? "").trim();
-  if (!token) throw new Error("Paste your HubSpot Private App token first");
+  if (!token) return { error: "Paste your HubSpot Private App token first" };
 
-  const { portalId } = await validateHubspotToken(token);
+  let portalId: string;
+  try {
+    ({ portalId } = await validateHubspotToken(token));
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Couldn't validate that HubSpot token" };
+  }
 
   await prisma.workspace.update({
     where: { id: user.workspaceId },
@@ -23,16 +28,18 @@ export async function connectHubspot(formData: FormData): Promise<void> {
   await logAudit({ workspaceId: user.workspaceId, actorEmail: session?.user?.email, action: "hubspot.connected", metadata: { portalId } });
 
   revalidatePath("/settings");
+  return {};
 }
 
-export async function toggleHubspot(): Promise<void> {
+export async function toggleHubspot(): Promise<{ error?: string }> {
   const user = await requirePermission("canManageWorkspace");
   const workspace = await prisma.workspace.findFirstOrThrow({ where: { id: user.workspaceId } });
   await prisma.workspace.update({ where: { id: user.workspaceId }, data: { hubspotEnabled: !workspace.hubspotEnabled } });
   revalidatePath("/settings");
+  return {};
 }
 
-export async function disconnectHubspot(): Promise<void> {
+export async function disconnectHubspot(): Promise<{ error?: string }> {
   const user = await requirePermission("canManageWorkspace");
   await prisma.workspace.update({
     where: { id: user.workspaceId },
@@ -43,4 +50,5 @@ export async function disconnectHubspot(): Promise<void> {
   await logAudit({ workspaceId: user.workspaceId, actorEmail: session?.user?.email, action: "hubspot.disconnected" });
 
   revalidatePath("/settings");
+  return {};
 }

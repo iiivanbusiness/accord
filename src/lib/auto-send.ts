@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { requestOrSendContract } from "@/lib/approval";
+import { requestOrSendReview } from "@/lib/review";
 
 // Used when a workspace has "Require manual approval before sending" turned off:
 // once a live call finishes with every required field captured, the contract
@@ -24,10 +24,10 @@ export async function autoGenerateAndSendContract(dealId: string): Promise<boole
 
   const firstName = deal.client.name.split(" ")[0];
 
-  await requestOrSendContract(dealId, {
+  await requestOrSendReview(dealId, {
     to: deal.client.email,
     subject: `${deal.template.name} from ${deal.workspace.name}`,
-    message: `Hi ${firstName},\n\nThanks again for the call — here's the ${deal.template.name.toLowerCase()} we discussed. Take a look and sign whenever you're ready.\n\nLet me know if anything needs adjusting.`,
+    message: `Hi ${firstName},\n\nThanks again for the call. Here's the ${deal.template.name.toLowerCase()} we discussed. Take a look and sign whenever you're ready.\n\nLet me know if anything needs adjusting.`,
   });
 
   return true;

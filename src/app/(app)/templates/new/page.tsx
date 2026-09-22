@@ -19,7 +19,7 @@ export default async function NewTemplatePage() {
     <div className="mb-6 max-w-[560px]">
       <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>New template</h1>
       <div className="mt-1 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-        Name it and define the clauses — the contract engine fills them from what a call actually covered.
+        Name it and define the clauses. The contract engine fills them from what a call actually covered.
       </div>
     </div>
 

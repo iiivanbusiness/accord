@@ -22,7 +22,7 @@ export type ProposedCorrection =
 // either a field change or sending the deal to a named teammate for
 // review — and never applies it. The rep hears confirmationText read back
 // and has to explicitly confirm (applyVoiceFieldCorrection or
-// requestTeammateReview in deals/[id]/actions.ts, both only called from a
+// sendForReviewTo in deals/[id]/review-actions.ts, both only called from a
 // tap on "Yes, apply") before anything is written or sent; a misheard word
 // this way surfaces as a wrong-sounding confirmation instead of a silently
 // wrong contract or an email to the wrong person.
@@ -45,7 +45,7 @@ export async function interpretVoiceCorrection(
   if (editableFields.length === 0 && teammates.length === 0) return null;
 
   const fieldList =
-    editableFields.map((f) => `${f.fieldKey} (${f.label}): currently ${f.status === "missing" ? "MISSING — not captured yet" : `"${f.value}"`}`).join("\n") ||
+    editableFields.map((f) => `${f.fieldKey} (${f.label}): currently ${f.status === "missing" ? "MISSING. Not captured yet" : `"${f.value}"`}`).join("\n") ||
     "(none)";
   const teammateList = teammates.map((u) => `${u.id}: ${u.name}`).join("\n") || "(none)";
 
@@ -68,7 +68,7 @@ export async function interpretVoiceCorrection(
   if (editableFields.length > 0) {
     tools.push({
       name: "propose_field_change",
-      description: "Propose a single field's value — either correcting an already-filled field or filling one currently marked MISSING.",
+      description: "Propose a single field's value. Either correcting an already-filled field or filling one currently marked MISSING.",
       input_schema: {
         type: "object",
         properties: {
@@ -76,7 +76,7 @@ export async function interpretVoiceCorrection(
           proposedValue: { type: "string", description: "The new value, formatted naturally the way it should appear in the contract." },
           confirmationText: {
             type: "string",
-            description: "A short spoken question (in English) reading back the proposed value — say \"setting\" for a field that was missing, \"changing\" for one that already had a value.",
+            description: "A short spoken question (in English) reading back the proposed value. Say \"setting\" for a field that was missing, \"changing\" for one that already had a value.",
           },
         },
         required: ["fieldKey", "proposedValue", "confirmationText"],
@@ -86,12 +86,12 @@ export async function interpretVoiceCorrection(
   if (teammates.length > 0) {
     tools.push({
       name: "send_for_review",
-      description: "The rep asked to send this deal to a named teammate for review — propose who, matched from the listed teammates only.",
+      description: "The rep asked to send this deal to a named teammate for review. Propose who, matched from the listed teammates only.",
       input_schema: {
         type: "object",
         properties: {
           recipientUserId: { type: "string", enum: teammates.map((u) => u.id) },
-          confirmationText: { type: "string", description: "A short spoken question (in English) confirming who it'll be sent to, e.g. \"Send this to Marko for review — confirm?\"" },
+          confirmationText: { type: "string", description: "A short spoken question (in English) confirming who it'll be sent to, e.g. \"Send this to Marko for review. Confirm?\"" },
         },
         required: ["recipientUserId", "confirmationText"],
       },
@@ -104,9 +104,9 @@ export async function interpretVoiceCorrection(
     max_tokens: 300,
     system:
       "The rep just spoke a voice command about a contract, right after hearing a spoken recap of what a call " +
-      "produced. It's one of two things: (1) a correction to a field's value — match loosely (they might say " +
+      "produced. It's one of two things: (1) a correction to a field's value. Match loosely (they might say " +
       "\"price\" for a field labeled \"Fee\", or speak a different language than the fields are recorded in), " +
-      "or (2) a request to send the deal to a specific named teammate for review — match the name loosely " +
+      "or (2) a request to send the deal to a specific named teammate for review. Match the name loosely " +
       "(nicknames, mispronunciations) against the listed teammates only, never invent a person who isn't " +
       "listed. If it's neither, or the match isn't confident, use `unclear` instead of guessing. Always write " +
       "confirmationText in English regardless of what language the rep spoke.",

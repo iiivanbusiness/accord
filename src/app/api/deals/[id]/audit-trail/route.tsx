@@ -9,10 +9,10 @@ const CALL_SOURCE_LABEL: Record<string, string> = {
   upload: "Pasted transcript",
 };
 
-// Compliance-sensitive (approval decisions, signer IPs) — gated on
-// canManageWorkspace, the same admin tier that configures the approval
-// chain itself, not the general canManageTemplates/canApproveContracts
-// permissions a regular teammate might hold.
+// Compliance-sensitive (review decisions, signer IPs) — gated on
+// canManageWorkspace, the same admin tier that configures the review
+// chain itself, not the general canManageTemplates permission a regular
+// teammate might hold.
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
@@ -36,7 +36,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       contract: {
         include: {
           template: true,
-          approvals: { include: { role: true, decidedByUser: true }, orderBy: { order: "asc" } },
+          reviewSteps: { include: { assignee: true, decidedByUser: true }, orderBy: { order: "asc" } },
         },
       },
     },
@@ -55,7 +55,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const events: AuditEvent[] = [];
 
-  events.push({ when: deal.createdAt, label: "Deal created", detail: `${deal.client.name} — ${deal.service}` });
+  events.push({ when: deal.createdAt, label: "Deal created", detail: `${deal.client.name} - ${deal.service}` });
 
   for (const call of deal.calls) {
     events.push({
@@ -76,14 +76,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
 
   if (deal.contract) {
-    for (const approval of deal.contract.approvals) {
-      if (approval.status === "pending") continue;
+    for (const step of deal.contract.reviewSteps) {
+      if (step.status === "pending") continue;
       events.push({
-        when: approval.decidedAt ?? deal.contract.createdAt,
-        label: `Approval ${approval.status} — ${approval.role.name}`,
-        detail: [approval.decidedByUser ? `by ${approval.decidedByUser.name} (${approval.decidedByUser.email})` : null, approval.note ? `"${approval.note}"` : null]
+        when: step.decidedAt ?? deal.contract.createdAt,
+        label: `Review ${step.status} - ${step.assignee.name}`,
+        detail: [step.decidedByUser ? `by ${step.decidedByUser.name} (${step.decidedByUser.email})` : null, step.note ? `"${step.note}"` : null]
           .filter(Boolean)
-          .join(" — "),
+          .join(", "),
       });
     }
     if (deal.contract.sentAt) {
@@ -119,7 +119,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     events.push({
       when: entry.createdAt,
       label: `System log: ${entry.action}`,
-      detail: [entry.actorEmail, detail, entry.ip ? `IP ${entry.ip}` : null].filter(Boolean).join(" — ") || null,
+      detail: [entry.actorEmail, detail, entry.ip ? `IP ${entry.ip}` : null].filter(Boolean).join(", ") || null,
     });
   }
 

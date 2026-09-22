@@ -26,7 +26,7 @@ export default function TwoFactorSettings({ enabled }: { enabled: boolean }) {
       setQr(result);
       setMode("setup");
     } catch {
-      setError("Couldn't start setup — try again");
+      setError("Couldn't start setup. Try again");
     } finally {
       setBusy(false);
     }
@@ -83,7 +83,7 @@ export default function TwoFactorSettings({ enabled }: { enabled: boolean }) {
         <div className="chip chip-success w-fit px-4 py-2.5 text-[13px]">✓ Two-factor authentication is on</div>
         <div className="text-[13px] font-medium">Save these backup codes</div>
         <p className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-          Each one works once, if you ever lose access to your authenticator app. Store them somewhere safe — this is the only time they&apos;re shown.
+          Each one works once, if you ever lose access to your authenticator app. Store them somewhere safe. This is the only time they&apos;re shown.
         </p>
         <div className="font-mono-tab grid grid-cols-2 gap-2 rounded-[10px] p-4 text-[13px]" style={{ background: "var(--surface-2)" }}>
           {backupCodes.map((code) => (
@@ -176,7 +176,7 @@ export default function TwoFactorSettings({ enabled }: { enabled: boolean }) {
     return (
       <form action={handleRegenerate} className="flex flex-col gap-3">
         <p className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-          Confirm your password to generate a fresh set of backup codes — your old ones stop working.
+          Confirm your password to generate a fresh set of backup codes. Your old ones stop working.
         </p>
         <input name="password" type="password" required placeholder="Current password" className="input" style={{ maxWidth: 260 }} />
         {error && <div className="chip chip-warn w-fit px-3 py-2 text-[12.5px]">{error}</div>}

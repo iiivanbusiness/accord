@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import CountersignerFields from "./CountersignerFields";
 import SentConfirmationCard from "./SentConfirmationCard";
 
-type SendResult = { status: "sent" } | { status: "pending_approval"; approverRoleName: string };
+type SendResult = { status: "sent" } | { status: "pending_approval"; assigneeName: string } | { status: "error"; error: string };
 
 // Wraps the manual Send form: submits via the sendContractEmail action
 // directly (not a native <form action> redirect) so a successful send can
 // show an animated confirmation — naming who it actually went to (the
-// client, or the first approver if an approval chain caught it) — before
+// client, or the first reviewer if a review chain caught it) — before
 // moving on to the contract page, instead of the page just changing out
 // from under the rep with no acknowledgment.
 export default function SendContractForm({
@@ -42,13 +42,13 @@ export default function SendContractForm({
   function handleSubmit(formData: FormData) {
     setError(null);
     startTransition(async () => {
-      try {
-        const res = await sendAction(dealId, formData);
-        setResult(res);
-        setTimeout(() => router.push(`/deals/${dealId}/contract`), 1600);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Couldn't send the email — check your Resend setup and try again");
+      const res = await sendAction(dealId, formData);
+      if (res.status === "error") {
+        setError(res.error);
+        return;
       }
+      setResult(res);
+      setTimeout(() => router.push(`/deals/${dealId}/contract`), 1600);
     });
   }
 
@@ -58,7 +58,7 @@ export default function SendContractForm({
         <SentConfirmationCard
           title={
             result.status === "pending_approval"
-              ? `Sent to ${result.approverRoleName} for approval`
+              ? `Sent to ${result.assigneeName} for review`
               : `Sent to ${clientName}`
           }
         />
@@ -76,7 +76,7 @@ export default function SendContractForm({
         <input name="to" type="email" required defaultValue={defaultTo} placeholder="client@company.com" className="input" />
       </label>
       <label className="flex flex-col gap-1.5">
-        <span className="text-[13px] font-medium">CC <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>(optional — comma-separated, gets a copy but doesn&apos;t sign)</span></span>
+        <span className="text-[13px] font-medium">CC <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>(optional. Comma-separated, gets a copy but doesn&apos;t sign)</span></span>
         <input name="cc" placeholder="assistant@client.com, ops@yourcompany.com" className="input" />
       </label>
       <label className="flex flex-col gap-1.5">

@@ -26,28 +26,25 @@ export default function SlackSettingsPanel({
   channels: Channel[];
   channelsError: string | null;
   enabled: boolean;
-  setChannelAction: (formData: FormData) => Promise<void>;
-  toggleAction: () => Promise<void>;
-  disconnectAction: () => Promise<void>;
+  setChannelAction: (formData: FormData) => Promise<{ error?: string }>;
+  toggleAction: () => Promise<{ error?: string }>;
+  disconnectAction: () => Promise<{ error?: string }>;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function run(fn: () => Promise<void>) {
+  function run(fn: () => Promise<{ error?: string }>) {
     setError(null);
     startTransition(async () => {
-      try {
-        await fn();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
-      }
+      const result = await fn();
+      if (result.error) setError(result.error);
     });
   }
 
   if (!configured) {
     return (
       <div className="px-[22px] py-[18px] text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-        Slack isn&apos;t set up for this deployment yet — a SLACK_CLIENT_ID/SECRET needs to be configured first.
+        Slack isn&apos;t set up for this deployment yet. A SLACK_CLIENT_ID/SECRET needs to be configured first.
       </div>
     );
   }

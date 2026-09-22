@@ -16,7 +16,7 @@ export async function resetPassword(token: string, formData: FormData) {
   const resetToken = await prisma.passwordResetToken.findUnique({ where: { tokenHash } });
 
   if (!resetToken || resetToken.usedAt || resetToken.expiresAt < new Date()) {
-    redirect(`/reset-password/${token}?error=${encodeURIComponent("This reset link is invalid or has expired — request a new one.")}`);
+    redirect(`/reset-password/${token}?error=${encodeURIComponent("This reset link is invalid or has expired. Request a new one.")}`);
   }
 
   const user = await prisma.user.update({ where: { id: resetToken.userId }, data: { passwordHash: hashPassword(password) } });

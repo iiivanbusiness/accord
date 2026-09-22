@@ -24,13 +24,13 @@ export async function extractCallHighlights(dealId: string, transcript: string, 
     max_tokens: 1536,
     system:
       "You read a raw call transcript between an agency (\"we\"/\"I\"/\"us\") and a client, and pull out the shape " +
-      "of the conversation — NOT the deal terms themselves (price, service, contract length are captured elsewhere). " +
-      "Report only things actually said on the call, quoting the exact sentence for each — never invent or infer. " +
-      "Four kinds of item: discussion_point (something notable that came up — a requirement, a constraint, context " +
+      "of the conversation. NOT the deal terms themselves (price, service, contract length are captured elsewhere). " +
+      "Report only things actually said on the call, quoting the exact sentence for each. Never invent or infer. " +
+      "Four kinds of item: discussion_point (something notable that came up. A requirement, a constraint, context " +
       "that matters), objection (pushback, hesitation, or a concern the client raised), competitor_mention (another " +
       "vendor or tool the client brought up, by name), next_step (something agreed to happen after this call that " +
-      "isn't already a commitment with an owner/deadline — those belong to action items, not here). Skip a category " +
-      "entirely if nothing on the call fits it — don't force an item into existence.",
+      "isn't already a commitment with an owner/deadline. Those belong to action items, not here). Skip a category " +
+      "entirely if nothing on the call fits it. Don't force an item into existence.",
     messages: [
       {
         role: "user",

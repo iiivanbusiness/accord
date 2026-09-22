@@ -11,9 +11,9 @@ export default function ClauseLibraryManager({
   deleteAction,
 }: {
   items: LibraryItem[];
-  createAction: (formData: FormData) => Promise<void>;
-  updateAction: (itemId: string, formData: FormData) => Promise<void>;
-  deleteAction: (itemId: string) => Promise<void>;
+  createAction: (formData: FormData) => Promise<{ error?: string }>;
+  updateAction: (itemId: string, formData: FormData) => Promise<{ error?: string }>;
+  deleteAction: (itemId: string) => Promise<{ error?: string }>;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -21,17 +21,17 @@ export default function ClauseLibraryManager({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function run(fn: () => Promise<void>) {
+  function run(fn: () => Promise<{ error?: string }>) {
     setError(null);
     startTransition(async () => {
-      try {
-        await fn();
-        setEditingId(null);
-        setAdding(false);
-        setConfirmingDeleteId(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
+      const result = await fn();
+      if (result.error) {
+        setError(result.error);
+        return;
       }
+      setEditingId(null);
+      setAdding(false);
+      setConfirmingDeleteId(null);
     });
   }
 
@@ -45,7 +45,7 @@ export default function ClauseLibraryManager({
 
       {items.length === 0 && !adding && (
         <div className="py-4 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-          No saved clauses yet — add one below, then insert it into any template.
+          No saved clauses yet. Add one below, then insert it into any template.
         </div>
       )}
 

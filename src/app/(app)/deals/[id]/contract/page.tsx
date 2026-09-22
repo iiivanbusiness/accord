@@ -7,8 +7,6 @@ import { currentUserWithRole } from "@/lib/permissions";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import DownloadContractButton from "@/components/DownloadContractButton";
 import AuditTrailButton from "@/components/AuditTrailButton";
-import ApprovalStepper from "@/components/ApprovalStepper";
-import { decideApproval } from "../approval-actions";
 import { startRenewal } from "../actions";
 
 function daysUntil(date: Date): number {
@@ -31,33 +29,23 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
   const workspaceId = await requireWorkspaceId();
   const currentUser = await currentUserWithRole();
   const { where: visibility } = await dealVisibilityFilter(currentUser);
-  const [deal, activeDelegationsToMe] = await Promise.all([
-    prisma.deal.findFirst({
-      where: { id, workspaceId, ...visibility },
-      include: {
-        client: true,
-        template: true,
-        fields: true,
-        contract: {
-          include: {
-            approvals: { include: { role: true, decidedByUser: true, decidedOnBehalfOfUser: true }, orderBy: { order: "asc" } },
-            clauseComments: { where: { resolved: false }, orderBy: { createdAt: "asc" } },
-          },
+  const deal = await prisma.deal.findFirst({
+    where: { id, workspaceId, ...visibility },
+    include: {
+      client: true,
+      template: true,
+      fields: true,
+      contract: {
+        include: {
+          clauseComments: { where: { resolved: false }, orderBy: { createdAt: "asc" } },
         },
-        workspace: true,
       },
-    }),
-    prisma.approvalDelegate.findMany({
-      where: { toUserId: currentUser.id, startsAt: { lte: new Date() }, OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }] },
-      include: { fromUser: { select: { roleId: true } } },
-    }),
-  ]);
+      workspace: true,
+    },
+  });
   if (!deal || !deal.contract || !deal.template) notFound();
 
-  const delegatedRoleIds = [...new Set(activeDelegationsToMe.map((d) => d.fromUser.roleId).filter((id): id is string => Boolean(id)))];
-
   const clauses = fillClauses(deal.template.clauses, deal.fields);
-  const showApprovalStepper = deal.contract.approvals.length > 0 && (deal.contract.status === "pending_approval" || deal.contract.status === "changes_requested");
   const canResend = deal.contract.status === "draft" || deal.contract.status === "changes_requested";
   const commentsByClause = new Map<string, typeof deal.contract.clauseComments>();
   for (const comment of deal.contract.clauseComments) {
@@ -94,21 +82,24 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
     {deal.contract.status === "pending_approval" && (
       <div className="mb-[18px] flex flex-wrap items-center gap-3">
         <div className="chip chip-neutral px-4 py-3 text-[13.5px]">
-          Waiting on approval before this goes to {deal.client.name}
+          Waiting on review before this goes to {deal.client.name}
         </div>
+        <Link href={`/deals/${deal.id}`} className="text-[12.5px] font-medium" style={{ color: "var(--accent-blue)" }}>
+          See who has it →
+        </Link>
       </div>
     )}
     {deal.contract.status === "changes_requested" && (
       <div className="mb-[18px] flex flex-wrap items-center gap-3">
         <div className="chip chip-warn px-4 py-3 text-[13.5px]">
-          Changes requested — make edits, then send again
+          Changes requested. Make edits, then send again
         </div>
       </div>
     )}
     {deal.contract.status === "sent" && (
       <div className="mb-[18px] flex flex-wrap items-center gap-3">
         <div className="chip chip-warn px-4 py-3 text-[13.5px]">
-          ✓ Sent to {deal.client.name} — awaiting signature
+          ✓ Sent to {deal.client.name}. Awaiting signature
         </div>
         {deal.contract.viewedAt && (
           <span className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
@@ -202,28 +193,6 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
       </div>
     )}
 
-    {showApprovalStepper && (
-      <div className="mt-[18px] max-w-[600px]">
-        <ApprovalStepper
-          dealId={deal.id}
-          approvals={deal.contract.approvals.map((a) => ({
-            id: a.id,
-            order: a.order,
-            status: a.status,
-            roleId: a.roleId,
-            roleName: a.role.name,
-            decidedByName: a.decidedByUser?.name ?? null,
-            decidedOnBehalfOfName: a.decidedOnBehalfOfUser?.name ?? null,
-            decidedAt: a.decidedAt,
-            note: a.note,
-          }))}
-          currentUserRoleId={currentUser.roleId}
-          currentUserCanApprove={Boolean(currentUser.role?.canApproveContracts)}
-          delegatedRoleIds={delegatedRoleIds}
-          decideAction={decideApproval}
-        />
-      </div>
-    )}
     </>
   );
 }

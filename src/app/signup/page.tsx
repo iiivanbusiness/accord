@@ -57,7 +57,7 @@ export default async function SignupPage({
           <form action={signup} className="flex flex-col gap-3">
             <label className="flex flex-col gap-1.5">
               <span className="text-[13px] font-medium">Company name</span>
-              <input name="companyName" required placeholder="Acme Agency" className="input" />
+              <input name="companyName" required placeholder="Horizon Media" className="input" />
             </label>
             <label className="flex flex-col gap-1.5">
               <span className="text-[13px] font-medium">Your name</span>

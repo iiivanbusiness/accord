@@ -75,7 +75,7 @@ export async function extractDealFromTranscript(
     max_tokens: 4096,
     system:
       "You extract structured sales-deal terms from a raw call transcript between an agency and a prospective client. " +
-      "Only report a field if the transcript actually states it — never invent numbers, dates, or names. " +
+      "Only report a field if the transcript actually states it. Never invent numbers, dates, or names. " +
       "For every extracted field, quote the exact transcript sentence it came from.",
     messages: [
       {
@@ -93,7 +93,7 @@ export async function extractDealFromTranscript(
             clientName: { type: "string", description: "The client contact's full name" },
             company: { type: "string", description: "The client's company name, if mentioned" },
             email: { type: "string", description: "The client's email address, if mentioned" },
-            summary: { type: "string", description: "A neutral 2-3 sentence summary of what was discussed on the call — the context, what the client needs, and any notable concerns raised. Not a restatement of the extracted fields." },
+            summary: { type: "string", description: "A neutral 2-3 sentence summary of what was discussed on the call. The context, what the client needs, and any notable concerns raised. Not a restatement of the extracted fields." },
             fields: {
               type: "array",
               description: "One entry per requested field key, in the same order given.",
@@ -103,7 +103,7 @@ export async function extractDealFromTranscript(
                   fieldKey: { type: "string", enum: fieldKeys },
                   value: { type: "string", description: "The extracted value, formatted naturally (e.g. fee as '€2,500 / month'). Empty string if not mentioned." },
                   sourceQuote: { type: "string", description: "The exact transcript sentence supporting this value. Empty string if not mentioned." },
-                  confidence: { type: "number", description: "0 to 1 — how directly the transcript states this value." },
+                  confidence: { type: "number", description: "0 to 1. How directly the transcript states this value." },
                 },
                 required: ["fieldKey", "value", "sourceQuote", "confidence"],
               },

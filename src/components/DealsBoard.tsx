@@ -39,7 +39,7 @@ export default function DealsBoard({
   updateStatusAction,
 }: {
   byColumn: Record<string, BoardDeal[]>;
-  updateStatusAction: (dealId: string, status: string) => Promise<void>;
+  updateStatusAction: (dealId: string, status: string) => Promise<{ error?: string }>;
 }) {
   const router = useRouter();
   const [columns, setColumns] = useState(byColumn);
@@ -61,13 +61,13 @@ export default function DealsBoard({
     });
     setError(null);
     startTransition(async () => {
-      try {
-        await updateStatusAction(dealId, targetCol);
-        router.refresh();
-      } catch (err) {
+      const result = await updateStatusAction(dealId, targetCol);
+      if (result.error) {
         setColumns(previous);
-        setError(err instanceof Error ? err.message : "Couldn't move that deal");
+        setError(result.error);
+        return;
       }
+      router.refresh();
     });
   }
 

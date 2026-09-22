@@ -12,7 +12,7 @@ export const STATUS_LABEL: Record<string, string> = {
   ready: "Ready for review",
   pending_approval: "Awaiting approval",
   changes_requested: "Changes requested",
-  sent: "Sent — awaiting signature",
+  sent: "Sent - awaiting signature",
   signed: "Signed",
 };
 
