@@ -133,7 +133,7 @@ export default function TermsPage() {
           </Section>
 
           <Section title="14. Contact">
-            <p>Questions about these Terms can be sent to <span style={{ color: "var(--ink)" }}>legal@accord.example</span>.</p>
+            <p>Questions about these Terms can be sent to <span style={{ color: "var(--ink)" }}>hello@sealme.net</span>.</p>
           </Section>
         </div>
       </main>

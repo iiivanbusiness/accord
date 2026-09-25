@@ -551,3 +551,6 @@ a {
 .gradient-spotlight-violet { background: linear-gradient(155deg, var(--gradient-violet), #4a2fb8); }
 .gradient-spotlight-magenta { background: linear-gradient(155deg, var(--gradient-magenta), #8e2fb8); }
 
+
+/* Sign-in options Apple's guideline 4.8 doesn't allow without Sign in with Apple. */
+[data-desktop] .web-only { display: none !important; }

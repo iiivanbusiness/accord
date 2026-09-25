@@ -41,17 +41,19 @@ export default async function SignupPage({
         )}
 
         <div className="card flex flex-col gap-3 p-6">
-          <form action={continueWithGoogle}>
-            <button type="submit" className="btn btn-secondary w-full justify-center gap-2.5">
-              <GoogleIcon />
-              Continue with Google
-            </button>
-          </form>
+          <div className="web-only contents">
+            <form action={continueWithGoogle}>
+              <button type="submit" className="btn btn-secondary w-full justify-center gap-2.5">
+                <GoogleIcon />
+                Continue with Google
+              </button>
+            </form>
 
-          <div className="my-1 flex items-center gap-3">
-            <div className="h-px flex-1" style={{ background: "var(--hairline)" }} />
-            <span className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>or</span>
-            <div className="h-px flex-1" style={{ background: "var(--hairline)" }} />
+            <div className="my-1 flex items-center gap-3">
+              <div className="h-px flex-1" style={{ background: "var(--hairline)" }} />
+              <span className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>or</span>
+              <div className="h-px flex-1" style={{ background: "var(--hairline)" }} />
+            </div>
           </div>
 
           <form action={signup} className="flex flex-col gap-3">

@@ -51,6 +51,7 @@ const THEME_INIT_SCRIPT = `
     var t = localStorage.getItem("sealme-theme");
     if (t === "dark") document.documentElement.setAttribute("data-theme", "dark");
   } catch (e) {}
+  if ("__TAURI_INTERNALS__" in window) document.documentElement.setAttribute("data-desktop", "");
 `;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
