@@ -17,8 +17,8 @@ export async function POST(req: Request) {
     return new NextResponse(null, { status: 400 });
   }
 
-  const message = typeof body.message === "string" ? body.message.slice(0, 500) : "Unknown browser error";
-  const error = new Error(message);
+  if (typeof body.message !== "string" || !body.message.trim()) return new NextResponse(null, { status: 204 });
+  const error = new Error(body.message.slice(0, 500));
   error.name = "BrowserError";
   if (typeof body.stack === "string") error.stack = body.stack.slice(0, 4000);
   // Route pattern only: strip ids/tokens so they don't end up in the email.

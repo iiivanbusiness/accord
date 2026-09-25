@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { useVisibleInterval } from "@/lib/use-visible-interval";
 import Link from "next/link";
 import DealTermsCard from "./DealTermsCard";
 import ContinueCallButton from "./ContinueCallButton";
@@ -209,7 +210,7 @@ export default function LiveDealView({
   const [actionItems, setActionItems] = useState(initialActionItems);
   const [callHighlights, setCallHighlights] = useState(initialCallHighlights);
   const [contractIsDraft, setContractIsDraft] = useState(initialContractIsDraft);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [live, setLive] = useState(() => isLive(initialStatus, initialCalls));
 
   // ReviewPanel polls its own review state independently (contractStatus/
   // dealStatus), but the call-progress poll above only runs while a call is
@@ -230,8 +231,8 @@ export default function LiveDealView({
     return Boolean(last && !last.endedAt);
   }
 
-  useEffect(() => {
-    async function poll() {
+  useVisibleInterval(
+    async () => {
       const data = await getLiveDealStateAction(dealId);
       if (!data) return;
       setStatus(data.status);
@@ -240,20 +241,11 @@ export default function LiveDealView({
       setCalls(data.calls);
       setActionItems(data.actionItems);
       setCallHighlights(data.callHighlights);
-      if (!isLive(data.status, data.calls) && pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    }
-
-    if (isLive(initialStatus, initialCalls)) {
-      pollRef.current = setInterval(poll, POLL_INTERVAL_MS);
-    }
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dealId]);
+      setLive(isLive(data.status, data.calls));
+    },
+    POLL_INTERVAL_MS,
+    live
+  );
 
   const groups = new Map<string, FieldItem[]>();
   for (const field of fields) {

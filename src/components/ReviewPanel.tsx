@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { useVisibleInterval } from "@/lib/use-visible-interval";
 
 type ChecklistItem = { id: string; label: string; done: boolean };
 type Comment = { id: string; authorName: string; authorEmail: string; body: string; createdAt: string };
@@ -30,7 +31,10 @@ type ReviewState = {
   steps: ReviewStepItem[];
 };
 
-const POLL_INTERVAL_MS = 5000;
+// Faster while someone is actively reviewing, slower otherwise; stops once the
+// contract is signed since nothing can change after that.
+const ACTIVE_REVIEW_POLL_MS = 10000;
+const IDLE_POLL_MS = 30000;
 
 // Same-day: an exact clock time ("4:32 PM") is more useful than a relative
 // "now" once there's more than one timestamp on screen — the whole point of
@@ -313,15 +317,15 @@ export default function ReviewPanel({
   // Picks up a teammate's own decision on their own device without anyone
   // having to reload — this is what makes "did he actually review it yet"
   // a question the panel answers on its own instead of one you have to ask.
+  const hasActiveStep = steps.some((s) => s.status === "pending");
+  useVisibleInterval(refresh, hasActiveStep ? ACTIVE_REVIEW_POLL_MS : IDLE_POLL_MS, contractStatus !== "signed");
+
   useEffect(() => {
-    const interval = setInterval(refresh, POLL_INTERVAL_MS);
     return () => {
-      clearInterval(interval);
       if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
       if (sentTimeoutRef.current) clearTimeout(sentTimeoutRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dealId]);
+  }, []);
 
   const { rows, activeStep, mostRecentDecided } = buildTimeline({
     steps,

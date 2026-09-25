@@ -185,10 +185,29 @@ export default function CompanionPanel({ upcomingEvents, fastPoll = false }: { u
       }
     }
     load();
-    const interval = setInterval(load, fastPoll ? 2000 : 15000);
+    // Pauses while the companion window is hidden; catches up on reopen.
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const start = () => {
+      if (interval === null) interval = setInterval(load, fastPoll ? 2000 : 15000);
+    };
+    const stop = () => {
+      if (interval !== null) clearInterval(interval);
+      interval = null;
+    };
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        stop();
+      } else {
+        load();
+        start();
+      }
+    };
+    if (!document.hidden) start();
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      stop();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [session, fastPoll]);
 

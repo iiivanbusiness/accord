@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useVisibleInterval } from "@/lib/use-visible-interval";
 import { useRouter } from "next/navigation";
 import { getUnreadNotifications, markNotificationRead, markAllNotificationsRead, type NotificationItem } from "@/app/(app)/notifications/actions";
 
@@ -31,18 +32,15 @@ export default function NotificationBell({
   const [items, setItems] = useState(initialItems);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const data = await getUnreadNotifications();
-        setUnreadCount(data.unreadCount);
-        setItems(data.items);
-      } catch {
-        // Best-effort — a failed poll just leaves the last-known state up.
-      }
-    }, 15000);
-    return () => clearInterval(interval);
-  }, []);
+  useVisibleInterval(async () => {
+    try {
+      const data = await getUnreadNotifications();
+      setUnreadCount(data.unreadCount);
+      setItems(data.items);
+    } catch {
+      // Best-effort — a failed poll just leaves the last-known state up.
+    }
+  }, 30000);
 
   useEffect(() => {
     if (!open) return;
