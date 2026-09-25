@@ -4,7 +4,7 @@ export const metadata = {
   title: "Terms of Service - SealMe",
 };
 
-const LAST_UPDATED = "August 19, 2026";
+const LAST_UPDATED = "September 25, 2026";
 
 export default function TermsPage() {
   return (
@@ -19,9 +19,6 @@ export default function TermsPage() {
       </header>
 
       <main className="mx-auto max-w-[820px] px-6 py-16">
-        <div className="chip chip-warn mb-6 w-fit uppercase tracking-wide" style={{ fontSize: "10.5px", fontWeight: 600 }}>
-          Draft. Pending legal review
-        </div>
         <h1 className="mb-2 text-[36px] font-medium" style={{ letterSpacing: "-0.8px", color: "var(--primary)" }}>Terms of Service</h1>
         <p className="mb-12 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>Last updated: {LAST_UPDATED}</p>
 
