@@ -70,9 +70,11 @@ export async function POST(req: Request) {
     // A chunk can be empty on the final call (e.g. the call was stopped in
     // the same instant as the last periodic ping) — nothing new to
     // transcribe, but we still need to run the finalize steps below.
+    let gotNewWords = false;
     if (audioBuffer.length > 0) {
       const chunkTranscript = await transcribeWav(audioBuffer);
-      if (chunkTranscript) {
+      if (chunkTranscript.trim()) {
+        gotNewWords = true;
         await prisma.$executeRaw`UPDATE "Deal" SET "liveTranscript" = COALESCE("liveTranscript", '') || ${`\n${chunkTranscript}`} WHERE id = ${deal.id}`;
         // Same append, scoped to just this call — Deal.liveTranscript stays
         // the input extraction actually reads; Call.transcript exists so the
@@ -80,6 +82,12 @@ export async function POST(req: Request) {
         // without re-splitting one giant string.
         await prisma.$executeRaw`UPDATE "Call" SET "transcript" = "transcript" || ${`\n${chunkTranscript}`} WHERE id = ${record.callId}`;
       }
+    }
+
+    // Mid-call chunks with only silence would re-run the paid extraction on an
+    // unchanged transcript. The final pass always runs: it decides auto-send.
+    if (!isFinal && !gotNewWords) {
+      return NextResponse.json({ ok: true, dealId: deal.id, final: false });
     }
 
     const fresh = await prisma.deal.findUnique({ where: { id: deal.id } });

@@ -60,17 +60,23 @@ export default async function DashboardPage() {
   const staleCutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   const [deals, clientCount, upcomingEvents, renewalsAtRisk, staleDeals] = await Promise.all([
-    prisma.deal.findMany({ where: { workspaceId, ...visibility }, include: { client: true, contract: true }, orderBy: { updatedAt: "desc" } }),
+    // Only the columns this page shows: a full Deal row carries the whole
+    // call transcript, and this runs over every deal on each dashboard load.
+    prisma.deal.findMany({
+      where: { workspaceId, ...visibility },
+      select: { id: true, status: true, service: true, feeDisplay: true, createdAt: true, updatedAt: true, client: { select: { name: true } } },
+      orderBy: { updatedAt: "desc" },
+    }),
     prisma.client.count({ where: { workspaceId } }),
     prisma.calendarEvent.findMany({ where: { workspaceId, startTime: { gte: now } }, orderBy: { startTime: "asc" }, take: 5 }),
     prisma.contract.findMany({
       where: { status: "signed", renewalDate: { gte: now, lte: in90Days }, deal: { workspaceId, ...visibility } },
-      include: { deal: { include: { client: true } } },
+      select: { id: true, dealId: true, autoRenews: true, renewalDate: true, deal: { select: { feeDisplay: true, client: { select: { name: true } } } } },
       orderBy: { renewalDate: "asc" },
     }),
     prisma.deal.findMany({
       where: { workspaceId, status: { in: ["ready", "missing_info"] }, updatedAt: { lte: staleCutoff }, ...visibility },
-      include: { client: true },
+      select: { id: true, status: true, updatedAt: true, client: { select: { name: true } } },
       orderBy: { updatedAt: "asc" },
     }),
   ]);

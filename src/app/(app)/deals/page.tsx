@@ -66,7 +66,16 @@ export default async function DealsPage({
     requireWorkspace(),
     prisma.deal.findMany({
       where: { workspaceId, ...visibility, ...filterWhere, trashedAt: null },
-      include: { client: true, contract: true, owner: true },
+      select: {
+        id: true,
+        service: true,
+        feeDisplay: true,
+        status: true,
+        updatedAt: true,
+        client: { select: { name: true, email: true } },
+        contract: { select: { status: true } },
+        owner: { select: { name: true } },
+      },
       orderBy: { updatedAt: "desc" },
     }),
     canViewAll ? prisma.user.findMany({ where: { workspaceId }, select: { id: true, name: true }, orderBy: { name: "asc" } }) : Promise.resolve([]),

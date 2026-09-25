@@ -35,7 +35,10 @@ const STATUS_LABEL: Record<string, string> = {
 export default async function AnalyticsPage() {
   const workspaceId = await requireWorkspaceId();
   const { where: visibility, canViewAll } = await dealVisibilityFilter();
-  const deals = await prisma.deal.findMany({ where: { workspaceId, ...visibility }, include: { template: true, contract: true } });
+  const deals = await prisma.deal.findMany({
+    where: { workspaceId, ...visibility },
+    select: { status: true, feeDisplay: true, template: { select: { name: true } }, contract: { select: { sentAt: true, signedAt: true } } },
+  });
 
   // Real count straight off the Call table (same visibility scope as
   // everything else on this page) rather than trusting Workspace.callsLimit's

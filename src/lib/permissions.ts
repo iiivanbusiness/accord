@@ -1,7 +1,12 @@
+import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 
 export type Permission = "canManageWorkspace" | "canManageTeam" | "canManageTemplates" | "canApproveTemplates";
+
+// The layout, the page, and dealVisibilityFilter each ask for the current
+// user; cache() makes that one query per request instead of three.
+const findUserWithRole = cache((email: string) => prisma.user.findUnique({ where: { email }, include: { role: true } }));
 
 // Every user has a role since the migration that introduced roles backfilled
 // one onto every existing account — role is only ever actually null in the
@@ -11,7 +16,7 @@ export async function currentUserWithRole() {
   const session = await auth();
   const email = session?.user?.email;
   if (!email) throw new Error("Not signed in");
-  const user = await prisma.user.findUnique({ where: { email }, include: { role: true } });
+  const user = await findUserWithRole(email);
   if (!user) throw new Error("Not signed in");
   return user;
 }
