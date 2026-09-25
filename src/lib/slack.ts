@@ -15,11 +15,12 @@ function redirectUri(): string {
   return `${base}/api/slack/callback`;
 }
 
-export function buildSlackAuthorizeUrl(): string {
+export function buildSlackAuthorizeUrl(state: string): string {
   const params = new URLSearchParams({
     client_id: process.env.SLACK_CLIENT_ID ?? "",
     scope: SCOPES,
     redirect_uri: redirectUri(),
+    state,
   });
   return `https://slack.com/oauth/v2/authorize?${params.toString()}`;
 }

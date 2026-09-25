@@ -1,3 +1,4 @@
+import { cache } from "react";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
@@ -10,6 +11,10 @@ import { createOwnerRole } from "@/lib/permissions";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
 import { verifyTotpCode, consumeBackupCode, type BackupCode } from "@/lib/two-factor";
+
+const findSessionAccount = cache((email: string) =>
+  prisma.user.findUnique({ where: { email }, select: { workspaceId: true, deactivatedAt: true } })
+);
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -123,6 +128,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         await logAudit({ workspaceId: user.workspaceId, actorEmail: email, action: "login.success", metadata: { provider: "google" } });
         token.workspaceId = user.workspaceId;
+      }
+
+      // Deactivation, removal, and self-deletion are otherwise only enforced at
+      // sign-in, and a JWT lives for 30 days. Returning null clears the cookie.
+      if (typeof token.email === "string") {
+        const account = await findSessionAccount(token.email);
+        if (!account || account.deactivatedAt) return null;
+        if (token.workspaceId && token.workspaceId !== account.workspaceId) return null;
       }
 
       return token;

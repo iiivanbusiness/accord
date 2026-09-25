@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
-import { requirePermission } from "@/lib/permissions";
+import { requirePermission, canActOnRole, ROLE_ESCALATION_ERROR } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 
 const PERMISSION_FIELDS = [
@@ -30,12 +30,14 @@ export async function createRole(formData: FormData): Promise<{ error?: string }
   const user = await requirePermission("canManageTeam");
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Role name is required" };
+  const permissions = readPermissions(formData);
+  if (!canActOnRole(user.role, permissions)) return { error: ROLE_ESCALATION_ERROR };
 
   const existing = await prisma.role.findFirst({ where: { workspaceId: user.workspaceId, name } });
   if (existing) return { error: "A role with that name already exists" };
 
   await prisma.role.create({
-    data: { workspaceId: user.workspaceId, name, ...readPermissions(formData) },
+    data: { workspaceId: user.workspaceId, name, ...permissions },
   });
 
   const session = await auth();
@@ -53,6 +55,7 @@ export async function updateRole(roleId: string, formData: FormData): Promise<{ 
   const user = await requirePermission("canManageTeam");
   const role = await prisma.role.findFirst({ where: { id: roleId, workspaceId: user.workspaceId } });
   if (!role) return { error: "Role not found" };
+  if (!canActOnRole(user.role, role)) return { error: ROLE_ESCALATION_ERROR };
 
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Role name is required" };
@@ -64,6 +67,7 @@ export async function updateRole(roleId: string, formData: FormData): Promise<{ 
   }
 
   const permissions = readPermissions(formData);
+  if (!canActOnRole(user.role, permissions)) return { error: ROLE_ESCALATION_ERROR };
 
   // If this role currently holds canManageTeam and is about to lose it,
   // make sure some other role in the workspace still grants it — otherwise
@@ -91,6 +95,7 @@ export async function deleteRole(roleId: string): Promise<{ error?: string }> {
   const role = await prisma.role.findFirst({ where: { id: roleId, workspaceId: user.workspaceId }, include: { _count: { select: { users: true } } } });
   if (!role) return { error: "Role not found" };
   if (role.isOwner) return { error: "The Owner role can't be deleted" };
+  if (!canActOnRole(user.role, role)) return { error: ROLE_ESCALATION_ERROR };
   if (role._count.users > 0) return { error: `Reassign ${role._count.users} teammate(s) off this role before deleting it` };
 
   await prisma.role.delete({ where: { id: roleId } });
@@ -112,6 +117,7 @@ export async function assignUserRole(userId: string, formData: FormData): Promis
   ]);
   if (!targetUser) return { error: "Teammate not found" };
   if (!newRole) return { error: "Role not found" };
+  if (!canActOnRole(user.role, targetUser.role) || !canActOnRole(user.role, newRole)) return { error: ROLE_ESCALATION_ERROR };
 
   // Never let a reassignment leave the workspace with nobody who can manage
   // the team — that would be a permanent lockout with no way back in short

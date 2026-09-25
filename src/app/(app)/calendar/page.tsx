@@ -22,6 +22,7 @@ const ERROR_MESSAGE: Record<string, string> = {
   google_not_configured: "Google Calendar isn't set up yet. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env first.",
   google_no_code: "Google didn't return an authorization code. Try connecting again.",
   google_token_exchange: "Couldn't complete the connection with Google. Try again.",
+  google_invalid_state: "That connection link expired or came from somewhere else. Click Connect again.",
   google_sync_failed: "Couldn't sync your calendar. Your connection may have expired. Try reconnecting.",
   google_access_denied: "Access was declined on Google's side, so nothing was connected.",
 };

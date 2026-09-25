@@ -5,6 +5,7 @@ import { requireWorkspaceId } from "@/lib/workspace";
 import { requirePermission } from "@/lib/permissions";
 import { auth } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { isValidOAuthState } from "@/lib/oauth-state";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -17,6 +18,9 @@ export async function GET(req: Request) {
   try {
     await requirePermission("canManageWorkspace");
     const workspaceId = await requireWorkspaceId();
+    if (!(await isValidOAuthState("slack", url.searchParams.get("state"), workspaceId))) {
+      return NextResponse.redirect(new URL("/settings?error=slack_invalid_state", req.url));
+    }
     const { accessToken, teamId, teamName } = await exchangeSlackCode(code);
 
     await prisma.workspace.update({

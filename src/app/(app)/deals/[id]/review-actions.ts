@@ -131,8 +131,15 @@ export async function sendForReviewTo(dealId: string, assigneeId: string): Promi
   });
   if (!deal || !deal.contract) return { error: "Generate a contract for this deal first" };
 
-  const assignee = await prisma.user.findFirst({ where: { id: assigneeId, workspaceId } });
+  const assignee = await prisma.user.findFirst({ where: { id: assigneeId, workspaceId, deactivatedAt: null } });
   if (!assignee) return { error: "Teammate not found" };
+
+  // Otherwise anyone could route a required approval (e.g. Legal) to
+  // themselves, approve it, and send the contract.
+  const caller = await currentUserWithRole();
+  if (assigneeId === caller.id && !caller.role?.canManageWorkspace) {
+    return { error: "You can't send a review to yourself. Pick a teammate" };
+  }
 
   const activeStep = await prisma.reviewStep.findFirst({ where: { contractId: deal.contract.id, status: "pending" }, orderBy: { order: "asc" } });
   const startingFreshChain = !activeStep && deal.contract.status !== "sent" && deal.contract.status !== "signed";
@@ -173,8 +180,7 @@ export async function sendForReviewTo(dealId: string, assigneeId: string): Promi
     }
   }
 
-  const session = await currentUserWithRole();
-  await logAudit({ workspaceId, actorEmail: session.email, action: "contract.sent_for_review", targetType: "Deal", targetId: dealId, metadata: { assignee: assignee.name } });
+  await logAudit({ workspaceId, actorEmail: caller.email, action: "contract.sent_for_review", targetType: "Deal", targetId: dealId, metadata: { assignee: assignee.name } });
 
   await notifyStepAssignee(dealId, stepId);
 

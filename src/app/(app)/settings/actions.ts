@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { requireWorkspace } from "@/lib/workspace";
-import { requirePermission } from "@/lib/permissions";
+import { requirePermission, canActOnRole, ROLE_ESCALATION_ERROR } from "@/lib/permissions";
 import { createSenderDomain, getSenderDomainStatus, removeSenderDomain } from "@/lib/sender-domain";
 import { sendTeammateInviteEmail, sendVerificationEmail } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -158,14 +158,22 @@ export async function inviteTeammate(formData: FormData): Promise<{ error: strin
 }
 
 export async function removeTeammate(userId: string) {
-  await requirePermission("canManageTeam");
+  const actor = await requirePermission("canManageTeam");
   const workspace = await requireWorkspace();
   const session = await auth();
 
   const count = await prisma.user.count({ where: { workspaceId: workspace.id } });
   if (count <= 1) throw new Error("Can't remove the only member of a workspace");
 
-  const removed = await prisma.user.findFirst({ where: { id: userId, workspaceId: workspace.id } });
+  const removed = await prisma.user.findFirst({ where: { id: userId, workspaceId: workspace.id }, include: { role: true } });
+  if (!removed) throw new Error("Teammate not found");
+  if (!canActOnRole(actor.role, removed.role)) throw new Error(ROLE_ESCALATION_ERROR);
+  if (removed.role?.canManageTeam) {
+    const otherTeamManagers = await prisma.user.count({
+      where: { workspaceId: workspace.id, id: { not: userId }, deactivatedAt: null, role: { canManageTeam: true } },
+    });
+    if (otherTeamManagers === 0) throw new Error("This is the only teammate who can manage the team. Give someone else that access first");
+  }
   await prisma.user.deleteMany({ where: { id: userId, workspaceId: workspace.id } });
   await logAudit({
     workspaceId: workspace.id,

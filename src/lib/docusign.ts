@@ -26,12 +26,13 @@ function redirectUri(): string {
   return `${base}/api/docusign/callback`;
 }
 
-export function buildDocusignAuthorizeUrl(): string {
+export function buildDocusignAuthorizeUrl(state: string): string {
   const params = new URLSearchParams({
     response_type: "code",
     scope: "signature",
     client_id: process.env.DOCUSIGN_CLIENT_ID ?? "",
     redirect_uri: redirectUri(),
+    state,
   });
   return `${authBaseUrl()}/oauth/auth?${params.toString()}`;
 }

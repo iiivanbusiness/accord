@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { requirePermission } from "@/lib/permissions";
+import { requireWorkspaceId } from "@/lib/workspace";
+import { signOAuthState } from "@/lib/oauth-state";
 import { buildSlackAuthorizeUrl, isSlackConfigured } from "@/lib/slack";
 
 export async function GET(req: Request) {
@@ -14,5 +16,6 @@ export async function GET(req: Request) {
   }
 
   if (!isSlackConfigured()) return NextResponse.redirect(new URL("/settings?error=slack_not_configured", req.url));
-  return NextResponse.redirect(buildSlackAuthorizeUrl());
+  const workspaceId = await requireWorkspaceId();
+  return NextResponse.redirect(buildSlackAuthorizeUrl(await signOAuthState("slack", workspaceId)));
 }

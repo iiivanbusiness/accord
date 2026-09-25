@@ -62,7 +62,15 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
       },
     }),
     requireWorkspace(),
-    prisma.user.findMany({ where: { workspaceId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.user.findMany({
+      where: {
+        workspaceId,
+        deactivatedAt: null,
+        ...(currentUser.role?.canManageWorkspace ? {} : { id: { not: currentUser.id } }),
+      },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
     prisma.approvalDelegate.findMany({
       where: { toUserId: currentUser.id, startsAt: { lte: new Date() }, OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }] },
     }),

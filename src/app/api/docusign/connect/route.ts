@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { requirePermission } from "@/lib/permissions";
+import { requireWorkspaceId } from "@/lib/workspace";
+import { signOAuthState } from "@/lib/oauth-state";
 import { buildDocusignAuthorizeUrl, isDocusignConfigured } from "@/lib/docusign";
 
 export async function GET(req: Request) {
@@ -14,5 +16,6 @@ export async function GET(req: Request) {
   }
 
   if (!isDocusignConfigured()) return NextResponse.redirect(new URL("/settings?error=docusign_not_configured", req.url));
-  return NextResponse.redirect(buildDocusignAuthorizeUrl());
+  const workspaceId = await requireWorkspaceId();
+  return NextResponse.redirect(buildDocusignAuthorizeUrl(await signOAuthState("docusign", workspaceId)));
 }

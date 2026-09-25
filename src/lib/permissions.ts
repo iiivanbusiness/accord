@@ -16,6 +16,20 @@ export async function currentUserWithRole() {
   return user;
 }
 
+const ROLE_PERMISSIONS = ["canManageWorkspace", "canManageTeam", "canManageTemplates", "canApproveTemplates", "canViewAllDeals"] as const;
+type RolePermissions = Partial<Record<(typeof ROLE_PERMISSIONS)[number], boolean>> & { isOwner?: boolean };
+
+// canManageTeam alone must not be a path to admin: whoever creates, edits,
+// assigns, or removes a role may only touch access they hold themselves, and
+// only an Owner can act on the Owner role.
+export function canActOnRole(actorRole: RolePermissions | null | undefined, targetRole: RolePermissions | null | undefined): boolean {
+  if (!targetRole) return true;
+  if (targetRole.isOwner && !actorRole?.isOwner) return false;
+  return ROLE_PERMISSIONS.every((p) => !targetRole[p] || Boolean(actorRole?.[p]));
+}
+
+export const ROLE_ESCALATION_ERROR = "You can't grant, change, or remove access you don't have yourself";
+
 export async function requirePermission(permission: Permission) {
   const user = await currentUserWithRole();
   if (!user.role?.[permission]) throw new Error("You don't have permission to do that");

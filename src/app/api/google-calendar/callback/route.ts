@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { exchangeCodeForTokens, getUserEmail } from "@/lib/google-calendar";
 import { requireWorkspaceId } from "@/lib/workspace";
+import { isValidOAuthState } from "@/lib/oauth-state";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -16,10 +17,13 @@ export async function GET(req: Request) {
   }
 
   try {
+    const workspaceId = await requireWorkspaceId();
+    if (!(await isValidOAuthState("google-calendar", url.searchParams.get("state"), workspaceId))) {
+      return NextResponse.redirect(new URL("/calendar?error=google_invalid_state", req.url));
+    }
     const tokens = await exchangeCodeForTokens(code);
     const email = await getUserEmail(tokens.access_token);
 
-    const workspaceId = await requireWorkspaceId();
     const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
     if (!workspace) throw new Error("No workspace found");
 
