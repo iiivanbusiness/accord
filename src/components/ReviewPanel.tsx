@@ -191,6 +191,7 @@ export default function ReviewPanel({
   teammates,
   currentUserId,
   currentUserEmail,
+  currentUserName,
   delegatedAssigneeIds,
   currentUserCanManageWorkspace,
   getReviewStateAction,
@@ -215,6 +216,7 @@ export default function ReviewPanel({
   teammates: TeammateOption[];
   currentUserId: string;
   currentUserEmail: string;
+  currentUserName: string;
   delegatedAssigneeIds: string[];
   currentUserCanManageWorkspace: boolean;
   getReviewStateAction: (dealId: string) => Promise<ReviewState | null>;
@@ -404,12 +406,34 @@ export default function ReviewPanel({
     );
   }
 
+  // Comments show (or disappear) immediately; refresh() then swaps in the
+  // server's version, which also undoes the change if the save failed.
   function addComment() {
-    if (!activeStep || !commentDraft.trim()) return;
-    run(
-      () => addCommentAction(dealId, activeStep.id, commentDraft.trim()),
-      () => setCommentDraft("")
-    );
+    const body = commentDraft.trim();
+    if (!activeStep || !body) return;
+    const stepId = activeStep.id;
+    const pending: Comment = { id: `pending-${Date.now()}`, authorName: currentUserName, authorEmail: currentUserEmail, body, createdAt: new Date().toISOString() };
+    setError(null);
+    setCommentDraft("");
+    setSteps((prev) => prev.map((s) => (s.id === stepId ? { ...s, comments: [...s.comments, pending] } : s)));
+    startTransition(async () => {
+      const result = await addCommentAction(dealId, stepId, body);
+      if (result.error) {
+        setError(result.error);
+        setCommentDraft(body);
+      }
+      await refresh();
+    });
+  }
+
+  function deleteComment(commentId: string) {
+    setError(null);
+    setSteps((prev) => prev.map((s) => ({ ...s, comments: s.comments.filter((c) => c.id !== commentId) })));
+    startTransition(async () => {
+      const result = await deleteCommentAction(dealId, commentId);
+      if (result.error) setError(result.error);
+      await refresh();
+    });
   }
 
   function updatePriority(value: string) {
@@ -569,13 +593,17 @@ export default function ReviewPanel({
 
                     <div className="flex flex-col gap-2">
                       {activeStep!.comments.map((c) => (
-                        <div key={c.id} className="rounded-[8px] px-2.5 py-2" style={{ background: "var(--surface-1)" }}>
+                        <div
+                          key={c.id}
+                          className="rounded-[8px] px-2.5 py-2"
+                          style={{ background: "var(--surface-1)", opacity: c.id.startsWith("pending-") ? 0.6 : 1, transition: "opacity 0.2s ease-out" }}
+                        >
                           <div className="mb-0.5 flex items-center justify-between gap-2">
                             <span className="text-[12px] font-medium">{c.authorName}</span>
                             <div className="flex items-center gap-2">
-                              <span className="text-[10.5px]" style={{ color: "var(--ink-muted)" }}>{timeAgo(c.createdAt)}</span>
-                              {c.authorEmail === currentUserEmail && (
-                                <button type="button" disabled={isPending} onClick={() => run(() => deleteCommentAction(dealId, c.id))} className="text-[10.5px]" style={{ color: "var(--ink-muted)" }}>
+                              <span className="text-[10.5px]" style={{ color: "var(--ink-muted)" }}>{c.id.startsWith("pending-") ? "Saving…" : timeAgo(c.createdAt)}</span>
+                              {c.authorEmail === currentUserEmail && !c.id.startsWith("pending-") && (
+                                <button type="button" onClick={() => deleteComment(c.id)} className="text-[10.5px]" style={{ color: "var(--ink-muted)" }}>
                                   Delete
                                 </button>
                               )}
@@ -591,11 +619,10 @@ export default function ReviewPanel({
                         onChange={(e) => setCommentDraft(e.target.value)}
                         placeholder="Leave a comment…"
                         rows={2}
-                        disabled={isPending}
                         className="input flex-1"
                         style={{ fontSize: "12.5px", padding: "6px 9px" }}
                       />
-                      <button type="button" disabled={isPending || !commentDraft.trim()} onClick={addComment} className="btn btn-secondary btn-sm self-end">
+                      <button type="button" disabled={!commentDraft.trim()} onClick={addComment} className="btn btn-secondary btn-sm self-end">
                         Post
                       </button>
                     </div>

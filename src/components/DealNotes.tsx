@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useOptimistic, useState, useTransition } from "react";
 
-type Note = { id: string; authorName: string; authorEmail: string; body: string; createdAt: string };
+type Note = { id: string; authorName: string; authorEmail: string; body: string; createdAt: string; saving?: boolean };
+type OptimisticChange = { type: "add"; note: Note } | { type: "delete"; noteId: string };
 
 function timeAgo(iso: string): string {
   const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -22,43 +22,50 @@ export default function DealNotes({
   dealId,
   notes,
   currentUserEmail,
+  currentUserName,
   addAction,
   deleteAction,
 }: {
   dealId: string;
   notes: Note[];
   currentUserEmail: string;
+  currentUserName: string;
   addAction: (dealId: string, body: string) => Promise<{ error?: string }>;
   deleteAction: (dealId: string, noteId: string) => Promise<{ error?: string }>;
 }) {
-  const router = useRouter();
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
+  // Shown immediately; once the action's revalidation delivers the real
+  // `notes`, React swaps these for them, and drops them if the save failed.
+  const [visibleNotes, applyOptimistic] = useOptimistic(notes, (state: Note[], change: OptimisticChange) =>
+    change.type === "add" ? [change.note, ...state] : state.filter((n) => n.id !== change.noteId)
+  );
 
   function handleAdd() {
     const body = draft.trim();
     if (!body) return;
     setError(null);
+    setDraft("");
     startTransition(async () => {
+      applyOptimistic({
+        type: "add",
+        note: { id: `pending-${Date.now()}`, authorName: currentUserName, authorEmail: currentUserEmail, body, createdAt: new Date().toISOString(), saving: true },
+      });
       const result = await addAction(dealId, body);
       if (result.error) {
         setError(result.error);
-        return;
+        setDraft(body);
       }
-      setDraft("");
-      router.refresh();
     });
   }
 
   function handleDelete(noteId: string) {
+    setError(null);
     startTransition(async () => {
+      applyOptimistic({ type: "delete", noteId });
       const result = await deleteAction(dealId, noteId);
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      router.refresh();
+      if (result.error) setError(result.error);
     });
   }
 
@@ -75,21 +82,24 @@ export default function DealNotes({
       )}
 
       <div className="flex flex-col gap-3">
-        {notes.length === 0 && (
+        {visibleNotes.length === 0 && (
           <p className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
             No notes yet. Leave context here for the team, not visible to the client.
           </p>
         )}
-        {notes.map((note) => (
-          <div key={note.id} className="border-b pb-3 last:border-b-0 last:pb-0" style={{ borderColor: "var(--hairline-soft)" }}>
+        {visibleNotes.map((note) => (
+          <div
+            key={note.id}
+            className="border-b pb-3 last:border-b-0 last:pb-0"
+            style={{ borderColor: "var(--hairline-soft)", opacity: note.saving ? 0.6 : 1, transition: "opacity 0.2s ease-out" }}
+          >
             <div className="mb-1 flex items-center justify-between gap-2">
               <span className="text-[12.5px] font-medium">{note.authorName}</span>
               <div className="flex items-center gap-2">
-                <span className="text-[11px]" style={{ color: "var(--ink-muted)" }}>{timeAgo(note.createdAt)}</span>
-                {note.authorEmail === currentUserEmail && (
+                <span className="text-[11px]" style={{ color: "var(--ink-muted)" }}>{note.saving ? "Saving…" : timeAgo(note.createdAt)}</span>
+                {note.authorEmail === currentUserEmail && !note.saving && (
                   <button
                     type="button"
-                    disabled={isPending}
                     onClick={() => handleDelete(note.id)}
                     className="text-[11px] font-medium"
                     style={{ color: "var(--ink-muted)" }}
@@ -115,11 +125,11 @@ export default function DealNotes({
         />
         <button
           type="button"
-          disabled={isPending || !draft.trim()}
+          disabled={!draft.trim()}
           onClick={handleAdd}
           className="btn btn-secondary btn-sm self-end"
         >
-          {isPending ? "Adding…" : "Add note"}
+          Add note
         </button>
       </div>
     </div>

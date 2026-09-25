@@ -116,6 +116,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
       toggleActionItemAction={toggleActionItem}
       notes={deal.notes.map((n) => ({ id: n.id, authorName: n.authorName, authorEmail: n.authorEmail, body: n.body, createdAt: n.createdAt.toISOString() }))}
       currentUserEmail={currentUser.email}
+      currentUserName={currentUser.name}
       addNoteAction={addDealNote}
       deleteNoteAction={deleteDealNote}
       applyVoiceFieldCorrectionAction={applyVoiceFieldCorrection}

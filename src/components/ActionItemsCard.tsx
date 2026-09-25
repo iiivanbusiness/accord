@@ -30,21 +30,39 @@ export default function ActionItemsCard({
 }) {
   const [error, setError] = useState<string | null>(null);
   const [openQuote, setOpenQuote] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
+
+  // The parent only refreshes `items` from its live-call poll, so after a
+  // toggle this card is the source of truth; new items from a poll still
+  // replace it. Toggles show instantly and flip back if the save fails.
+  const [localItems, setLocalItems] = useState(items);
+  const [syncedItems, setSyncedItems] = useState(items);
+  if (items !== syncedItems) {
+    setSyncedItems(items);
+    setLocalItems(items);
+  }
+
+  function flip(itemId: string) {
+    setLocalItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, status: i.status === "done" ? "open" : "done" } : i)));
+  }
 
   function toggle(itemId: string) {
     setError(null);
+    flip(itemId);
     startTransition(async () => {
       const result = await toggleAction(dealId, itemId);
-      if (result.error) setError(result.error);
+      if (result.error) {
+        flip(itemId);
+        setError(result.error);
+      }
     });
   }
 
-  const open = items.filter((i) => i.status !== "done");
-  const doneItems = items.filter((i) => i.status === "done");
+  const open = localItems.filter((i) => i.status !== "done");
+  const doneItems = localItems.filter((i) => i.status === "done");
   const ordered = [...open, ...doneItems];
 
-  if (items.length === 0) return null;
+  if (localItems.length === 0) return null;
 
   return (
     <div className="card">
@@ -68,7 +86,6 @@ export default function ActionItemsCard({
               <div className="flex items-start gap-3">
                 <button
                   type="button"
-                  disabled={isPending}
                   onClick={() => toggle(item.id)}
                   className="mt-0.5 flex h-[18px] w-[18px] flex-none items-center justify-center rounded-[5px] text-[11px]"
                   style={{

@@ -137,6 +137,7 @@ export default function LiveDealView({
   toggleActionItemAction,
   notes,
   currentUserEmail,
+  currentUserName,
   addNoteAction,
   deleteNoteAction,
   applyVoiceFieldCorrectionAction,
@@ -168,6 +169,7 @@ export default function LiveDealView({
   toggleActionItemAction: (dealId: string, itemId: string) => Promise<{ error?: string }>;
   notes: NoteItem[];
   currentUserEmail: string;
+  currentUserName: string;
   addNoteAction: (dealId: string, body: string) => Promise<{ error?: string }>;
   deleteNoteAction: (dealId: string, noteId: string) => Promise<{ error?: string }>;
   applyVoiceFieldCorrectionAction: (dealId: string, fieldKey: string, newValue: string) => Promise<void>;
@@ -335,6 +337,7 @@ export default function LiveDealView({
             dealId={dealId}
             notes={notes}
             currentUserEmail={currentUserEmail}
+            currentUserName={currentUserName}
             addAction={addNoteAction}
             deleteAction={deleteNoteAction}
           />
@@ -360,6 +363,7 @@ export default function LiveDealView({
               teammates={reviewPanel.teammates}
               currentUserId={reviewPanel.currentUserId}
               currentUserEmail={currentUserEmail}
+              currentUserName={currentUserName}
               delegatedAssigneeIds={reviewPanel.delegatedAssigneeIds}
               currentUserCanManageWorkspace={reviewPanel.currentUserCanManageWorkspace}
               getReviewStateAction={reviewPanel.getReviewStateAction}
