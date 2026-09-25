@@ -8,9 +8,9 @@ import { extractPlaceholderKeys } from "@/lib/contract";
 import { autoGenerateAndSendContract } from "@/lib/auto-send";
 import { extractActionItems } from "@/lib/extract-action-items";
 import { extractCallHighlights } from "@/lib/extract-call-highlights";
-import { sendAdminAlertEmail } from "@/lib/email";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { reportError } from "@/lib/error-report";
 
 export const runtime = "nodejs";
 
@@ -90,11 +90,13 @@ export async function POST(req: Request) {
         await extractActionItems(record.callId);
       } catch (err) {
         console.error(`Failed to extract action items for call ${record.callId}`, err);
+        await reportError(err, "Action item extraction", { dealId: deal.id, callId: record.callId });
       }
       try {
         await extractCallHighlights(deal.id, fresh?.liveTranscript ?? "", record.callId);
       } catch (err) {
         console.error(`Failed to extract call highlights for call ${record.callId}`, err);
+        await reportError(err, "Call highlight extraction", { dealId: deal.id, callId: record.callId });
       }
       if (!hasMissing && !deal.workspace.requireApproval) {
         await autoGenerateAndSendContract(deal.id);
@@ -112,6 +114,7 @@ export async function POST(req: Request) {
   } catch (err) {
     console.error(`Local capture transcription failed for deal ${deal.id} (final=${isFinal})`, err);
     if (!isFinal) {
+      await reportError(err, "Local capture chunk (mid-call)", { workspace: deal.workspace.name, dealId: deal.id });
       // Soft-fail mid-call, same as the Recall realtime webhook — one bad
       // chunk shouldn't derail a deal that's still being recorded.
       return NextResponse.json({ ok: false }, { status: 200 });
@@ -119,14 +122,7 @@ export async function POST(req: Request) {
     if (deal.status !== "sent" && deal.status !== "signed") {
       await prisma.deal.update({ where: { id: deal.id }, data: { status: "extraction_failed" } });
     }
-    try {
-      await sendAdminAlertEmail({
-        subject: "Local capture transcription failed",
-        details: `Workspace: ${deal.workspace.name} (${deal.workspaceId})\nDeal: ${deal.id}\n\n${err instanceof Error ? err.stack ?? err.message : String(err)}`,
-      });
-    } catch (alertErr) {
-      console.error("Failed to send admin alert email", alertErr);
-    }
+    await reportError(err, "Local capture transcription (final)", { workspace: `${deal.workspace.name} (${deal.workspaceId})`, dealId: deal.id });
     return NextResponse.json({ error: "Transcription failed" }, { status: 500 });
   }
 }

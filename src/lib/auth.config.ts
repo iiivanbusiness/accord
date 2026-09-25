@@ -34,7 +34,8 @@ export const authConfig = {
         request.nextUrl.pathname.startsWith("/api/docusign/webhook") ||
         request.nextUrl.pathname.startsWith("/terms") ||
         request.nextUrl.pathname.startsWith("/privacy") ||
-        request.nextUrl.pathname.startsWith("/support");
+        request.nextUrl.pathname.startsWith("/support") ||
+        request.nextUrl.pathname.startsWith("/api/client-error");
       if (isPublic) return true;
       return !!auth?.user;
     },

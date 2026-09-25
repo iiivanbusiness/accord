@@ -12,6 +12,7 @@ import { logAudit } from "@/lib/audit";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import { currentUserWithRole } from "@/lib/permissions";
 import { randomBytes } from "crypto";
+import { reportError } from "@/lib/error-report";
 
 export type LiveDealState = {
   status: string;
@@ -86,7 +87,8 @@ export async function retryExtraction(dealId: string) {
   try {
     const placeholderKeys = extractPlaceholderKeys(deal.template.clauses);
     await applyExtractionToDeal(dealId, deal.liveTranscript ?? "", placeholderKeys);
-  } catch {
+  } catch (err) {
+    await reportError(err, "Retry extraction", { dealId });
     await prisma.deal.update({ where: { id: dealId }, data: { status: "extraction_failed" } });
   }
 

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import { generateCallRecapScript, synthesizeSpeech, isFishAudioConfigured } from "@/lib/call-recap";
+import { reportError } from "@/lib/error-report";
 
 // Played once, right when a locally-recorded call is stopped (see
 // LocalCaptureBanner) — a spoken recap of what the call produced. This is a
@@ -33,6 +34,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     });
   } catch (err) {
     console.error(`Call recap generation failed for deal ${id}`, err);
+    await reportError(err, "Call recap generation", { dealId: id });
     return new NextResponse(null, { status: 204 });
   }
 }

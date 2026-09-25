@@ -13,6 +13,7 @@ import { dispatchWebhookEvent } from "@/lib/webhooks";
 import { notifySlack } from "@/lib/slack";
 import { syncDealToHubspot } from "@/lib/hubspot";
 import { syncDealToSalesforce } from "@/lib/salesforce";
+import { reportError } from "@/lib/error-report";
 
 export async function createDeal(formData: FormData) {
   const clientName = String(formData.get("clientName") ?? "").trim();
@@ -85,7 +86,8 @@ export async function createDealFromTranscript(formData: FormData) {
   let extracted;
   try {
     extracted = await extractDealFromTranscript(transcript, placeholderKeys);
-  } catch {
+  } catch (err) {
+    await reportError(err, "Deal extraction from pasted transcript", { workspaceId });
     redirect(`/deals/new?error=${encodeURIComponent("Couldn't extract deal terms from that transcript. Try again or enter it manually.")}`);
   }
 
@@ -127,11 +129,13 @@ export async function createDealFromTranscript(formData: FormData) {
     await extractActionItems(deal.calls[0].id);
   } catch (err) {
     console.error(`Failed to extract action items for deal ${deal.id}`, err);
+    await reportError(err, "Action item extraction", { dealId: deal.id });
   }
   try {
     await extractCallHighlights(deal.id, transcript, deal.calls[0].id);
   } catch (err) {
     console.error(`Failed to extract call highlights for deal ${deal.id}`, err);
+    await reportError(err, "Call highlight extraction", { dealId: deal.id });
   }
 
   await dispatchWebhookEvent(workspaceId, "deal.created", { dealId: deal.id, clientName: extracted.clientName, service, feeDisplay: fee, status: deal.status });
