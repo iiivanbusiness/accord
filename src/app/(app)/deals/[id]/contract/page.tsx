@@ -7,7 +7,7 @@ import { currentUserWithRole } from "@/lib/permissions";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import DownloadContractButton from "@/components/DownloadContractButton";
 import AuditTrailButton from "@/components/AuditTrailButton";
-import { startRenewal } from "../actions";
+import { startRenewal, updateFieldValues } from "../actions";
 
 function daysUntil(date: Date): number {
   return Math.ceil((date.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
@@ -24,8 +24,15 @@ function timeAgo(date: Date): string {
   return `${days}d ago`;
 }
 
-export default async function ContractPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ContractPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ updated?: string }>;
+}) {
   const { id } = await params;
+  const { updated } = await searchParams;
   const workspaceId = await requireWorkspaceId();
   const currentUser = await currentUserWithRole();
   const { where: visibility } = await dealVisibilityFilter(currentUser);
@@ -47,6 +54,14 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
 
   const clauses = fillClauses(deal.template.clauses, deal.fields);
   const canResend = deal.contract.status === "draft" || deal.contract.status === "changes_requested";
+  // Which deal fields each clause pulls in (e.g. "Fees & Payment" -> {fee}),
+  // so a client's change request can be answered right under the comment.
+  const fieldsByClause = new Map<string, typeof deal.fields>();
+  for (const raw of JSON.parse(deal.template.clauses) as { title: string; body: string }[]) {
+    const keys = new Set([...raw.body.matchAll(/\{(\w+)\}/g)].map((m) => m[1]));
+    fieldsByClause.set(raw.title, deal.fields.filter((f) => keys.has(f.fieldKey) && f.status !== "missing"));
+  }
+  const updateClauseFields = updateFieldValues.bind(null, deal.id);
   const commentsByClause = new Map<string, typeof deal.contract.clauseComments>();
   for (const comment of deal.contract.clauseComments) {
     if (!commentsByClause.has(comment.clauseTitle)) commentsByClause.set(comment.clauseTitle, []);
@@ -91,8 +106,8 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
     )}
     {deal.contract.status === "changes_requested" && (
       <div className="mb-[18px] flex flex-wrap items-center gap-3">
-        <div className="chip chip-warn px-4 py-3 text-[13.5px]">
-          Changes requested. Make edits, then send again
+        <div className={`chip ${updated ? "chip-success" : "chip-warn"} px-4 py-3 text-[13.5px]`}>
+          {updated ? "Contract updated. Click Send again so the client gets this version" : "Changes requested. Update the terms below each comment, then send again"}
         </div>
       </div>
     )}
@@ -127,6 +142,26 @@ export default async function ContractPage({ params }: { params: Promise<{ id: s
                 <span className="font-medium">{comment.fromName}:</span> {comment.comment}
               </div>
             ))}
+            {canResend && commentsByClause.has(clause.title) && (
+              (fieldsByClause.get(clause.title)?.length ?? 0) > 0 ? (
+                <form action={updateClauseFields} className="mt-2 flex flex-col gap-2 rounded-[8px] p-3" style={{ border: "1px solid var(--hairline)" }}>
+                  <input type="hidden" name="returnTo" value="contract" />
+                  {fieldsByClause.get(clause.title)!.map((field) => (
+                    <label key={field.id} className="flex flex-col gap-1">
+                      <span className="text-[12px]" style={{ color: "var(--ink-muted)" }}>{field.label}</span>
+                      <input name={field.id} defaultValue={field.value ?? ""} className="input" style={{ fontSize: "13px", padding: "8px 11px" }} />
+                    </label>
+                  ))}
+                  <button type="submit" className="btn btn-primary btn-sm self-start">
+                    Update contract
+                  </button>
+                </form>
+              ) : (
+                <p className="mt-2 text-[12px]" style={{ color: "var(--ink-muted)" }}>
+                  This clause is fixed template wording. Change it in the template, or reply to the client and send again as is.
+                </p>
+              )
+            )}
           </div>
         ))}
       </div>

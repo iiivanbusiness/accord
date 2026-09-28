@@ -189,6 +189,8 @@ export async function updateFieldValues(dealId: string, formData: FormData) {
   const editableFields = deal.fields.filter((f) => f.status !== "missing");
   const changed: { fieldKey: string; value: string }[] = [];
   for (const field of editableFields) {
+    // The contract page edits only one clause's fields; absent ones stay as-is.
+    if (!formData.has(field.id)) continue;
     const value = String(formData.get(field.id) ?? "").trim();
     if (value === field.value) continue;
     if (field.value) {
@@ -204,6 +206,10 @@ export async function updateFieldValues(dealId: string, formData: FormData) {
   }
   await syncCoreDealFields(dealId, deal.clientId, changed);
 
+  if (formData.get("returnTo") === "contract") {
+    revalidatePath(`/deals/${dealId}`);
+    redirect(`/deals/${dealId}/contract?updated=1`);
+  }
   redirect(`/deals/${dealId}`);
 }
 

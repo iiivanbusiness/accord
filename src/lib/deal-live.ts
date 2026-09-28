@@ -11,9 +11,15 @@ export async function applyExtractionToDeal(
   placeholderKeys: string[],
   callId?: string
 ): Promise<{ hasMissing: boolean }> {
-  const deal = await prisma.deal.findUnique({ where: { id: dealId } });
+  const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { contract: { select: { status: true } } } });
   if (!deal) throw new Error("Deal not found");
   if (deal.status === "sent" || deal.status === "signed") return { hasMissing: false };
+  // Once an approver or the client is looking at the contract, a call that's
+  // still recording must not rewrite the terms under them. After the client
+  // asks for changes, a continued call may update terms, but the deal stays
+  // "changes_requested" until the rep sends it again.
+  const contractStatus = deal.contract?.status;
+  if (contractStatus && contractStatus !== "draft" && contractStatus !== "changes_requested") return { hasMissing: false };
 
   const extracted = await extractDealFromTranscript(transcript, placeholderKeys, deal.lastExtractedTranscript);
   const { fieldRows, service, fee } = buildDealFieldRows(extracted, placeholderKeys);
@@ -75,7 +81,7 @@ export async function applyExtractionToDeal(
     data: {
       service: locked("service") ? deal.service : service || deal.service,
       feeDisplay: locked("fee") ? deal.feeDisplay : fee || deal.feeDisplay,
-      status: hasMissing ? "missing_info" : "ready",
+      status: contractStatus === "changes_requested" ? "changes_requested" : hasMissing ? "missing_info" : "ready",
       summary: extracted.summary ?? deal.summary,
       lastExtractedAt: new Date(),
       // Baseline for next pass's cache split — becomes the "stable" block

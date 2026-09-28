@@ -15,6 +15,9 @@ export async function autoGenerateAndSendContract(dealId: string): Promise<boole
   });
   if (!deal || !deal.template || !deal.client.email) return false;
   if (deal.status === "sent" || deal.status === "signed" || deal.status === "pending_approval") return false;
+  // Only a contract nobody has seen yet may go out on its own; anything past
+  // draft (e.g. the client asked for changes) needs the rep to resend it.
+  if (deal.contract && deal.contract.status !== "draft") return false;
 
   await prisma.contract.upsert({
     where: { dealId },
