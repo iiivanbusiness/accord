@@ -84,10 +84,10 @@ export default function TermsPage() {
             </p>
           </Section>
 
-          <Section title="8. Subscriptions, Fees, and Billing">
+          <Section title="8. Fees">
             <p>
-              Paid plans are billed in advance on a recurring basis as described at the time of purchase. Fees are non-refundable except where required by law.
-              We may change plan pricing on a going-forward basis with reasonable notice. Failure to pay may result in suspension of paid features.
+              The Service is currently provided free of charge. If we introduce paid plans or features, we will give you notice in advance, and you will not be
+              charged unless you choose to sign up for them.
             </p>
           </Section>
 

@@ -4,6 +4,7 @@ import { sendAdminAlertEmail, sendRenewalReminderEmail, sendReviewOverdueEmail }
 import { createNotification } from "@/lib/notifications";
 import { runStaleDealsDigest } from "@/lib/stale-deals";
 import { cleanupRateLimitHits } from "@/lib/rate-limit-cleanup";
+import { reportError } from "@/lib/error-report";
 
 const WINDOW_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -24,7 +25,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // the others.
 export async function GET(req: Request) {
   const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -135,7 +136,21 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ renewals: { checked: dueContracts.length, sent }, overdueReviews: overdueReviewResult, staleDeals: staleResult, rateLimitCleanup: rateLimitResult });
+    // The "this month" counters (calls shown on Deals/Analytics, the AI chat
+    // allowance) had no reset at all, so they only ever grew. This job runs
+    // daily at 09:00 UTC, so the 1st of the month is the reset point.
+    let monthlyReset = { workspaces: 0 };
+    if (now.getUTCDate() === 1) {
+      try {
+        const result = await prisma.workspace.updateMany({ data: { callsUsedThisMonth: 0, aiChatMessagesUsedThisMonth: 0 } });
+        monthlyReset = { workspaces: result.count };
+      } catch (err) {
+        console.error("Monthly usage reset (piggybacked on renewals cron) crashed", err);
+        await reportError(err, "Monthly usage reset");
+      }
+    }
+
+    return NextResponse.json({ renewals: { checked: dueContracts.length, sent }, overdueReviews: overdueReviewResult, staleDeals: staleResult, rateLimitCleanup: rateLimitResult, monthlyReset });
   } catch (err) {
     console.error("Renewal reminder cron crashed", err);
     try {

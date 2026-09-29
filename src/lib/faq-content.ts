@@ -40,7 +40,6 @@ export function appNavigationText(): string {
     "- Bulk import: bring clients and deals in from a CSV\n" +
     "- API & webhooks: generate API keys, set up webhook endpoints\n" +
     "- Two-factor authentication\n" +
-    "- Plan & usage: calls used this month, AI chat messages used this month, request an upgrade\n" +
     "- Sending domain: verify your own domain so contracts go out as you\n" +
     "- Notification toggles: require manual approval before sending, email me when signed, auto-remind clients, signing/reminder timing\n" +
     "- Delete account\n\n" +
@@ -168,16 +167,15 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
   },
   {
     id: "billing",
-    label: "Plan and usage",
+    label: "Pricing",
     questions: [
       {
-        question: "How many calls can I run on my plan?",
-        answer:
-          "It depends on your plan, for example Growth includes 15 calls a month per workspace. Once you hit that limit, you can't start a new deal until you upgrade.",
+        question: "Does SealMe cost anything?",
+        answer: "No. SealMe is currently free to use, with no limit on calls or deals, and there's nothing to buy in the app.",
       },
       {
-        question: "How do I upgrade?",
-        answer: "Click Request upgrade in Settings, and your account contact will follow up.",
+        question: "Is there a limit on this chat?",
+        answer: "Each workspace has a monthly allowance of AI chat messages that resets on the 1st. You can always reach a person at hello@sealme.net.",
       },
     ],
   },
