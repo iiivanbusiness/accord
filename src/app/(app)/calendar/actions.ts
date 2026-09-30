@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { syncWorkspaceCalendar } from "@/lib/google-calendar";
+import { revokeGoogleToken, syncWorkspaceCalendar } from "@/lib/google-calendar";
 import { requireWorkspaceId } from "@/lib/workspace";
 
 export async function createEvent(formData: FormData) {
@@ -52,11 +52,19 @@ export async function syncGoogleCalendarNow() {
   redirect(redirectTo);
 }
 
+// Disconnecting means we keep nothing from Google: the grant is revoked on
+// Google's side and the events we synced are deleted. Events a rep added by
+// hand stay.
 export async function disconnectGoogleCalendar() {
   const workspaceId = await requireWorkspaceId();
-  await prisma.workspace.update({
-    where: { id: workspaceId },
-    data: { googleAccessToken: null, googleRefreshToken: null, googleTokenExpiresAt: null, googleAccountEmail: null },
-  });
+  const workspace = await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId }, select: { googleRefreshToken: true } });
+  if (workspace.googleRefreshToken) await revokeGoogleToken(workspace.googleRefreshToken);
+  await prisma.$transaction([
+    prisma.calendarEvent.deleteMany({ where: { workspaceId, googleEventId: { not: null } } }),
+    prisma.workspace.update({
+      where: { id: workspaceId },
+      data: { googleAccessToken: null, googleRefreshToken: null, googleTokenExpiresAt: null, googleAccountEmail: null },
+    }),
+  ]);
   revalidatePath("/calendar");
 }

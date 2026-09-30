@@ -55,6 +55,20 @@ async function refreshAccessToken(refreshToken: string) {
   return res.json() as Promise<{ access_token: string; expires_in: number }>;
 }
 
+// Best effort: if Google is unreachable the local tokens are still wiped, and
+// the grant stays listed at myaccount.google.com/permissions for the user to remove.
+export async function revokeGoogleToken(token: string): Promise<void> {
+  try {
+    await fetch("https://oauth2.googleapis.com/revoke", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token }),
+    });
+  } catch {
+    // ignore, see above
+  }
+}
+
 export async function getUserEmail(accessToken: string): Promise<string | null> {
   const res = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
     headers: { Authorization: `Bearer ${accessToken}` },
