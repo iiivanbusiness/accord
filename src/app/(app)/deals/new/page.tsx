@@ -3,7 +3,12 @@ import { prisma } from "@/lib/db";
 import { isExtractionConfigured } from "@/lib/extract-deal";
 import { requireWorkspaceId } from "@/lib/workspace";
 import LocalCaptureForm from "@/components/LocalCaptureForm";
+import SubmitButton from "@/components/SubmitButton";
 import { createDeal, createDealFromTranscript } from "./actions";
+
+// Extracting terms from an hour-long transcript is one ~15-30s model call;
+// the follow-up work runs in after() within the same budget.
+export const maxDuration = 60;
 
 function Field({ label, name, placeholder, required }: { label: string; name: string; placeholder?: string; required?: boolean }) {
   return (
@@ -53,7 +58,7 @@ export default async function NewDealPage({
           ? "SealMe records your system audio for the call. Nothing joins as a visible participant."
           : isManual
             ? "Enter what the call covered and it'll drop straight into the review flow."
-            : "Paste the call transcript and Claude will pull out the deal terms for you to review."}
+            : "Paste the call transcript and SealMe will pull out the deal terms for you to review."}
       </div>
     </div>
 
@@ -88,9 +93,9 @@ export default async function NewDealPage({
           </select>
         </label>
 
-        <button type="submit" className="btn btn-primary mt-2 w-full justify-center">
+        <SubmitButton className="btn btn-primary mt-2 w-full justify-center" pendingText="Starting…">
           Start processing
-        </button>
+        </SubmitButton>
       </form>
     ) : isLocal ? (
       !extractionConfigured ? (
@@ -141,9 +146,9 @@ Client: Of course, excited to talk about..."
           </select>
         </label>
 
-        <button type="submit" className="btn btn-primary mt-2 w-full justify-center">
+        <SubmitButton className="btn btn-primary mt-2 w-full justify-center" pendingText="Reading the call, this can take up to a minute…">
           Extract deal terms
-        </button>
+        </SubmitButton>
       </form>
     )}
     </>

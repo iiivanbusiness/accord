@@ -16,7 +16,7 @@ export async function extractActionItems(callId: string): Promise<void> {
 
   const response = await client.messages.create({
     model: "claude-sonnet-5",
-    max_tokens: 1536,
+    max_tokens: 4096,
     system:
       "You read a raw call transcript between an agency (\"we\"/\"I\"/\"us\") and a client, and pull out concrete " +
       "commitments made during the call that are NOT the deal terms themselves (price, service, contract length). " +

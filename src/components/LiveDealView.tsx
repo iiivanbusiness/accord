@@ -230,7 +230,11 @@ export default function LiveDealView({
   function isLive(s: string, callList: CallItem[]): boolean {
     if (s === "processing") return true;
     const last = callList[callList.length - 1];
-    return Boolean(last && !last.endedAt);
+    if (!last) return false;
+    if (!last.endedAt) return true;
+    // Action items and highlights are extracted in the background right
+    // after a call ends, so keep polling briefly until they land.
+    return Date.now() - new Date(last.endedAt).getTime() < 2 * 60 * 1000;
   }
 
   useVisibleInterval(

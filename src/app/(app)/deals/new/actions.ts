@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { extractDealFromTranscript, buildDealFieldRows } from "@/lib/extract-deal";
@@ -125,23 +126,26 @@ export async function createDealFromTranscript(formData: FormData) {
     data: { callsUsedThisMonth: { increment: 1 } },
   });
 
-  try {
-    await extractActionItems(deal.calls[0].id);
-  } catch (err) {
-    console.error(`Failed to extract action items for deal ${deal.id}`, err);
-    await reportError(err, "Action item extraction", { dealId: deal.id });
-  }
-  try {
-    await extractCallHighlights(deal.id, transcript, deal.calls[0].id);
-  } catch (err) {
-    console.error(`Failed to extract call highlights for deal ${deal.id}`, err);
-    await reportError(err, "Call highlight extraction", { dealId: deal.id });
-  }
-
-  await dispatchWebhookEvent(workspaceId, "deal.created", { dealId: deal.id, clientName: extracted.clientName, service, feeDisplay: fee, status: deal.status });
-  await notifySlack(workspaceId, { type: "deal.created", dealId: deal.id, clientName: extracted.clientName, service });
-  await syncDealToHubspot(workspaceId, deal.id);
-  await syncDealToSalesforce(workspaceId, deal.id);
+  // Everything below is two more model calls plus integrations. Done inline
+  // it pushed a long call past the function timeout before the redirect, so
+  // the rep saw nothing happen. The deal page polls these in as they land.
+  const callId = deal.calls[0].id;
+  after(async () => {
+    await Promise.all([
+      extractActionItems(callId).catch(async (err) => {
+        console.error(`Failed to extract action items for deal ${deal.id}`, err);
+        await reportError(err, "Action item extraction", { dealId: deal.id });
+      }),
+      extractCallHighlights(deal.id, transcript, callId).catch(async (err) => {
+        console.error(`Failed to extract call highlights for deal ${deal.id}`, err);
+        await reportError(err, "Call highlight extraction", { dealId: deal.id });
+      }),
+    ]);
+    await dispatchWebhookEvent(workspaceId, "deal.created", { dealId: deal.id, clientName: extracted.clientName, service, feeDisplay: fee, status: deal.status });
+    await notifySlack(workspaceId, { type: "deal.created", dealId: deal.id, clientName: extracted.clientName, service });
+    await syncDealToHubspot(workspaceId, deal.id);
+    await syncDealToSalesforce(workspaceId, deal.id);
+  });
 
   redirect(`/deals/${deal.id}`);
 }

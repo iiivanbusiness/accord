@@ -21,7 +21,7 @@ export async function extractCallHighlights(dealId: string, transcript: string, 
 
   const response = await client.messages.create({
     model: "claude-sonnet-5",
-    max_tokens: 1536,
+    max_tokens: 4096,
     system:
       "You read a raw call transcript between an agency (\"we\"/\"I\"/\"us\") and a client, and pull out the shape " +
       "of the conversation. NOT the deal terms themselves (price, service, contract length are captured elsewhere). " +
