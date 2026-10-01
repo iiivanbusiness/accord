@@ -10,21 +10,21 @@ export default function AppFooter() {
         <span>© {new Date().getFullYear()} SealMe</span>
         <div className="flex items-center gap-4">
           <a
-            href="mailto:hello@sealme.net"
+            href="mailto:ivan@sealme.net"
             className="transition-colors hover:opacity-70"
             style={{ color: "var(--ink-muted)" }}
           >
-            hello@sealme.net
+            ivan@sealme.net
           </a>
           <a
-            href="https://www.instagram.com/join.sealme/"
+            href="https://www.instagram.com/sealme.app/"
             target="_blank"
             rel="noreferrer"
             className="flex items-center gap-1.5 transition-colors hover:opacity-70"
             style={{ color: "var(--ink-muted)" }}
           >
             <InstagramIcon />
-            @join.sealme
+            @sealme.app
           </a>
         </div>
       </div>
