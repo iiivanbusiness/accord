@@ -107,9 +107,14 @@ export default async function LeadsPage({
             {total} {total === 1 ? "lead" : "leads"}. {access.canViewAll ? "Prospects you call before they become deals" : "Your prospects, before they become deals"}
           </div>
         </div>
-        <Link href="/leads/new" className="btn btn-primary">
-          + Add lead
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/leads/import" className="btn btn-secondary">
+            Import
+          </Link>
+          <Link href="/leads/new" className="btn btn-primary">
+            + Add lead
+          </Link>
+        </div>
       </div>
 
       {access.canViewAll && (
@@ -133,12 +138,17 @@ export default async function LeadsPage({
         <div className="card flex flex-col items-start gap-3 p-6">
           <div className="text-[14.5px] font-medium">{total === 0 ? "No leads yet" : "No leads match"}</div>
           <div className="text-[13px]" style={{ color: "var(--ink-muted)" }}>
-            {total === 0 ? "Add your first lead by hand. Importing from a file or your CRM is coming next." : "Try a different search or clear the filters."}
+            {total === 0 ? "Add your first lead by hand, or bring in a list from a spreadsheet or CSV." : "Try a different search or clear the filters."}
           </div>
           {total === 0 && (
-            <Link href="/leads/new" className="btn btn-primary btn-sm">
-              + Add lead
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/leads/new" className="btn btn-primary btn-sm">
+                + Add lead
+              </Link>
+              <Link href="/leads/import" className="btn btn-secondary btn-sm">
+                Import a list
+              </Link>
+            </div>
           )}
         </div>
       ) : (

@@ -2,13 +2,14 @@
 // this contained. Handles quoted fields (including embedded commas,
 // newlines, and "" as an escaped quote) and both \n and \r\n line endings.
 // Returns rows as plain string arrays; the caller maps the header row to
-// field names.
-export function parseCsv(text: string): string[][] {
+// field names. Pass "\t" for rows pasted straight from Excel or Google
+// Sheets, which copy as tab-separated text.
+export function parseCsv(text: string, delimiter = ","): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
   let inQuotes = false;
-  const chars = text.replace(/\r\n/g, "\n");
+  const chars = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
 
   for (let i = 0; i < chars.length; i++) {
     const c = chars[i];
@@ -28,7 +29,7 @@ export function parseCsv(text: string): string[][] {
 
     if (c === '"') {
       inQuotes = true;
-    } else if (c === ",") {
+    } else if (c === delimiter) {
       row.push(field);
       field = "";
     } else if (c === "\n") {
