@@ -27,7 +27,7 @@ export default function DealValueHeroCard({
   dealCount: number;
 }) {
   return (
-    <div className="glass-card card-hover relative p-5" style={{ border: "1px solid transparent" }}>
+    <div className="glass-card card-hover relative flex h-full flex-col p-5" style={{ border: "1px solid transparent" }}>
       <div className="glass-card-blur" aria-hidden="true" style={{ background: "var(--glow-dark-surface)" }} />
 
       <div className="relative z-10 mb-5 flex items-center justify-between">
@@ -61,13 +61,14 @@ export default function DealValueHeroCard({
         </div>
       </div>
 
-      <div className="relative z-10 flex h-[160px] items-end gap-3">
+      {/* Grows with the widget when the dashboard makes it taller. */}
+      <div className="relative z-10 flex min-h-[160px] flex-1 items-end gap-3">
         {months.map((m) => {
           const heightPct = maxMonthValue > 0 ? Math.max(4, Math.round((m.value / maxMonthValue) * 100)) : 4;
           const isCurrent = m.key === currentMonthKey;
           return (
-            <div key={m.key} className="flex flex-1 flex-col items-center gap-2">
-              <div className="flex h-[120px] w-full items-end">
+            <div key={m.key} className="flex h-full flex-1 flex-col items-center gap-2">
+              <div className="flex min-h-[120px] w-full flex-1 items-end">
                 <div
                   className="w-full rounded-t-[6px] transition-all duration-500 ease-out"
                   style={{

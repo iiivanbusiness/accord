@@ -6,13 +6,15 @@ export default function GlassStatCard({
   label,
   value,
   sub,
+  className,
 }: {
   label: string;
   value: string;
   sub?: string;
+  className?: string;
 }) {
   return (
-    <div className="glass-card card-hover p-5">
+    <div className={`glass-card card-hover p-5 ${className ?? ""}`}>
       <div className="glass-card-blur" aria-hidden="true" />
       <div className="relative z-10">
         <div

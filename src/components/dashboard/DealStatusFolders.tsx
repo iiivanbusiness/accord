@@ -10,7 +10,9 @@ export type StatusCount = { status: string; count: number };
 // graphic itself is the only thing that isn't flat page background.
 export default function DealStatusFolders({ counts }: { counts: StatusCount[] }) {
   return (
-    <div className="grid grid-cols-2 gap-1 sm:grid-cols-4 md:grid-cols-8">
+    // Columns follow the widget's own width (a container query), since on
+    // the dashboard it can be resized independently of the window.
+    <div className="grid grid-cols-2 gap-1 @sm:grid-cols-4 @3xl:grid-cols-8">
       {counts.map(({ status, count }) => {
         const empty = count === 0;
         return (

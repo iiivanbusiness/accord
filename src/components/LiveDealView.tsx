@@ -10,6 +10,7 @@ import CallHighlightsOverlay from "./CallHighlightsOverlay";
 import SendToDocusignButton from "./SendToDocusignButton";
 import VoiceCorrectionButton from "./VoiceCorrectionButton";
 import DealNotes from "./DealNotes";
+import ClientText from "./ClientText";
 import ReviewPanel from "./ReviewPanel";
 
 const POLL_INTERVAL_MS = 4000;
@@ -318,7 +319,7 @@ export default function LiveDealView({
                     <div className="mb-1 flex items-center justify-between gap-2">
                       <span className="text-[13px] font-medium">Call {i + 1} - {CALL_SOURCE_LABEL[call.source] ?? call.source}</span>
                       <span className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
-                        {call.startedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                        <ClientText text={() => new Date(call.startedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })} />
                         {!call.endedAt && call.id === calls[calls.length - 1].id ? " · in progress" : ""}
                       </span>
                     </div>
