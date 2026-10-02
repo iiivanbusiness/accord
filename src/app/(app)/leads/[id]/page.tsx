@@ -8,8 +8,14 @@ import { formatPhone } from "@/lib/phone";
 import LeadFields from "@/components/LeadFields";
 import SubmitButton from "@/components/SubmitButton";
 import LeadTasks from "@/components/LeadTasks";
+import LeadCalls from "@/components/LeadCalls";
 import { setLeadStage, updateLead } from "../actions";
 import { createLeadTask, deleteTask, setTaskStatus } from "../task-actions";
+import { processColdCallTranscript } from "../call-actions";
+
+// Processing a pasted call transcript (an action on this page) waits on
+// Claude; give it room beyond the default.
+export const maxDuration = 60;
 
 function formatDay(date: Date): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
@@ -27,7 +33,7 @@ export default async function LeadPage({
   const { created, saved } = await searchParams;
 
   const access = await leadAccess();
-  const [lead, members, tasks] = await Promise.all([
+  const [lead, members, tasks, calls] = await Promise.all([
     prisma.lead.findFirst({ where: { id, workspaceId: workspace.id, ...access.where }, include: { owner: { select: { id: true, name: true } } } }),
     access.canAssign
       ? prisma.user.findMany({ where: { workspaceId: workspace.id, deactivatedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } })
@@ -37,6 +43,12 @@ export default async function LeadPage({
       where: { leadId: id, workspaceId: workspace.id },
       select: { id: true, type: true, dueDate: true, dueTime: true, priority: true, status: true, note: true, assigneeId: true, assignee: { select: { name: true } } },
       orderBy: [{ dueDate: "asc" }, { dueTime: "asc" }, { createdAt: "asc" }],
+    }),
+    prisma.phoneCall.findMany({
+      where: { leadId: id, workspaceId: workspace.id, status: "processed" },
+      select: { id: true, startedAt: true, outcome: true, summary: true, transcript: true, source: true, user: { select: { name: true } } },
+      orderBy: { startedAt: "desc" },
+      take: 50,
     }),
   ]);
   if (!lead) notFound();
@@ -68,13 +80,19 @@ export default async function LeadPage({
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <form action={updateLead.bind(null, lead.id)} className="card order-2 flex min-w-0 flex-col gap-5 p-5 sm:p-6 lg:order-1">
+        <div className="order-2 flex min-w-0 flex-col gap-4 lg:order-1">
+        <LeadCalls
+          calls={calls.map((c) => ({ id: c.id, at: c.startedAt.toISOString(), who: c.user?.name ?? null, outcome: c.outcome, summary: c.summary, transcript: c.transcript, source: c.source }))}
+          processAction={processColdCallTranscript.bind(null, lead.id)}
+        />
+        <form action={updateLead.bind(null, lead.id)} className="card flex min-w-0 flex-col gap-5 p-5 sm:p-6">
           <div className="text-[14px] font-medium">Details</div>
           <LeadFields owners={owners} full values={lead} allowUnassigned={access.canAssign} />
           <SubmitButton className="btn btn-primary w-full justify-center sm:w-auto sm:self-start" pendingText="Saving…">
             Save changes
           </SubmitButton>
         </form>
+        </div>
 
         <div className="order-1 flex min-w-0 flex-col gap-4 lg:order-2">
           <div className="card flex flex-col gap-3 p-5">

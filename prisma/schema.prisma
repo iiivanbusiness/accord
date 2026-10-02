@@ -1206,6 +1206,12 @@ model PhoneCall {
 
   mode   String @default("unknown") // cold | sales | unknown
   status String @default("recording") // recording | pending | processing | processed | discarded | failed | skipped
+  source String @default("phone") // phone | paste (a transcript pasted on the lead page) | desktop
+  // What happened, from the transcript: meeting_booked | interested | follow_up
+  // | not_interested | voicemail | no_answer | wrong_person. connected is
+  // true when they actually talked (what /team counts as connected).
+  outcome   String?
+  connected Boolean @default(false)
 
   fromNumber String? // the rep's phone, as caller ID showed it
   toNumber   String? // the lead's number, when we know it

@@ -15,10 +15,6 @@ const PERIODS = [
 
 const DAY = 24 * 60 * 60 * 1000;
 
-// Calls that lasted at least this long count as connected: shorter ones
-// are usually no answer or a voicemail greeting.
-const CONNECTED_SECONDS = 30;
-
 type Counted = { _count: { _all: number } };
 function countsBy<K extends string>(rows: (Counted & Record<K, string | null>)[], key: K): Map<string, number> {
   return new Map(rows.map((r) => [r[key] ?? "unassigned", r._count._all]));
@@ -45,7 +41,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
     prisma.task.groupBy({ by: ["assigneeId"], where: { workspaceId: ws, status: "open", dueDate: { lte: todayDate } }, _count: { _all: true } }),
     prisma.task.groupBy({ by: ["assigneeId"], where: { workspaceId: ws, status: "done", completedAt: { gte: since } }, _count: { _all: true } }),
     prisma.phoneCall.groupBy({ by: ["userId"], where: { workspaceId: ws, startedAt: { gte: since } }, _count: { _all: true } }),
-    prisma.phoneCall.groupBy({ by: ["userId"], where: { workspaceId: ws, startedAt: { gte: since }, durationSec: { gte: CONNECTED_SECONDS } }, _count: { _all: true } }),
+    prisma.phoneCall.groupBy({ by: ["userId"], where: { workspaceId: ws, startedAt: { gte: since }, connected: true }, _count: { _all: true } }),
     prisma.lead.groupBy({ by: ["ownerId"], where: { workspaceId: ws, convertedAt: { gte: since } }, _count: { _all: true } }),
   ]);
 
@@ -107,7 +103,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
       <TeamTable rows={rows} recipients={recipients} moveAction={moveTasks} />
 
       <div className="mt-3 max-w-[640px] text-[12px]" style={{ color: "var(--ink-muted)" }}>
-        Open tasks are what&apos;s on each person&apos;s list right now. Done, calls, connected and converted count {periodLabel === "today" ? "today" : `the ${periodLabel}`}. Calls are calls made through SealMe; connected means the call lasted at least {CONNECTED_SECONDS} seconds.
+        Open tasks are what&apos;s on each person&apos;s list right now. Done, calls, connected and converted count {periodLabel === "today" ? "today" : `the ${periodLabel}`}. Calls are calls logged in SealMe; connected means someone picked up and talked (voicemail and no answer don&apos;t count).
       </div>
     </>
   );
