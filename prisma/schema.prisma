@@ -234,6 +234,15 @@ model User {
   emailVerifiedAt DateTime? // set immediately for Google sign-ins (already verified); via emailed link for credentials sign-ups
   createdAt       DateTime  @default(now())
 
+  // The browser's timezone, saved when they use the app, so the morning
+  // task email knows which day is "today" for them.
+  timezone         String?
+  // Morning "your tasks" email: on unless they turn it off on Today, and
+  // the day (YYYY-MM-DD, their time) it last went out, so a re-run of the
+  // cron never sends it twice.
+  taskDigestEmail  Boolean   @default(true)
+  taskDigestSentOn String?
+
   // SCIM provisioning (Okta/Azure AD/Entra pushing user lifecycle events).
   // scimExternalId is the IdP's own id for this person, kept so a later
   // SCIM call can look them up by an id the IdP already knows rather than

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { sendAdminAlertEmail, sendRenewalReminderEmail, sendReviewOverdueEmail } from "@/lib/email";
 import { createNotification } from "@/lib/notifications";
 import { runStaleDealsDigest } from "@/lib/stale-deals";
+import { runTaskDigest } from "@/lib/task-digest";
 import { cleanupRateLimitHits } from "@/lib/rate-limit-cleanup";
 import { reportError } from "@/lib/error-report";
 
@@ -16,7 +17,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // gate it.
 //
 // Also runs the overdue-review reminder (a ReviewStep past its dueAt),
-// the stale-deals digest (see src/lib/stale-deals.ts), and the
+// the stale-deals digest (see src/lib/stale-deals.ts), the morning task
+// email (see src/lib/task-digest.ts), and the
 // RateLimitHit table cleanup (see src/lib/rate-limit-cleanup.ts) in the same
 // request — Vercel's Hobby plan caps a project at 2 cron jobs, and this
 // project already has 2 without them (remind, renewals), so extra daily
@@ -121,6 +123,22 @@ export async function GET(req: Request) {
       }
     }
 
+    // Morning "your tasks" email for reps (see src/lib/task-digest.ts).
+    let taskDigestResult = { checked: 0, sent: 0 };
+    try {
+      taskDigestResult = await runTaskDigest();
+    } catch (err) {
+      console.error("Task digest (piggybacked on renewals cron) crashed", err);
+      try {
+        await sendAdminAlertEmail({
+          subject: "Task digest crashed",
+          details: err instanceof Error ? (err.stack ?? err.message) : String(err),
+        });
+      } catch (alertErr) {
+        console.error("Failed to send admin alert email", alertErr);
+      }
+    }
+
     let rateLimitResult = { deleted: 0 };
     try {
       rateLimitResult = await cleanupRateLimitHits();
@@ -150,7 +168,7 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ renewals: { checked: dueContracts.length, sent }, overdueReviews: overdueReviewResult, staleDeals: staleResult, rateLimitCleanup: rateLimitResult, monthlyReset });
+    return NextResponse.json({ renewals: { checked: dueContracts.length, sent }, overdueReviews: overdueReviewResult, staleDeals: staleResult, taskDigest: taskDigestResult, rateLimitCleanup: rateLimitResult, monthlyReset });
   } catch (err) {
     console.error("Renewal reminder cron crashed", err);
     try {

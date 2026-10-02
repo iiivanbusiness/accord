@@ -267,6 +267,48 @@ export async function sendChangesRequestedEmail(options: {
   });
 }
 
+export type TaskDigestItem = { leadName: string; kind: string; when: string; company: string | null; overdue: boolean };
+
+// The morning "your tasks" email. Built separately from sending so the
+// cron can stay simple and the layout can be checked without sending.
+export function taskDigestEmail(options: {
+  firstName: string | null;
+  isToday: boolean;
+  dayLabel: string; // "Friday, October 2"
+  summary: string; // "8 cold calls, 2 sales calls, 1 follow-up"
+  overdueCount: number;
+  items: TaskDigestItem[];
+  moreCount: number;
+  todayUrl: string;
+}): { subject: string; bodyHtml: string } {
+  const when = options.isToday ? "today" : "tomorrow";
+  const overdue = options.overdueCount > 0 ? `${options.overdueCount} overdue` : "";
+  const subject = `Your tasks ${when}: ${[options.summary, overdue].filter(Boolean).join(", ")}`;
+  const rows = options.items
+    .map(
+      (i) => `
+      <p style="margin:0 0 10px;">
+        <strong>${escapeHtml(i.leadName)}</strong>
+        <span style="color:${i.overdue ? "#b45309" : "#6e6e73"};"> - ${escapeHtml([i.kind, i.when].filter(Boolean).join(" · "))}</span>${i.company ? `<span style="color:#6e6e73;"> (${escapeHtml(i.company)})</span>` : ""}
+      </p>`
+    )
+    .join("");
+  const bodyHtml = `
+    <p style="margin:0 0 14px;">${options.isToday ? "Good morning" : "Hi"}${options.firstName ? `, ${escapeHtml(options.firstName)}` : ""}. Here's your list for ${escapeHtml(options.dayLabel)}: ${escapeHtml(options.summary || "nothing new")}.${options.overdueCount > 0 ? ` ${options.overdueCount === 1 ? "One task is" : `${options.overdueCount} tasks are`} overdue from earlier days.` : ""}</p>
+    ${rows}
+    ${options.moreCount > 0 ? `<p style="margin:0 0 14px;color:#6e6e73;">And ${options.moreCount} more.</p>` : ""}
+    <a href="${options.todayUrl}" style="display:inline-block;margin:6px 0 20px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
+      Open Today
+    </a>
+    <p style="margin:0;color:#6e6e73;font-size:12px;">You get this because tasks are assigned to you in SealMe. You can turn it off at the bottom of the Today page.</p>
+  `;
+  return { subject, bodyHtml };
+}
+
+export async function sendTaskDigestEmail(to: string, content: { subject: string; bodyHtml: string }): Promise<void> {
+  await sendSystemEmail({ to: [to], subject: content.subject, bodyHtml: content.bodyHtml });
+}
+
 export async function sendRenewalReminderEmail(options: {
   to: string[];
   clientName: string;

@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db";
 import { requireProspecting } from "@/lib/prospecting";
 import { leadAccess } from "@/lib/lead-visibility";
 import { cookieTimeZone, dayInZone } from "@/lib/viewer-time";
+import { currentUserWithRole } from "@/lib/permissions";
+import { notifyTasksMoved } from "@/lib/task-notify";
 
 // "unassigned" stands for open tasks whose assignee's account was removed.
 export type MoveTasksInput = { fromUserId: string; toUserId: string; scope: "all" | "due"; makeOwner: boolean };
@@ -22,10 +24,8 @@ export async function moveTasks(input: MoveTasksInput): Promise<{ moved: number 
   // The person they come from may already be deactivated: moving work off
   // someone who left is the main reason to do this.
   const fromId = input.fromUserId === "unassigned" ? null : input.fromUserId;
-  if (fromId) {
-    const from = await prisma.user.findFirst({ where: { id: fromId, workspaceId: workspace.id }, select: { id: true } });
-    if (!from) throw new Error("Teammate not found");
-  }
+  const from = fromId ? await prisma.user.findFirst({ where: { id: fromId, workspaceId: workspace.id }, select: { id: true, name: true } }) : null;
+  if (fromId && !from) throw new Error("Teammate not found");
 
   const today = dayInZone(new Date(), await cookieTimeZone());
   const tasks = await prisma.task.findMany({
@@ -48,6 +48,11 @@ export async function moveTasks(input: MoveTasksInput): Promise<{ moved: number 
       ? [prisma.lead.updateMany({ where: { id: { in: leadIds }, workspaceId: workspace.id, ownerId: fromId }, data: { ownerId: to.id } })]
       : []),
   ]);
+
+  if (to.id !== access.userId) {
+    const actor = await currentUserWithRole();
+    await notifyTasksMoved({ workspaceId: workspace.id, recipientId: to.id, actorName: actor.name, fromName: from?.name ?? null, count: tasks.length });
+  }
 
   revalidatePath("/team");
   return { moved: tasks.length };

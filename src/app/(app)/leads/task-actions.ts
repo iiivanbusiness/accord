@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db";
 import { requireProspecting } from "@/lib/prospecting";
 import { leadAccess } from "@/lib/lead-visibility";
 import { isValidDay, isValidTime, isValidTimeZone, TASK_PRIORITIES, TASK_TYPES } from "@/lib/tasks";
+import { currentUserWithRole } from "@/lib/permissions";
+import { notifyTasksAssigned } from "@/lib/task-notify";
 
 export type TaskInput = {
   assigneeId: string;
@@ -63,6 +65,12 @@ export async function assignLeadTasks(input: TaskInput & { leadIds: string[]; ma
     ...(input.makeOwner ? [prisma.lead.updateMany({ where: { id: { in: ids } }, data: { ownerId: assigneeId } })] : []),
   ]);
 
+  if (assigneeId !== access.userId) {
+    const actor = await currentUserWithRole();
+    const lead = ids.length === 1 ? await prisma.lead.findUnique({ where: { id: ids[0] }, select: { id: true, name: true } }) : null;
+    await notifyTasksAssigned({ workspaceId: workspace.id, assigneeId, actorName: actor.name, count: ids.length, type: task.type, dueDate: task.dueDate, dueTime: task.dueTime, lead: lead ?? undefined });
+  }
+
   revalidatePath("/leads");
   return { created: ids.length };
 }
@@ -72,7 +80,7 @@ export async function assignLeadTasks(input: TaskInput & { leadIds: string[]; ma
 export async function createLeadTask(leadId: string, input: TaskInput): Promise<void> {
   const workspace = await requireProspecting();
   const access = await leadAccess();
-  const lead = await prisma.lead.findFirst({ where: { id: leadId, workspaceId: workspace.id, AND: [access.where] }, select: { id: true } });
+  const lead = await prisma.lead.findFirst({ where: { id: leadId, workspaceId: workspace.id, AND: [access.where] }, select: { id: true, name: true } });
   if (!lead) throw new Error("Lead not found");
 
   const task = clean(input);
@@ -80,6 +88,10 @@ export async function createLeadTask(leadId: string, input: TaskInput): Promise<
   if (!assigneeId) throw new Error("Pick who it's for");
 
   await prisma.task.create({ data: { workspaceId: workspace.id, leadId, assigneeId, createdById: access.userId, ...task } });
+  if (assigneeId !== access.userId) {
+    const actor = await currentUserWithRole();
+    await notifyTasksAssigned({ workspaceId: workspace.id, assigneeId, actorName: actor.name, count: 1, type: task.type, dueDate: task.dueDate, dueTime: task.dueTime, lead });
+  }
   revalidatePath(`/leads/${leadId}`);
 }
 

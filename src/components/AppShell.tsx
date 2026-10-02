@@ -46,7 +46,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
   const isAdmin = isAdminEmail(session?.user?.email);
 
   const currentUser = session?.user?.email
-    ? await prisma.user.findUnique({ where: { email: session.user.email }, select: { aiDisclosureAcknowledgedAt: true, role: { select: { canManageTeam: true } } } })
+    ? await prisma.user.findUnique({ where: { email: session.user.email }, select: { aiDisclosureAcknowledgedAt: true, timezone: true, role: { select: { canManageTeam: true } } } })
     : null;
   const { unreadCount, items: notificationItems } = await getUnreadNotifications();
   const groups = navGroupsFor({ prospecting: workspace.prospectingEnabled, admin: isAdmin, manager: Boolean(currentUser?.role?.canManageTeam) });
@@ -121,7 +121,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
       </div>
 
       {currentUser && <AiDisclosureModal show={!currentUser.aiDisclosureAcknowledgedAt} />}
-      <TimezoneSync />
+      <TimezoneSync stored={currentUser?.timezone ?? null} />
 
       <FaqChatWidget />
 

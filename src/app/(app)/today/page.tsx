@@ -7,7 +7,9 @@ import { formatPhone } from "@/lib/phone";
 import { STATUS_CHIP, STATUS_LABEL } from "@/lib/deal-status";
 import { formatTaskDue, TASK_TYPE_LABEL } from "@/lib/tasks";
 import TodayTaskRow, { type TodayTask } from "@/components/TodayTaskRow";
+import TaskDigestToggle from "@/components/TaskDigestToggle";
 import { setTaskStatus } from "../leads/task-actions";
+import { setTaskDigestEmail } from "../preferences-actions";
 
 const DAY = 24 * 60 * 60 * 1000;
 const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
@@ -253,6 +255,10 @@ export default async function TodayPage() {
             <div style={{ borderTop: "1px solid var(--hairline-soft)" }}>{rows(finished, () => "", { showType: true })}</div>
           </details>
         )}
+
+        <div className="order-8 px-1 pt-1">
+          <TaskDigestToggle enabled={user.taskDigestEmail} action={setTaskDigestEmail} />
+        </div>
       </div>
     </div>
   );
