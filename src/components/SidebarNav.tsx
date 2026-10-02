@@ -65,7 +65,7 @@ export default function SidebarNav({ groups }: { groups: SidebarNavGroup[] }) {
       )}
       {groups.map((group, gi) => (
         <div key={group.label} className={`flex flex-col gap-1 ${gi > 0 ? "mt-3.5" : ""}`}>
-          <div className="px-3 pb-0.5 text-[10.5px] font-medium uppercase tracking-[0.08em]" style={{ color: "var(--ink-muted)", opacity: 0.75 }}>
+          <div className="h-[18px] px-3 text-[10.5px] font-medium uppercase leading-[18px] tracking-[0.08em]" style={{ color: "var(--ink-muted)", opacity: 0.75 }}>
             {group.label}
           </div>
           {group.items.map((item) => {
@@ -78,7 +78,7 @@ export default function SidebarNav({ groups }: { groups: SidebarNavGroup[] }) {
                   if (el) itemRefs.current.set(item.href, el);
                   else itemRefs.current.delete(item.href);
                 }}
-                className="group relative z-10 flex items-center gap-2.5 rounded-[10px] px-3 py-2 text-[13.5px] font-medium transition-[color,transform] duration-150 active:scale-[0.97]"
+                className="group relative z-10 flex h-[35px] items-center gap-2.5 rounded-[10px] px-3 text-[13.5px] font-medium leading-5 transition-[color,transform] duration-150 active:scale-[0.97]"
                 style={{ color: isActive ? "var(--on-primary)" : "var(--ink-muted)" }}
               >
                 <span className="inline-flex flex-none transition-transform duration-150 group-hover:scale-[1.12]">
