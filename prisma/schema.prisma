@@ -135,6 +135,10 @@ model Workspace {
   salesforceInstanceUrl    String?
   salesforceAccountEmail   String?
 
+  // Leads, tasks, and phone calls ship dark: only workspaces a platform
+  // admin turns on in /admin see them, until they're finished and the
+  // current App Store build has been reviewed. See src/lib/prospecting.ts.
+  prospectingEnabled Boolean @default(false)
   createdAt          DateTime @default(now())
 
   users             User[]

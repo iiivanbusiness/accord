@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin";
-import { applyPlanChange, dismissUpgradeRequest } from "./actions";
+import { applyPlanChange, dismissUpgradeRequest, setProspectingEnabled } from "./actions";
 
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -24,6 +24,8 @@ const AUDIT_ACTION_LABEL: Record<string, string> = {
   "teammate.invited": "Teammate invited",
   "teammate.removed": "Teammate removed",
   "admin.plan_changed": "Plan changed",
+  "admin.prospecting_enabled": "Prospecting turned on",
+  "admin.prospecting_disabled": "Prospecting turned off",
 };
 
 const AUDIT_ACTION_CHIP: Record<string, string> = {
@@ -177,7 +179,7 @@ export default async function AdminPage() {
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              {["Workspace", "Owner", "Plan", "Calls used", "Deals", "Signed up", "Last activity"].map((h) => (
+              {["Workspace", "Owner", "Plan", "Calls used", "Deals", "Signed up", "Last activity", "Prospecting"].map((h) => (
                 <th
                   key={h}
                   className="border-b px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wide"
@@ -207,6 +209,17 @@ export default async function AdminPage() {
                   </td>
                   <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)", color: "var(--ink-muted)" }}>
                     {stats._max.updatedAt ? timeAgo(stats._max.updatedAt) : "—"}
+                  </td>
+                  <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)" }}>
+                    <form action={setProspectingEnabled.bind(null, w.id, !w.prospectingEnabled)}>
+                      <button
+                        type="submit"
+                        className={`chip ${w.prospectingEnabled ? "chip-success" : "chip-neutral"}`}
+                        title={w.prospectingEnabled ? "Turn off Leads, tasks, and calls for this workspace" : "Turn on Leads, tasks, and calls for this workspace"}
+                      >
+                        {w.prospectingEnabled ? "On" : "Off"}
+                      </button>
+                    </form>
                   </td>
                 </tr>
               );

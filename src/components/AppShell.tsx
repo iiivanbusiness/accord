@@ -2,7 +2,7 @@ import { auth, signOut } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { requireWorkspace } from "@/lib/workspace";
 import { isAdminEmail } from "@/lib/admin";
-import { NAV_ITEMS, ADMIN_ITEM } from "@/lib/nav-config";
+import { NAV_ITEMS, ADMIN_ITEM, PROSPECTING_ITEMS } from "@/lib/nav-config";
 import ThemeToggle from "./ThemeToggle";
 import CompanionToggleButton from "./CompanionToggleButton";
 import BrandLogo from "./BrandLogo";
@@ -21,6 +21,7 @@ import { getUnreadNotifications } from "@/app/(app)/notifications/actions";
 const NAV_ICONS: Record<string, () => React.ReactNode> = {
   "/dashboard": DashboardIcon,
   "/deals": DealsIcon,
+  "/leads": LeadsIcon,
   "/calendar": CalendarIcon,
   "/analytics": AnalyticsIcon,
   "/clients": ClientsIcon,
@@ -45,7 +46,8 @@ export default async function AppShell({ children }: { children: React.ReactNode
     ? await prisma.user.findUnique({ where: { email: session.user.email }, select: { aiDisclosureAcknowledgedAt: true } })
     : null;
   const { unreadCount, items: notificationItems } = await getUnreadNotifications();
-  const items = isAdmin ? [...NAV_ITEMS, ADMIN_ITEM] : NAV_ITEMS;
+  const baseItems = workspace.prospectingEnabled ? [NAV_ITEMS[0], NAV_ITEMS[1], ...PROSPECTING_ITEMS, ...NAV_ITEMS.slice(2)] : NAV_ITEMS;
+  const items = isAdmin ? [...baseItems, ADMIN_ITEM] : baseItems;
 
   const navItems = items.map((item) => {
     const Icon = NAV_ICONS[item.href];
@@ -174,6 +176,16 @@ function AnalyticsIcon() {
     <svg {...iconProps()}>
       <path d="M4 16V9M10 16V4M16 16v-6.5" />
       <path d="M2.5 16h15" />
+    </svg>
+  );
+}
+
+function LeadsIcon() {
+  return (
+    <svg {...iconProps()}>
+      <circle cx="8" cy="6.6" r="2.7" />
+      <path d="M3 16.2c.5-3 2.6-4.6 5-4.6 1.2 0 2.3.4 3.1 1.1" />
+      <path d="M14.6 11.2v6M11.6 14.2h6" />
     </svg>
   );
 }

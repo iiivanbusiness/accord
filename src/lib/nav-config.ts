@@ -11,6 +11,9 @@ export const NAV_ITEMS = [
 
 export const ADMIN_ITEM = { href: "/admin", label: "Admin" } as const;
 
+// Only shown to workspaces with prospectingEnabled (see src/lib/prospecting.ts).
+export const PROSPECTING_ITEMS = [{ href: "/leads", label: "Leads" }] as const;
+
 const SCREEN_LABELS: { test: (path: string) => boolean; label: string }[] = [
   { test: (p) => p === "/dashboard", label: "Dashboard" },
   { test: (p) => p === "/deals/new", label: "Start a call" },
@@ -18,6 +21,7 @@ const SCREEN_LABELS: { test: (path: string) => boolean; label: string }[] = [
   { test: (p) => /^\/deals\/[^/]+\/send$/.test(p), label: "Send contract" },
   { test: (p) => /^\/deals\/[^/]+$/.test(p), label: "Deal" },
   { test: (p) => p === "/deals", label: "Deals" },
+  { test: (p) => p === "/leads", label: "Leads" },
   { test: (p) => p === "/calendar/new", label: "New event" },
   { test: (p) => p === "/calendar", label: "Calendar" },
   { test: (p) => p === "/analytics", label: "Analytics" },
