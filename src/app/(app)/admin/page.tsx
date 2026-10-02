@@ -13,6 +13,59 @@ function timeAgo(date: Date): string {
   return `${days}d ago`;
 }
 
+// The admin tables have to fit beside the sidebar at any window width,
+// not just full screen: lower-priority columns drop out as the window
+// narrows instead of pushing the Prospecting switch off the edge.
+const COLUMN_SHOW = {
+  owner: "hidden lg:table-cell",
+  plan: "hidden xl:table-cell",
+  calls: "hidden md:table-cell",
+  deals: "hidden lg:table-cell",
+  signedUp: "hidden 2xl:table-cell",
+  lastActivity: "hidden xl:table-cell",
+};
+
+const WORKSPACE_COLUMNS = [
+  { label: "Workspace", show: "" },
+  { label: "Owner", show: COLUMN_SHOW.owner },
+  { label: "Plan", show: COLUMN_SHOW.plan },
+  { label: "Calls used", show: COLUMN_SHOW.calls },
+  { label: "Deals", show: COLUMN_SHOW.deals },
+  { label: "Signed up", show: COLUMN_SHOW.signedUp },
+  { label: "Last activity", show: COLUMN_SHOW.lastActivity },
+  { label: "Prospecting", show: "" },
+];
+
+const PROFILE_SHOW = {
+  role: "hidden lg:table-cell",
+  calls: "hidden xl:table-cell",
+  handoff: "hidden xl:table-cell",
+  signedUp: "hidden md:table-cell",
+};
+
+const PROFILE_COLUMNS = [
+  { label: "Workspace", show: "" },
+  { label: "Role", show: PROFILE_SHOW.role },
+  { label: "Calls / month", show: PROFILE_SHOW.calls },
+  { label: 'After a "yes"', show: PROFILE_SHOW.handoff },
+  { label: "Biggest problem", show: "" },
+  { label: "Signed up", show: PROFILE_SHOW.signedUp },
+];
+
+const AUDIT_SHOW = {
+  workspace: "hidden xl:table-cell",
+  actor: "hidden lg:table-cell",
+  details: "hidden lg:table-cell",
+};
+
+const AUDIT_COLUMNS = [
+  { label: "When", show: "" },
+  { label: "Workspace", show: AUDIT_SHOW.workspace },
+  { label: "Actor", show: AUDIT_SHOW.actor },
+  { label: "Event", show: "" },
+  { label: "Details", show: AUDIT_SHOW.details },
+];
+
 const AUDIT_ACTION_LABEL: Record<string, string> = {
   "login.success": "Signed in",
   "login.failure": "Failed sign-in",
@@ -141,13 +194,13 @@ export default async function AdminPage() {
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                {["Workspace", "Role", "Calls / month", "After a \"yes\"", "Biggest problem", "Signed up"].map((h) => (
+                {PROFILE_COLUMNS.map((col) => (
                   <th
-                    key={h}
-                    className="border-b px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wide"
+                    key={col.label}
+                    className={`whitespace-nowrap border-b px-4 py-3 text-left text-[12px] font-medium uppercase tracking-wide ${col.show}`}
                     style={{ color: "var(--ink-muted)", borderColor: "var(--hairline)" }}
                   >
-                    {h}
+                    {col.label}
                   </th>
                 ))}
               </tr>
@@ -155,12 +208,14 @@ export default async function AdminPage() {
             <tbody>
               {onboardingProfiles.map((p) => (
                 <tr key={p.id} className="row-hover transition-colors">
-                  <td className="border-b px-5 py-3.5 font-medium" style={{ borderColor: "var(--hairline-soft)" }}>{p.workspace.name}</td>
-                  <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)" }}>{p.role}</td>
-                  <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)" }}>{p.callVolume}</td>
-                  <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)" }}>{p.handoff}</td>
-                  <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)" }}>{p.biggestProblem}</td>
-                  <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)", color: "var(--ink-muted)" }}>
+                  <td className="border-b px-4 py-3.5 font-medium" style={{ borderColor: "var(--hairline-soft)" }}>
+                    <div className="max-w-[160px] truncate" title={p.workspace.name}>{p.workspace.name}</div>
+                  </td>
+                  <td className={`border-b px-4 py-3.5 text-[13px] ${PROFILE_SHOW.role}`} style={{ borderColor: "var(--hairline-soft)" }}>{p.role}</td>
+                  <td className={`border-b px-4 py-3.5 text-[13px] ${PROFILE_SHOW.calls}`} style={{ borderColor: "var(--hairline-soft)" }}>{p.callVolume}</td>
+                  <td className={`border-b px-4 py-3.5 text-[13px] ${PROFILE_SHOW.handoff}`} style={{ borderColor: "var(--hairline-soft)" }}>{p.handoff}</td>
+                  <td className="border-b px-4 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)" }}>{p.biggestProblem}</td>
+                  <td className={`whitespace-nowrap border-b px-4 py-3.5 text-[13px] ${PROFILE_SHOW.signedUp}`} style={{ borderColor: "var(--hairline-soft)", color: "var(--ink-muted)" }}>
                     {timeAgo(p.createdAt)}
                   </td>
                 </tr>
@@ -179,13 +234,13 @@ export default async function AdminPage() {
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              {["Workspace", "Owner", "Plan", "Calls used", "Deals", "Signed up", "Last activity", "Prospecting"].map((h) => (
+              {WORKSPACE_COLUMNS.map((col) => (
                 <th
-                  key={h}
-                  className="border-b px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wide"
+                  key={col.label}
+                  className={`whitespace-nowrap border-b px-4 py-3 text-left text-[12px] font-medium uppercase tracking-wide ${col.show}`}
                   style={{ color: "var(--ink-muted)", borderColor: "var(--hairline)" }}
                 >
-                  {h}
+                  {col.label}
                 </th>
               ))}
             </tr>
@@ -193,24 +248,29 @@ export default async function AdminPage() {
           <tbody>
             {workspaces.map((w, i) => {
               const stats = activity[i];
+              const cell = "border-b px-4 py-3.5 text-[13px]";
+              const border = { borderColor: "var(--hairline-soft)" };
+              const muted = { ...border, color: "var(--ink-muted)" };
               return (
                 <tr key={w.id} className="row-hover transition-colors">
-                  <td className="border-b px-5 py-3.5 font-medium" style={{ borderColor: "var(--hairline-soft)" }}>{w.name}</td>
-                  <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)", color: "var(--ink-muted)" }}>
-                    {w.users[0]?.email ?? "—"}
+                  <td className="border-b px-4 py-3.5 font-medium" style={border}>
+                    <div className="max-w-[160px] truncate" title={w.name}>{w.name}</div>
                   </td>
-                  <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)" }}>{w.plan}</td>
-                  <td className="font-mono-tab border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)" }}>
+                  <td className={`${cell} ${COLUMN_SHOW.owner}`} style={muted}>
+                    <div className="max-w-[180px] truncate" title={w.users[0]?.email}>{w.users[0]?.email ?? "-"}</div>
+                  </td>
+                  <td className={`${cell} ${COLUMN_SHOW.plan}`} style={border}>{w.plan}</td>
+                  <td className={`font-mono-tab whitespace-nowrap ${cell} ${COLUMN_SHOW.calls}`} style={border}>
                     {w.callsUsedThisMonth} / {w.callsLimit}
                   </td>
-                  <td className="font-mono-tab border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)" }}>{stats._count}</td>
-                  <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)", color: "var(--ink-muted)" }}>
+                  <td className={`font-mono-tab ${cell} ${COLUMN_SHOW.deals}`} style={border}>{stats._count}</td>
+                  <td className={`whitespace-nowrap ${cell} ${COLUMN_SHOW.signedUp}`} style={muted}>
                     {w.createdAt.toLocaleDateString()}
                   </td>
-                  <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)", color: "var(--ink-muted)" }}>
-                    {stats._max.updatedAt ? timeAgo(stats._max.updatedAt) : "—"}
+                  <td className={`whitespace-nowrap ${cell} ${COLUMN_SHOW.lastActivity}`} style={muted}>
+                    {stats._max.updatedAt ? timeAgo(stats._max.updatedAt) : "-"}
                   </td>
-                  <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)" }}>
+                  <td className={cell} style={border}>
                     <form action={setProspectingEnabled.bind(null, w.id, !w.prospectingEnabled)}>
                       <button
                         type="submit"
@@ -241,13 +301,13 @@ export default async function AdminPage() {
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                {["When", "Workspace", "Actor", "Event", "Details"].map((h) => (
+                {AUDIT_COLUMNS.map((col) => (
                   <th
-                    key={h}
-                    className="border-b px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wide"
+                    key={col.label}
+                    className={`whitespace-nowrap border-b px-3 py-3 text-left text-[12px] font-medium uppercase tracking-wide ${col.show}`}
                     style={{ color: "var(--ink-muted)", borderColor: "var(--hairline)" }}
                   >
-                    {h}
+                    {col.label}
                   </th>
                 ))}
               </tr>
@@ -267,22 +327,22 @@ export default async function AdminPage() {
                 }
                 return (
                   <tr key={entry.id} className="row-hover transition-colors">
-                    <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)", color: "var(--ink-muted)" }}>
+                    <td className="whitespace-nowrap border-b px-3 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)", color: "var(--ink-muted)" }}>
                       {timeAgo(entry.createdAt)}
                     </td>
-                    <td className="border-b px-5 py-3.5 text-[13px] font-medium" style={{ borderColor: "var(--hairline-soft)" }}>
-                      {entry.workspace?.name ?? "—"}
+                    <td className={`border-b px-3 py-3.5 text-[13px] font-medium ${AUDIT_SHOW.workspace}`} style={{ borderColor: "var(--hairline-soft)" }}>
+                      <div className="max-w-[140px] truncate" title={entry.workspace?.name}>{entry.workspace?.name ?? "-"}</div>
                     </td>
-                    <td className="border-b px-5 py-3.5 text-[13px]" style={{ borderColor: "var(--hairline-soft)", color: "var(--ink-muted)" }}>
-                      {entry.actorEmail ?? "—"}
+                    <td className={`border-b px-3 py-3.5 text-[13px] ${AUDIT_SHOW.actor}`} style={{ borderColor: "var(--hairline-soft)", color: "var(--ink-muted)" }}>
+                      <div className="max-w-[170px] truncate" title={entry.actorEmail ?? undefined}>{entry.actorEmail ?? "-"}</div>
                     </td>
-                    <td className="border-b px-5 py-3.5" style={{ borderColor: "var(--hairline-soft)" }}>
+                    <td className="whitespace-nowrap border-b px-3 py-3.5" style={{ borderColor: "var(--hairline-soft)" }}>
                       <span className={`chip ${AUDIT_ACTION_CHIP[entry.action] ?? "chip-neutral"}`}>
                         <span className="chip-dot" />
                         {AUDIT_ACTION_LABEL[entry.action] ?? entry.action}
                       </span>
                     </td>
-                    <td className="border-b px-5 py-3.5 text-[12.5px]" style={{ borderColor: "var(--hairline-soft)", color: "var(--ink-muted)" }}>
+                    <td className={`min-w-[140px] border-b px-3 py-3.5 text-[12.5px] [overflow-wrap:anywhere] ${AUDIT_SHOW.details}`} style={{ borderColor: "var(--hairline-soft)", color: "var(--ink-muted)" }}>
                       {details}
                       {entry.ip ? ` · ${entry.ip}` : ""}
                     </td>
