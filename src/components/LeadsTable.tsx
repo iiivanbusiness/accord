@@ -35,15 +35,18 @@ export default function LeadsTable({
   canAssign,
   assignees,
   assignAction,
+  deleteAction,
 }: {
   rows: LeadRow[];
   showOwner: boolean;
   canAssign: boolean;
   assignees: { id: string; name: string }[];
   assignAction: (input: AssignInput) => Promise<{ created: number }>;
+  deleteAction?: (leadIds: string[]) => Promise<{ deleted: number }>;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [dialog, setDialog] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const allOnPage = rows.length > 0 && rows.every((r) => selected.has(r.id));
@@ -180,9 +183,27 @@ export default function LeadsTable({
           >
             <span className="whitespace-nowrap text-[13px] font-medium">{selected.size.toLocaleString("en-US")} selected</span>
             <button type="button" onClick={() => setSelected(new Set())} className="btn btn-ghost btn-sm">Clear</button>
+            {deleteAction && (
+              <button type="button" onClick={() => setConfirmDelete(true)} className="btn btn-ghost btn-sm" style={{ color: "#c0392b" }}>Delete</button>
+            )}
             <button type="button" onClick={() => setDialog(true)} className="btn btn-primary btn-sm">Assign</button>
           </div>
         </div>
+      )}
+
+      {confirmDelete && deleteAction && (
+        <DeleteDialog
+          count={selected.size}
+          onClose={() => setConfirmDelete(false)}
+          onConfirm={async () => {
+            const { deleted } = await deleteAction([...selected]);
+            return () => {
+              setNotice(`Deleted ${deleted.toLocaleString("en-US")} ${deleted === 1 ? "lead" : "leads"}.`);
+              setSelected(new Set());
+              setConfirmDelete(false);
+            };
+          }}
+        />
       )}
 
       {dialog && (
@@ -262,6 +283,46 @@ function AssignDialog({
           <button type="button" disabled={pending} onClick={onClose} className="btn btn-secondary">Cancel</button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function DeleteDialog({ count, onClose, onConfirm }: { count: number; onClose: () => void; onConfirm: () => Promise<() => void> }) {
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const what = `${count.toLocaleString("en-US")} ${count === 1 ? "lead" : "leads"}`;
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ background: "rgba(0,0,0,0.45)" }} onMouseDown={(e) => e.target === e.currentTarget && !pending && onClose()}>
+      <div role="dialog" aria-modal="true" aria-label="Delete leads" className="card flex w-full max-w-[440px] flex-col gap-4 rounded-b-none p-5 sm:rounded-b-[var(--r-lg)] sm:p-6">
+        <div>
+          <h2 className="text-[16px] font-medium">Delete {what}?</h2>
+          <div className="mt-1 text-[13px]" style={{ color: "var(--ink-muted)" }}>
+            Their tasks and call notes are deleted too. Leads that became deals keep their deal and client. This can&apos;t be undone.
+          </div>
+        </div>
+        {error && <div className="chip chip-warn w-full justify-start px-4 py-2.5 text-[12.5px]">{error}</div>}
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                try {
+                  const done = await onConfirm();
+                  startTransition(done);
+                } catch {
+                  setError("Couldn't delete those. Try again.");
+                }
+              })
+            }
+            className="btn"
+            style={{ background: "#c0392b", color: "#fff" }}
+          >
+            {pending ? "Deleting…" : `Delete ${what}`}
+          </button>
+          <button type="button" disabled={pending} onClick={onClose} className="btn btn-secondary">Cancel</button>
+        </div>
+      </div>
     </div>
   );
 }

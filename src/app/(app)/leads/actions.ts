@@ -7,6 +7,8 @@ import { requireProspecting } from "@/lib/prospecting";
 import { normalizePhone } from "@/lib/phone";
 import { isLeadStage, LEAD_INTERESTS } from "@/lib/lead-stages";
 import { leadAccess } from "@/lib/lead-visibility";
+import { currentUserWithRole } from "@/lib/permissions";
+import { logAudit } from "@/lib/audit";
 
 function text(formData: FormData, key: string): string | null {
   const value = String(formData.get(key) ?? "").trim();
@@ -100,4 +102,40 @@ export async function setLeadStage(leadId: string, stage: string) {
   }
   revalidatePath("/leads");
   revalidatePath(`/leads/${leadId}`);
+}
+
+// Managers only. Tasks go with the lead (cascade); its call transcripts are
+// deleted too, unless the lead became a deal, where the calls are part of
+// the deal's history now. A converted lead's client and deal stay.
+export async function deleteLeads(leadIds: string[]): Promise<{ deleted: number }> {
+  const workspace = await requireProspecting();
+  const access = await leadAccess();
+  if (!access.canAssign) throw new Error("Only managers can delete leads");
+  if (!Array.isArray(leadIds) || leadIds.length === 0) return { deleted: 0 };
+  if (leadIds.length > 1000) throw new Error("Delete up to 1,000 leads at a time");
+
+  const leads = await prisma.lead.findMany({
+    where: { workspaceId: workspace.id, id: { in: leadIds.map(String) }, AND: [access.where] },
+    select: { id: true },
+  });
+  const ids = leads.map((l) => l.id);
+  if (ids.length === 0) return { deleted: 0 };
+
+  const user = await currentUserWithRole();
+  await prisma.$transaction([
+    prisma.phoneCall.deleteMany({ where: { leadId: { in: ids }, dealId: null } }),
+    prisma.lead.deleteMany({ where: { id: { in: ids } } }),
+  ]);
+  await logAudit({ workspaceId: workspace.id, actorEmail: user.email, action: "lead.deleted", targetType: "lead", targetId: ids.length === 1 ? ids[0] : undefined, metadata: { count: ids.length } });
+
+  revalidatePath("/leads");
+  revalidatePath("/today");
+  revalidatePath("/team");
+  return { deleted: ids.length };
+}
+
+// The "Delete lead" button on a lead's own page.
+export async function deleteLead(leadId: string): Promise<void> {
+  await deleteLeads([leadId]);
+  redirect("/leads?deleted=1");
 }

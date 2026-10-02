@@ -10,7 +10,8 @@ import SubmitButton from "@/components/SubmitButton";
 import LeadTasks from "@/components/LeadTasks";
 import LeadCalls from "@/components/LeadCalls";
 import ConvertLeadButton from "@/components/ConvertLeadButton";
-import { setLeadStage, updateLead } from "../actions";
+import DeleteLeadButton from "@/components/DeleteLeadButton";
+import { deleteLead, setLeadStage, updateLead } from "../actions";
 import { createLeadTask, deleteTask, setTaskStatus } from "../task-actions";
 import { processColdCallTranscript } from "../call-actions";
 import { convertLeadToDeal } from "../convert-actions";
@@ -159,6 +160,7 @@ export default async function LeadPage({
               </div>
             )}
           </div>
+          {access.canAssign && <DeleteLeadButton action={deleteLead.bind(null, lead.id)} />}
         </div>
       </div>
     </>

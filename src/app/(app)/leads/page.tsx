@@ -8,6 +8,7 @@ import { formatPhone } from "@/lib/phone";
 import LeadsFilterBar from "@/components/LeadsFilterBar";
 import LeadsTable from "@/components/LeadsTable";
 import { assignLeadTasks } from "./task-actions";
+import { deleteLeads } from "./actions";
 
 const TABS = [
   { key: "", label: "All" },
@@ -34,7 +35,7 @@ function formatDay(date: Date): string {
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; q?: string; stage?: string; owner?: string }>;
+  searchParams: Promise<{ tab?: string; q?: string; stage?: string; owner?: string; deleted?: string }>;
 }) {
   const workspace = await requireProspecting();
   const user = await currentUserWithRole();
@@ -128,6 +129,10 @@ export default async function LeadsPage({
       </div>
       )}
 
+      {params.deleted && (
+        <div className="chip chip-success mb-3 w-full justify-start px-4 py-2.5 text-[12.5px]" role="status">Lead deleted.</div>
+      )}
+
       <LeadsFilterBar owners={access.canViewAll ? members : []} showOwnerFilter={access.canViewAll && tab === ""} />
 
       {leads.length === 0 ? (
@@ -154,6 +159,7 @@ export default async function LeadsPage({
             canAssign={access.canAssign}
             assignees={access.canAssign ? members : []}
             assignAction={assignLeadTasks}
+            deleteAction={access.canAssign ? deleteLeads : undefined}
             rows={leads.map((lead) => {
               const next = [lead.nextStepAt ? formatDay(lead.nextStepAt) : null, lead.nextStep].filter(Boolean).join(" · ");
               return {
