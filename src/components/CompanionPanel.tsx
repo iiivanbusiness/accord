@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { LOCAL_CAPTURE_STORAGE_KEY, LOCAL_CAPTURE_EVENT } from "./LocalCaptureForm";
 import CallHighlightsList, { type CallHighlightItem } from "./CallHighlightsList";
 import RecentNotesList, { type RecentNoteItem } from "./RecentNotesList";
+import ClientText from "@/components/ClientText";
 
 type Session = { dealId: string; token: string; startedAt: number };
 type StopResult = { ok: boolean; error?: string };
@@ -467,7 +468,7 @@ export default function CompanionPanel({ upcomingEvents, fastPoll = false }: { u
                         >
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-[12.5px] font-medium" style={{ color: glass.text }}>{event.title}</div>
-                            <div className="text-[11px]" style={{ color: glass.textDim }}>{formatEventTime(event.startTime)}</div>
+                            <div className="text-[11px]" style={{ color: glass.textDim }}><ClientText text={() => formatEventTime(event.startTime)} /></div>
                           </div>
                           <svg
                             viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"

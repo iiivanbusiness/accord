@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import ClientText from "@/components/ClientText";
 
 type Delivery = { id: string; event: string; responseStatus: number | null; error: string | null; createdAt: string };
 type Endpoint = { id: string; url: string; secret: string; events: string[]; enabled: boolean; deliveries: Delivery[] };
@@ -80,7 +81,7 @@ function EndpointCard({
           <div className="mb-1 text-[10.5px] font-medium" style={{ color: "var(--ink-muted)" }}>RECENT DELIVERIES</div>
           {endpoint.deliveries.map((d) => (
             <div key={d.id} className="flex items-center justify-between text-[11px]" style={{ color: "var(--ink-muted)" }}>
-              <span>{d.event} · {formatDate(d.createdAt)}</span>
+              <span>{d.event} · <ClientText text={() => formatDate(d.createdAt)} /></span>
               <span style={{ color: d.responseStatus && d.responseStatus < 300 ? "var(--accent-blue)" : "#c0392b" }}>
                 {d.error ? "failed" : d.responseStatus}
               </span>

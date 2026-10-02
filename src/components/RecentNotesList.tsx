@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ClientText from "@/components/ClientText";
 
 export type RecentNoteItem = {
   id: string;
@@ -67,7 +68,7 @@ export default function RecentNotesList({ items }: { items: RecentNoteItem[] }) 
                     <div className="mb-0.5 flex items-center gap-1.5 text-[10px]" style={{ color: "var(--ink-muted)" }}>
                       <span>{TYPE_LABEL[item.type] ?? item.type}</span>
                       <span>·</span>
-                      <span>{formatWhen(item.createdAt)}</span>
+                      <span><ClientText text={() => formatWhen(item.createdAt)} /></span>
                     </div>
                     <p className="text-[12.5px] leading-snug">{item.body}</p>
                   </div>

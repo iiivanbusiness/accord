@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useVisibleInterval } from "@/lib/use-visible-interval";
+import ClientText from "@/components/ClientText";
 
 type ChecklistItem = { id: string; label: string; done: boolean };
 type Comment = { id: string; authorName: string; authorEmail: string; body: string; createdAt: string };
@@ -481,7 +482,8 @@ export default function ReviewPanel({
       <div className="flex flex-col">
         {rows.map((row, i) => {
           const isLast = i === rows.length - 1;
-          const timeLabel = row.kind === "upcoming" ? "next" : row.time ? formatWhen(row.time) : "now";
+          const time = row.time;
+          const timeLabel = row.kind === "upcoming" ? "next" : time ? <ClientText text={() => formatWhen(time)} /> : "now";
           const rowAnimation = newRowIds.has(row.id)
             ? "review-row-in 0.35s ease-out"
             : changedRowIds.has(row.id)
@@ -601,7 +603,7 @@ export default function ReviewPanel({
                           <div className="mb-0.5 flex items-center justify-between gap-2">
                             <span className="text-[12px] font-medium">{c.authorName}</span>
                             <div className="flex items-center gap-2">
-                              <span className="text-[10.5px]" style={{ color: "var(--ink-muted)" }}>{c.id.startsWith("pending-") ? "Saving…" : timeAgo(c.createdAt)}</span>
+                              <span className="text-[10.5px]" style={{ color: "var(--ink-muted)" }}>{c.id.startsWith("pending-") ? "Saving…" : <ClientText text={() => timeAgo(c.createdAt)} />}</span>
                               {c.authorEmail === currentUserEmail && !c.id.startsWith("pending-") && (
                                 <button type="button" onClick={() => deleteComment(c.id)} className="text-[10.5px]" style={{ color: "var(--ink-muted)" }}>
                                   Delete
