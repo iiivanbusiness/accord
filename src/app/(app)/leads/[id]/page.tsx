@@ -7,7 +7,9 @@ import { LEAD_STAGES, LEAD_STAGE_LABEL, LEAD_INTEREST_LABEL } from "@/lib/lead-s
 import { formatPhone } from "@/lib/phone";
 import LeadFields from "@/components/LeadFields";
 import SubmitButton from "@/components/SubmitButton";
+import LeadTasks from "@/components/LeadTasks";
 import { setLeadStage, updateLead } from "../actions";
+import { createLeadTask, deleteTask, setTaskStatus } from "../task-actions";
 
 function formatDay(date: Date): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
@@ -25,11 +27,17 @@ export default async function LeadPage({
   const { created, saved } = await searchParams;
 
   const access = await leadAccess();
-  const [lead, members] = await Promise.all([
+  const [lead, members, tasks] = await Promise.all([
     prisma.lead.findFirst({ where: { id, workspaceId: workspace.id, ...access.where }, include: { owner: { select: { id: true, name: true } } } }),
     access.canAssign
       ? prisma.user.findMany({ where: { workspaceId: workspace.id, deactivatedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } })
       : Promise.resolve([]),
+    // Only used once the lead itself passed the visibility check below.
+    prisma.task.findMany({
+      where: { leadId: id, workspaceId: workspace.id },
+      select: { id: true, type: true, dueDate: true, dueTime: true, priority: true, status: true, note: true, assigneeId: true, assignee: { select: { name: true } } },
+      orderBy: [{ dueDate: "asc" }, { dueTime: "asc" }, { createdAt: "asc" }],
+    }),
   ]);
   if (!lead) notFound();
   // A rep can't reassign, so the owner field just shows who has it.
@@ -90,6 +98,16 @@ export default async function LeadPage({
               })}
             </div>
           </div>
+
+          <LeadTasks
+            tasks={tasks.map(({ assignee, ...t }) => ({ ...t, dueDate: t.dueDate.toISOString(), assigneeName: assignee?.name ?? null }))}
+            userId={access.userId}
+            canAssign={access.canAssign}
+            assignees={members}
+            createAction={createLeadTask.bind(null, lead.id)}
+            statusAction={setTaskStatus}
+            deleteAction={deleteTask}
+          />
 
           <div className="card flex flex-col gap-2.5 p-5 text-[13px]">
             <div className="text-[14px] font-medium">At a glance</div>

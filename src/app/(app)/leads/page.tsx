@@ -6,6 +6,8 @@ import { leadAccess } from "@/lib/lead-visibility";
 import { isLeadStage, LEAD_INTEREST_LABEL, LEAD_STAGE_CHIP, LEAD_STAGE_LABEL } from "@/lib/lead-stages";
 import { formatPhone } from "@/lib/phone";
 import LeadsFilterBar from "@/components/LeadsFilterBar";
+import LeadsTable from "@/components/LeadsTable";
+import { assignLeadTasks } from "./task-actions";
 
 const TABS = [
   { key: "", label: "All" },
@@ -29,15 +31,6 @@ function formatDay(date: Date): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
-// Columns drop out as the window narrows so the table never runs past the
-// card; below md the list switches to stacked rows instead.
-const SHOW = {
-  company: "hidden lg:table-cell",
-  owner: "hidden 2xl:table-cell",
-  next: "hidden xl:table-cell",
-  updated: "hidden 2xl:table-cell",
-};
-
 export default async function LeadsPage({
   searchParams,
 }: {
@@ -52,25 +45,28 @@ export default async function LeadsPage({
   const tab = access.canViewAll ? (params.tab ?? "") : "";
   const { q, stage, owner } = params;
 
+  // AND, not a spread: the visibility rule and the search are both ORs.
   const where = {
     workspaceId: workspace.id,
-    ...access.where,
-    ...(tab === "mine" ? { ownerId: user.id } : tab === "unassigned" ? { ownerId: null } : {}),
-    ...(stage && isLeadStage(stage) ? { stage } : {}),
-    ...(owner && tab === "" ? { ownerId: owner } : {}),
-    ...(q
-      ? {
-          OR: [
-            { name: { contains: q, mode: "insensitive" as const } },
-            { company: { contains: q, mode: "insensitive" as const } },
-            { email: { contains: q, mode: "insensitive" as const } },
-            { phone: { contains: q.replace(/[^\d+]/g, "") || q } },
-          ],
-        }
-      : {}),
+    AND: [
+      access.where,
+      tab === "mine" ? { ownerId: user.id } : tab === "unassigned" ? { ownerId: null } : {},
+      stage && isLeadStage(stage) ? { stage } : {},
+      owner && tab === "" ? { ownerId: owner } : {},
+      q
+        ? {
+            OR: [
+              { name: { contains: q, mode: "insensitive" as const } },
+              { company: { contains: q, mode: "insensitive" as const } },
+              { email: { contains: q, mode: "insensitive" as const } },
+              { phone: { contains: q.replace(/[^\d+]/g, "") || q } },
+            ],
+          }
+        : {},
+    ],
   };
 
-  const [leads, owners, total] = await Promise.all([
+  const [leads, members, total] = await Promise.all([
     prisma.lead.findMany({
       where,
       select: {
@@ -90,7 +86,7 @@ export default async function LeadsPage({
       orderBy: { updatedAt: "desc" },
       take: 500,
     }),
-    access.canViewAll
+    access.canViewAll || access.canAssign
       ? prisma.user.findMany({ where: { workspaceId: workspace.id, deactivatedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } })
       : Promise.resolve([]),
     prisma.lead.count({ where: { workspaceId: workspace.id, ...access.where } }),
@@ -132,7 +128,7 @@ export default async function LeadsPage({
       </div>
       )}
 
-      <LeadsFilterBar owners={owners} showOwnerFilter={access.canViewAll && tab === ""} />
+      <LeadsFilterBar owners={access.canViewAll ? members : []} showOwnerFilter={access.canViewAll && tab === ""} />
 
       {leads.length === 0 ? (
         <div className="card flex flex-col items-start gap-3 p-6">
@@ -153,93 +149,28 @@ export default async function LeadsPage({
         </div>
       ) : (
         <>
-          {/* Phone: stacked rows */}
-          <div className="card divide-y overflow-hidden md:hidden" style={{ borderColor: "var(--hairline)" }}>
-            {leads.map((lead) => (
-              <Link key={lead.id} href={`/leads/${lead.id}`} className="row-hover flex flex-col gap-1.5 px-4 py-3.5" style={{ borderColor: "var(--hairline-soft)" }}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-[14px] font-medium" style={{ color: "var(--ink)" }}>{lead.name}</div>
-                    <div className="truncate text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-                      {[lead.title, lead.company].filter(Boolean).join(" · ") || lead.email || formatPhone(lead.phone) || "No details yet"}
-                    </div>
-                  </div>
-                  <span className={`chip flex-none ${LEAD_STAGE_CHIP[lead.stage] ?? "chip-neutral"}`}>{LEAD_STAGE_LABEL[lead.stage] ?? lead.stage}</span>
-                </div>
-                {(lead.nextStep || lead.nextStepAt) && (
-                  <div className="truncate text-[12px]" style={{ color: "var(--ink-muted)" }}>
-                    Next: {[lead.nextStepAt ? formatDay(lead.nextStepAt) : null, lead.nextStep].filter(Boolean).join(" · ")}
-                  </div>
-                )}
-              </Link>
-            ))}
-          </div>
-
-          {/* Computer: table */}
-          <div className="card hidden overflow-hidden md:block">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr>
-                    {[
-                      { label: "Lead", show: "" },
-                      { label: "Company", show: SHOW.company },
-                      { label: "Stage", show: "" },
-                      { label: "Interest", show: "" },
-                      ...(access.canViewAll ? [{ label: "Owner", show: SHOW.owner }] : []),
-                      { label: "Next step", show: SHOW.next },
-                      { label: "Updated", show: SHOW.updated },
-                    ].map((col) => (
-                      <th
-                        key={col.label}
-                        className={`whitespace-nowrap border-b px-4 py-3 text-left text-[11.5px] font-medium uppercase tracking-wide ${col.show}`}
-                        style={{ color: "var(--ink-muted)", borderColor: "var(--hairline)" }}
-                      >
-                        {col.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {leads.map((lead) => {
-                    const cell = "border-b px-4 py-3 text-[13px]";
-                    const border = { borderColor: "var(--hairline-soft)" };
-                    const muted = { ...border, color: "var(--ink-muted)" };
-                    return (
-                      <tr key={lead.id} className="row-hover transition-colors">
-                        <td className={cell} style={border}>
-                          <Link href={`/leads/${lead.id}`} className="block max-w-[200px]">
-                            <div className="truncate font-medium" style={{ color: "var(--ink)" }} title={lead.name}>{lead.name}</div>
-                            <div className="truncate text-[12px]" style={{ color: "var(--ink-muted)" }}>
-                              {lead.title || lead.email || formatPhone(lead.phone) || " "}
-                            </div>
-                          </Link>
-                        </td>
-                        <td className={`${cell} ${SHOW.company}`} style={muted}>
-                          <div className="max-w-[160px] truncate" title={lead.company ?? undefined}>{lead.company ?? "-"}</div>
-                        </td>
-                        <td className={cell} style={border}>
-                          <span className={`chip whitespace-nowrap ${LEAD_STAGE_CHIP[lead.stage] ?? "chip-neutral"}`}>{LEAD_STAGE_LABEL[lead.stage] ?? lead.stage}</span>
-                        </td>
-                        <td className={`whitespace-nowrap ${cell}`} style={muted}>{lead.interest ? LEAD_INTEREST_LABEL[lead.interest] : "-"}</td>
-                        {access.canViewAll && (
-                          <td className={`${cell} ${SHOW.owner}`} style={muted}>
-                            <div className="max-w-[120px] truncate">{lead.owner?.name ?? "Unassigned"}</div>
-                          </td>
-                        )}
-                        <td className={`${cell} ${SHOW.next}`} style={muted}>
-                          <div className="max-w-[180px] truncate" title={lead.nextStep ?? undefined}>
-                            {[lead.nextStepAt ? formatDay(lead.nextStepAt) : null, lead.nextStep].filter(Boolean).join(" · ") || "-"}
-                          </div>
-                        </td>
-                        <td className={`whitespace-nowrap ${cell} ${SHOW.updated}`} style={muted}>{timeAgo(lead.updatedAt)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <LeadsTable
+            showOwner={access.canViewAll}
+            canAssign={access.canAssign}
+            assignees={access.canAssign ? members : []}
+            assignAction={assignLeadTasks}
+            rows={leads.map((lead) => {
+              const next = [lead.nextStepAt ? formatDay(lead.nextStepAt) : null, lead.nextStep].filter(Boolean).join(" · ");
+              return {
+                id: lead.id,
+                name: lead.name,
+                subtitle: [lead.title, lead.company].filter(Boolean).join(" · ") || lead.email || formatPhone(lead.phone) || "",
+                secondary: lead.title || lead.email || formatPhone(lead.phone) || "",
+                company: lead.company,
+                stageLabel: LEAD_STAGE_LABEL[lead.stage] ?? lead.stage,
+                stageChip: LEAD_STAGE_CHIP[lead.stage] ?? "chip-neutral",
+                interest: lead.interest ? LEAD_INTEREST_LABEL[lead.interest] : "-",
+                owner: lead.owner?.name ?? "Unassigned",
+                next,
+                updated: timeAgo(lead.updatedAt),
+              };
+            })}
+          />
           {leads.length === 500 && (
             <div className="mt-2 text-[12px]" style={{ color: "var(--ink-muted)" }}>Showing the 500 most recently updated. Search or filter to narrow it down.</div>
           )}

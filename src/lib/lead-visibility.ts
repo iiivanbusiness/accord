@@ -4,10 +4,12 @@ import { currentUserWithRole } from "@/lib/permissions";
 type UserWithRole = Awaited<ReturnType<typeof currentUserWithRole>>;
 
 // Who sees and hands out which leads. Same "see everything" switch as deals
-// (canViewAllDeals): without it a rep only sees leads they own. Assigning a
-// lead to someone else is a manager's call (canManageTeam); everyone else
-// can only take a lead themselves. Spread `where` into every lead query
-// alongside workspaceId.
+// (canViewAllDeals): without it a rep sees leads they own plus any lead
+// they've been given a task on (otherwise a manager could hand them a call
+// they can't open). Assigning a lead or a task to someone else is a
+// manager's call (canManageTeam); everyone else can only take it
+// themselves. Put `where` inside an AND with any other OR filter, since it
+// carries its own OR.
 export async function leadAccess(user?: UserWithRole): Promise<{
   where: Prisma.LeadWhereInput;
   canViewAll: boolean;
@@ -17,5 +19,10 @@ export async function leadAccess(user?: UserWithRole): Promise<{
   const u = user ?? (await currentUserWithRole());
   const canViewAll = Boolean(u.role?.canViewAllDeals);
   const canAssign = Boolean(u.role?.canManageTeam);
-  return { where: canViewAll ? {} : { ownerId: u.id }, canViewAll, canAssign, userId: u.id };
+  return {
+    where: canViewAll ? {} : { OR: [{ ownerId: u.id }, { tasks: { some: { assigneeId: u.id } } }] },
+    canViewAll,
+    canAssign,
+    userId: u.id,
+  };
 }
