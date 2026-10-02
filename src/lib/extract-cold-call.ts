@@ -44,7 +44,7 @@ const SYSTEM =
   "If nobody picked up, or it went to voicemail, say so and leave the prospect fields empty. " +
   "Pain points and objections: merge what's already on file with anything new from this call into one short list each, newest first, separated by semicolons. " +
   "Next step dates: resolve relative days (\"next Tuesday\", \"tomorrow\") using the calendar given below. " +
-  "Write everything in English.";
+  "Write everything in English, in plain sentences without em dashes.";
 
 export async function extractColdCall(transcript: string, lead: LeadContext, today: string): Promise<ColdCallResult> {
   const client = new Anthropic();
@@ -110,7 +110,9 @@ export async function extractColdCall(transcript: string, lead: LeadContext, tod
   const toolUse = response.content.find((b) => b.type === "tool_use");
   if (!toolUse || toolUse.type !== "tool_use") throw new Error("Claude didn't return the call details");
   const input = toolUse.input as Record<string, string | undefined>;
-  const text = (v: string | undefined) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  // Em dashes read as machine-written in the CRM, so any that slip through
+  // become commas.
+  const text = (v: string | undefined) => (typeof v === "string" && v.trim() ? v.trim().replace(/\s*\u2014\s*/g, ", ") : null);
 
   const outcome = (CALL_OUTCOMES as readonly string[]).includes(input.outcome ?? "") ? (input.outcome as CallOutcome) : "follow_up";
   const date = text(input.nextStepDate);
