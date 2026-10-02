@@ -433,7 +433,8 @@ function AssignControls({
       {mode === "column" && hasOwnerColumn && (
         <div className="ml-6 flex flex-col gap-1.5">
           <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            {matched.toLocaleString("en-US")} of {leadCount.toLocaleString("en-US")} rows match a teammate. The rest go to:
+            {matched.toLocaleString("en-US")} of {leadCount.toLocaleString("en-US")} {leadCount === 1 ? "row" : "rows"}{" "}
+            {leadCount === 1 ? "matches" : "match"} a teammate. {matched === leadCount ? "If any don't match, they go to:" : "The rest go to:"}
           </div>
           <select value={fallbackOwner} onChange={(e) => setFallbackOwner(e.target.value)} className="input max-w-[300px]" disabled={disabled} aria-label="Rows with no match go to">
             <option value="">Nobody yet (Unassigned)</option>
