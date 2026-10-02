@@ -84,7 +84,7 @@ export async function GET(req: Request) {
   const cookie = await mintSessionCookie({ id: user.id, name: user.name, email: user.email, workspaceId: workspace.id });
   await logAudit({ workspaceId: workspace.id, actorEmail: claims.email, action: "login.success", metadata: { provider: "sso" } });
 
-  const response = NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/dashboard`);
+  const response = NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/`);
   response.cookies.set(cookie.name, cookie.value, cookie.options);
   return response;
 }

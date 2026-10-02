@@ -25,7 +25,7 @@ export default async function LoginPage({
         email: formData.get("email"),
         password: formData.get("password"),
         code: formData.get("code"),
-        redirectTo: callbackUrl || "/dashboard",
+        redirectTo: callbackUrl || "/",
       });
     } catch (err) {
       if (err instanceof AuthError) {
@@ -37,7 +37,7 @@ export default async function LoginPage({
 
   async function continueWithGoogle() {
     "use server";
-    await signIn("google", { redirectTo: callbackUrl || "/dashboard" });
+    await signIn("google", { redirectTo: callbackUrl || "/" });
   }
 
   return (

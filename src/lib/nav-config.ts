@@ -12,7 +12,13 @@ const OVERVIEW: NavGroup = {
     { href: "/calendar", label: "Calendar" },
   ],
 };
-const PROSPECTING: NavGroup = { label: "Prospecting", items: [{ href: "/leads", label: "Leads" }] };
+const PROSPECTING: NavGroup = {
+  label: "Prospecting",
+  items: [
+    { href: "/today", label: "Today" },
+    { href: "/leads", label: "Leads" },
+  ],
+};
 const CLOSING: NavGroup = {
   label: "Closing",
   items: [
@@ -55,6 +61,7 @@ export function mobilePrimaryItems(groups: NavGroup[], prospecting: boolean, cou
 
 const SCREEN_LABELS: { test: (path: string) => boolean; label: string }[] = [
   { test: (p) => p === "/dashboard", label: "Dashboard" },
+  { test: (p) => p === "/today", label: "Today" },
   { test: (p) => p === "/deals/new", label: "Start a call" },
   { test: (p) => /^\/deals\/[^/]+\/contract$/.test(p), label: "Contract review" },
   { test: (p) => /^\/deals\/[^/]+\/send$/.test(p), label: "Send contract" },

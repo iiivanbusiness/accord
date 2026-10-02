@@ -94,6 +94,7 @@ export async function setTaskStatus(taskId: string, status: "open" | "done" | "s
 
   await prisma.task.update({ where: { id: task.id }, data: { status, completedAt: status === "open" ? null : new Date() } });
   if (task.leadId) revalidatePath(`/leads/${task.leadId}`);
+  revalidatePath("/today");
 }
 
 // Managers only: take a task off entirely.

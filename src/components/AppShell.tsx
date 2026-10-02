@@ -13,6 +13,7 @@ import ScreenLabel from "./ScreenLabel";
 import GlassPanel from "./GlassPanel";
 import EmailVerifyBanner from "./EmailVerifyBanner";
 import LocalCaptureBanner from "./LocalCaptureBanner";
+import TimezoneSync from "./TimezoneSync";
 import AiDisclosureModal from "./AiDisclosureModal";
 import FaqChatWidget from "./FaqChatWidget";
 import NotificationBell from "./NotificationBell";
@@ -21,6 +22,7 @@ import { getUnreadNotifications } from "@/app/(app)/notifications/actions";
 const NAV_ICONS: Record<string, () => React.ReactNode> = {
   "/dashboard": DashboardIcon,
   "/deals": DealsIcon,
+  "/today": TodayIcon,
   "/leads": LeadsIcon,
   "/calendar": CalendarIcon,
   "/analytics": AnalyticsIcon,
@@ -118,6 +120,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
       </div>
 
       {currentUser && <AiDisclosureModal show={!currentUser.aiDisclosureAcknowledgedAt} />}
+      <TimezoneSync />
 
       <FaqChatWidget />
 
@@ -176,6 +179,15 @@ function AnalyticsIcon() {
     <svg {...iconProps()}>
       <path d="M4 16V9M10 16V4M16 16v-6.5" />
       <path d="M2.5 16h15" />
+    </svg>
+  );
+}
+
+function TodayIcon() {
+  return (
+    <svg {...iconProps()}>
+      <circle cx="10" cy="10" r="3.2" />
+      <path d="M10 2.6v1.8M10 15.6v1.8M2.6 10h1.8M15.6 10h1.8M4.8 4.8l1.3 1.3M13.9 13.9l1.3 1.3M4.8 15.2l1.3-1.3M13.9 6.1l1.3-1.3" />
     </svg>
   );
 }
