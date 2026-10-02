@@ -254,7 +254,7 @@ function AssignDialog({
         <TaskFields draft={draft} setDraft={setDraft} assignees={assignees} disabled={pending} />
         <label className="flex items-start gap-2.5 text-[13px]">
           <input type="checkbox" className="mt-[2px] h-4 w-4" checked={makeOwner} onChange={(e) => setMakeOwner(e.target.checked)} disabled={pending} />
-          <span>Also make them the owner of these leads</span>
+          <span>Also make them the owner of {count === 1 ? "this lead" : "these leads"}</span>
         </label>
         {error && <div className="chip chip-warn w-full justify-start px-4 py-2.5 text-[12.5px]">{error}</div>}
         <div className="flex flex-wrap gap-2">
