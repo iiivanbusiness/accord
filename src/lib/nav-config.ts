@@ -60,6 +60,8 @@ const SCREEN_LABELS: { test: (path: string) => boolean; label: string }[] = [
   { test: (p) => /^\/deals\/[^/]+\/send$/.test(p), label: "Send contract" },
   { test: (p) => /^\/deals\/[^/]+$/.test(p), label: "Deal" },
   { test: (p) => p === "/deals", label: "Deals" },
+  { test: (p) => p === "/leads/new", label: "New lead" },
+  { test: (p) => /^\/leads\/[^/]+$/.test(p), label: "Lead" },
   { test: (p) => p === "/leads", label: "Leads" },
   { test: (p) => p === "/calendar/new", label: "New event" },
   { test: (p) => p === "/calendar", label: "Calendar" },

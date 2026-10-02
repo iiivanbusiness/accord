@@ -1,8 +1,10 @@
 import InstagramIcon from "./InstagramIcon";
 
+// pb-24 on phones leaves room for the fixed bottom nav, which otherwise
+// covers the footer text once you scroll to the end of a page.
 export default function AppFooter() {
   return (
-    <footer className="mt-10 flex flex-col">
+    <footer className="mt-10 flex flex-col pb-24 md:pb-0">
       <div
         className="mx-3.5 flex flex-wrap items-center justify-between gap-3 border-t px-1.5 py-4 text-[12.5px]"
         style={{ borderColor: "var(--hairline)", color: "var(--ink-muted)" }}

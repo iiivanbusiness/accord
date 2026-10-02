@@ -112,7 +112,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
           <EmailVerifyBanner />
           <LocalCaptureBanner />
 
-          <main className="mx-auto w-full max-w-[1180px] flex-1 px-3.5 pb-24 pt-2 md:px-6 md:pb-0">{children}</main>
+          <main className="mx-auto w-full max-w-[1180px] flex-1 px-3.5 pt-2 md:px-6">{children}</main>
           <AppFooter />
         </div>
       </div>
