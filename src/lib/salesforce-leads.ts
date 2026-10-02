@@ -5,15 +5,25 @@ import { membersByEmail, notifyCrmAssignments, readSalesforceFilter, summarize, 
 type SfLead = {
   Id: string;
   Name: string | null;
-  Company: string | null;
-  Title: string | null;
-  Email: string | null;
-  Phone: string | null;
-  MobilePhone: string | null;
-  Website: string | null;
-  Owner: { Email?: string | null } | null;
+  Company?: string | null;
+  Title?: string | null;
+  Email?: string | null;
+  Phone?: string | null;
+  MobilePhone?: string | null;
+  Website?: string | null;
+  Owner?: { Email?: string | null } | null;
   LastModifiedDate: string;
 };
+type LeadDescribe = { fields: { name: string; picklistValues?: { value: string; label: string; active: boolean }[] }[] };
+
+// Fields we read when the org has them. Which Lead fields exist, and which
+// the connected user may see, differs from org to org; asking for one that
+// isn't there fails the whole query.
+const OPTIONAL_FIELDS = ["Company", "Title", "Email", "Phone", "MobilePhone", "Website"] as const;
+
+function describeLead(workspaceId: string): Promise<LeadDescribe> {
+  return salesforceGet<LeadDescribe>(workspaceId, `/services/data/${SALESFORCE_API_VERSION}/sobjects/Lead/describe`);
+}
 type QueryPage<T> = { records: T[]; nextRecordsUrl?: string; done: boolean };
 
 // One sync can't run forever; anything past this comes in on the next one.
@@ -23,10 +33,7 @@ const soqlString = (v: string) => `'${v.replace(/\\/g, "\\\\").replace(/'/g, "\\
 
 // The Lead Status values set up in this org, for the import filter.
 export async function salesforceLeadStatuses(workspaceId: string): Promise<{ value: string; label: string }[]> {
-  const data = await salesforceGet<{ fields: { name: string; picklistValues?: { value: string; label: string; active: boolean }[] }[] }>(
-    workspaceId,
-    `/services/data/${SALESFORCE_API_VERSION}/sobjects/Lead/describe`,
-  );
+  const data = await describeLead(workspaceId);
   const status = data.fields.find((f) => f.name === "Status");
   return (status?.picklistValues ?? []).filter((p) => p.active).map((p) => ({ value: p.value, label: p.label }));
 }
@@ -45,12 +52,20 @@ export async function syncSalesforceLeads(workspaceId: string, options: { full?:
   // A minute of overlap, so a record saved during the last run isn't missed.
   const since = !options.full && workspace.salesforceLeadsSyncedAt ? new Date(workspace.salesforceLeadsSyncedAt.getTime() - 60_000) : null;
 
+  const available = new Set((await describeLead(workspaceId)).fields.map((f) => f.name));
+  const fields = [
+    "Id",
+    "Name",
+    ...OPTIONAL_FIELDS.filter((f) => available.has(f)),
+    ...(available.has("OwnerId") ? ["Owner.Email"] : []),
+    "LastModifiedDate",
+  ];
   const where = [
     "IsConverted = false",
     ...(since ? [`LastModifiedDate > ${since.toISOString().replace(/\.\d{3}Z$/, "Z")}`] : []),
-    ...(filter.statuses.length ? [`Status IN (${filter.statuses.map(soqlString).join(", ")})`] : []),
+    ...(filter.statuses.length && available.has("Status") ? [`Status IN (${filter.statuses.map(soqlString).join(", ")})`] : []),
   ].join(" AND ");
-  const soql = `SELECT Id, Name, Company, Title, Email, Phone, MobilePhone, Website, Owner.Email, LastModifiedDate FROM Lead WHERE ${where} ORDER BY LastModifiedDate ASC`;
+  const soql = `SELECT ${fields.join(", ")} FROM Lead WHERE ${where} ORDER BY LastModifiedDate ASC`;
 
   const members = await membersByEmail(workspaceId);
   const results: UpsertResult[] = [];
@@ -69,9 +84,9 @@ export async function syncSalesforceLeads(workspaceId: string, options: { full?:
             recordType: "Lead",
             name: r.Name,
             company: r.Company && r.Company !== "[not provided]" ? r.Company : null,
-            title: r.Title,
-            email: r.Email,
-            phone: r.Phone || r.MobilePhone,
+            title: r.Title ?? null,
+            email: r.Email ?? null,
+            phone: r.Phone || r.MobilePhone || null,
             domain: r.Website ? r.Website.replace(/^https?:\/\//, "").replace(/\/.*$/, "") : null,
             ownerEmail: r.Owner?.Email ?? null,
           },
