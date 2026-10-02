@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { after } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireProspecting } from "@/lib/prospecting";
 import { currentUserWithRole } from "@/lib/permissions";
@@ -9,6 +10,10 @@ import LeadsFilterBar from "@/components/LeadsFilterBar";
 import LeadsTable from "@/components/LeadsTable";
 import { assignLeadTasks } from "./task-actions";
 import { deleteLeads } from "./actions";
+import { syncCrmLeadsIfDue } from "@/lib/crm-lead-autosync";
+
+// The CRM catch-up below runs after the page is sent, within this budget.
+export const maxDuration = 60;
 
 const TABS = [
   { key: "", label: "All" },
@@ -39,6 +44,9 @@ export default async function LeadsPage({
 }) {
   const workspace = await requireProspecting();
   const user = await currentUserWithRole();
+  // Opening Leads pulls anything new from a connected CRM (when it's due),
+  // after the page has gone out so it never slows the page down.
+  after(() => syncCrmLeadsIfDue(workspace, { budgetMs: 40_000 }));
   const access = await leadAccess(user);
   const params = await searchParams;
   // A rep only ever sees their own leads, so the tabs and owner filter are

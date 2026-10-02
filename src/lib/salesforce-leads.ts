@@ -1,0 +1,93 @@
+import { prisma } from "@/lib/db";
+import { salesforceGet, SALESFORCE_API_VERSION } from "@/lib/salesforce";
+import { membersByEmail, notifyCrmAssignments, readSalesforceFilter, summarize, upsertCrmLead, type SyncSummary, type UpsertResult } from "@/lib/crm-leads";
+
+type SfLead = {
+  Id: string;
+  Name: string | null;
+  Company: string | null;
+  Title: string | null;
+  Email: string | null;
+  Phone: string | null;
+  MobilePhone: string | null;
+  Website: string | null;
+  Owner: { Email?: string | null } | null;
+  LastModifiedDate: string;
+};
+type QueryPage<T> = { records: T[]; nextRecordsUrl?: string; done: boolean };
+
+// One sync can't run forever; anything past this comes in on the next one.
+const MAX_PER_SYNC = 5000;
+
+const soqlString = (v: string) => `'${v.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+
+// The Lead Status values set up in this org, for the import filter.
+export async function salesforceLeadStatuses(workspaceId: string): Promise<{ value: string; label: string }[]> {
+  const data = await salesforceGet<{ fields: { name: string; picklistValues?: { value: string; label: string; active: boolean }[] }[] }>(
+    workspaceId,
+    `/services/data/${SALESFORCE_API_VERSION}/sobjects/Lead/describe`,
+  );
+  const status = data.fields.find((f) => f.name === "Status");
+  return (status?.picklistValues ?? []).filter((p) => p.active).map((p) => ({ value: p.value, label: p.label }));
+}
+
+// Pulls Leads changed since the last sync (all open ones on the first run)
+// that match the workspace's filter. Converted Leads are left out: once a
+// Salesforce Lead is converted it's a Contact/Opportunity there.
+export async function syncSalesforceLeads(workspaceId: string, options: { full?: boolean; budgetMs?: number } = {}): Promise<SyncSummary> {
+  const workspace = await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } });
+  if (!workspace.salesforceRefreshToken) throw new Error("Salesforce isn't connected");
+  const filter = readSalesforceFilter(workspace.salesforceLeadFilter);
+  const startedAt = new Date();
+  // Stay well inside the request's time limit; the cursor below picks up
+  // where this left off.
+  const deadline = startedAt.getTime() + (options.budgetMs ?? 45_000);
+  // A minute of overlap, so a record saved during the last run isn't missed.
+  const since = !options.full && workspace.salesforceLeadsSyncedAt ? new Date(workspace.salesforceLeadsSyncedAt.getTime() - 60_000) : null;
+
+  const where = [
+    "IsConverted = false",
+    ...(since ? [`LastModifiedDate > ${since.toISOString().replace(/\.\d{3}Z$/, "Z")}`] : []),
+    ...(filter.statuses.length ? [`Status IN (${filter.statuses.map(soqlString).join(", ")})`] : []),
+  ].join(" AND ");
+  const soql = `SELECT Id, Name, Company, Title, Email, Phone, MobilePhone, Website, Owner.Email, LastModifiedDate FROM Lead WHERE ${where} ORDER BY LastModifiedDate ASC`;
+
+  const members = await membersByEmail(workspaceId);
+  const results: UpsertResult[] = [];
+  let path: string | undefined = `/services/data/${SALESFORCE_API_VERSION}/query?q=${encodeURIComponent(soql)}`;
+  let lastModified: string | null = null;
+  while (path && results.length < MAX_PER_SYNC && Date.now() < deadline) {
+    const page: QueryPage<SfLead> = await salesforceGet<QueryPage<SfLead>>(workspaceId, path);
+    for (const r of page.records) {
+      if (Date.now() >= deadline) break;
+      results.push(
+        await upsertCrmLead(
+          workspaceId,
+          {
+            source: "salesforce",
+            externalId: r.Id,
+            recordType: "Lead",
+            name: r.Name,
+            company: r.Company && r.Company !== "[not provided]" ? r.Company : null,
+            title: r.Title,
+            email: r.Email,
+            phone: r.Phone || r.MobilePhone,
+            domain: r.Website ? r.Website.replace(/^https?:\/\//, "").replace(/\/.*$/, "") : null,
+            ownerEmail: r.Owner?.Email ?? null,
+          },
+          { members, teamOwnedOnly: filter.teamOwnedOnly },
+        ),
+      );
+      lastModified = r.LastModifiedDate;
+    }
+    path = page.done ? undefined : page.nextRecordsUrl;
+  }
+  const more = Boolean(path) || Date.now() >= deadline;
+
+  // Stopped at the cap: carry on from the last record next time instead of
+  // skipping what's left.
+  const syncedTo = more && lastModified ? new Date(lastModified) : startedAt;
+  await prisma.workspace.update({ where: { id: workspaceId }, data: { salesforceLeadsSyncedAt: syncedTo } });
+  await notifyCrmAssignments(workspaceId, "salesforce", results);
+  return summarize(results, more);
+}

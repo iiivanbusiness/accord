@@ -4,6 +4,7 @@ import { sendAdminAlertEmail, sendRenewalReminderEmail, sendReviewOverdueEmail }
 import { createNotification } from "@/lib/notifications";
 import { runStaleDealsDigest } from "@/lib/stale-deals";
 import { runTaskDigest } from "@/lib/task-digest";
+import { syncCrmLeadsIfDue } from "@/lib/crm-lead-autosync";
 import { cleanupRateLimitHits } from "@/lib/rate-limit-cleanup";
 import { reportError } from "@/lib/error-report";
 
@@ -139,6 +140,20 @@ export async function GET(req: Request) {
       }
     }
 
+    // Daily catch-up of CRM leads for workspaces that bring them in, in case
+    // nobody opened Leads and a webhook was missed.
+    let crmLeadSync = { workspaces: 0 };
+    try {
+      const importing = await prisma.workspace.findMany({
+        where: { prospectingEnabled: true, OR: [{ salesforceLeadImport: true }, { hubspotLeadImport: true }] },
+        select: { id: true, salesforceLeadImport: true, salesforceRefreshToken: true, salesforceLeadsSyncedAt: true, hubspotLeadImport: true, hubspotAccessToken: true, hubspotLeadsSyncedAt: true },
+      });
+      for (const ws of importing) await syncCrmLeadsIfDue(ws, { force: true, budgetMs: 20_000 });
+      crmLeadSync = { workspaces: importing.length };
+    } catch (err) {
+      console.error("CRM lead sync (piggybacked on renewals cron) crashed", err);
+    }
+
     let rateLimitResult = { deleted: 0 };
     try {
       rateLimitResult = await cleanupRateLimitHits();
@@ -168,7 +183,7 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ renewals: { checked: dueContracts.length, sent }, overdueReviews: overdueReviewResult, staleDeals: staleResult, taskDigest: taskDigestResult, rateLimitCleanup: rateLimitResult, monthlyReset });
+    return NextResponse.json({ renewals: { checked: dueContracts.length, sent }, overdueReviews: overdueReviewResult, staleDeals: staleResult, taskDigest: taskDigestResult, crmLeadSync, rateLimitCleanup: rateLimitResult, monthlyReset });
   } catch (err) {
     console.error("Renewal reminder cron crashed", err);
     try {

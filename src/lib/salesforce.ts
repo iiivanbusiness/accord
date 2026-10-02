@@ -283,3 +283,12 @@ export async function syncDealToSalesforce(workspaceId: string, dealId: string):
     console.error(`Salesforce sync failed for deal ${dealId}`, err);
   }
 }
+
+// Read-only GET against the org's REST API (lead import, picklists).
+export async function salesforceGet<T>(workspaceId: string, path: string): Promise<T> {
+  const res = await sfFetch(workspaceId, path);
+  if (!res.ok) throw new Error(`Salesforce ${path.split("?")[0]} failed: ${res.status} ${await res.text()}`);
+  return (await res.json()) as T;
+}
+
+export const SALESFORCE_API_VERSION = API_VERSION;

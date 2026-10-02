@@ -19,6 +19,9 @@ import SlackSettingsPanel from "@/components/SlackSettingsPanel";
 import HubspotSettingsPanel from "@/components/HubspotSettingsPanel";
 import DocusignSettingsPanel from "@/components/DocusignSettingsPanel";
 import SalesforceSettingsPanel from "@/components/SalesforceSettingsPanel";
+import CrmLeadImportPanel from "@/components/CrmLeadImportPanel";
+import { readHubspotFilter, readSalesforceFilter } from "@/lib/crm-leads";
+import { loadCrmLeadOptions, saveCrmLeadFilter, saveHubspotWebhookSecret, setCrmLeadImport, syncCrmLeadsNow } from "./crm-lead-actions";
 import { isDocusignConfigured } from "@/lib/docusign";
 import { isSalesforceConfigured } from "@/lib/salesforce";
 import { listSlackChannels, isSlackConfigured } from "@/lib/slack";
@@ -64,6 +67,9 @@ function Toggle({ on, field }: { on: boolean; field: "requireApproval" | "notify
     </form>
   );
 }
+
+// "Sync now" for CRM leads runs as an action on this page.
+export const maxDuration = 60;
 
 export default async function SettingsPage({
   searchParams,
@@ -390,7 +396,7 @@ export default async function SettingsPage({
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">HubSpot</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            Push clients and deals to HubSpot automatically as Contacts and Deals. One-directional, SealMe stays the source of truth.
+            Push clients and deals to HubSpot as Contacts and Deals, and bring HubSpot contacts in as leads.
           </div>
         </div>
         <HubspotSettingsPanel
@@ -401,6 +407,20 @@ export default async function SettingsPage({
           toggleAction={toggleHubspot}
           disconnectAction={disconnectHubspot}
         />
+        {workspace.hubspotAccessToken && workspace.prospectingEnabled && (
+          <CrmLeadImportPanel
+            crm="hubspot"
+            enabled={workspace.hubspotLeadImport}
+            filter={readHubspotFilter(workspace.hubspotLeadFilter)}
+            syncedAt={workspace.hubspotLeadsSyncedAt?.toISOString() ?? null}
+            webhook={{ url: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/hubspot/webhook`, secretSaved: Boolean(workspace.hubspotWebhookSecret) }}
+            setEnabledAction={setCrmLeadImport}
+            saveFilterAction={saveCrmLeadFilter}
+            loadOptionsAction={loadCrmLeadOptions}
+            syncAction={syncCrmLeadsNow}
+            saveSecretAction={saveHubspotWebhookSecret}
+          />
+        )}
       </div>
     )}
 
@@ -428,7 +448,7 @@ export default async function SettingsPage({
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Salesforce</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            Push clients and deals to your own Salesforce org as Contacts and Opportunities. One-directional, SealMe stays the source of truth until a contract is signed.
+            Push clients and deals to your Salesforce org as Contacts and Opportunities, and bring Salesforce Leads in as leads.
           </div>
         </div>
         <SalesforceSettingsPanel
@@ -439,6 +459,18 @@ export default async function SettingsPage({
           toggleAction={toggleSalesforce}
           disconnectAction={disconnectSalesforce}
         />
+        {workspace.salesforceRefreshToken && workspace.prospectingEnabled && (
+          <CrmLeadImportPanel
+            crm="salesforce"
+            enabled={workspace.salesforceLeadImport}
+            filter={readSalesforceFilter(workspace.salesforceLeadFilter)}
+            syncedAt={workspace.salesforceLeadsSyncedAt?.toISOString() ?? null}
+            setEnabledAction={setCrmLeadImport}
+            saveFilterAction={saveCrmLeadFilter}
+            loadOptionsAction={loadCrmLeadOptions}
+            syncAction={syncCrmLeadsNow}
+          />
+        )}
       </div>
     )}
 

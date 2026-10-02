@@ -101,6 +101,19 @@ model Workspace {
   hubspotPortalId    String?
   hubspotAccessToken String?
 
+  // Leads coming IN from the workspace's CRM (separate from the push above).
+  // Off until turned on in Settings. The filters pick which records come in
+  // (see src/lib/crm-leads.ts). hubspotWebhookSecret is the Private App's
+  // client secret, used to check that webhook calls really come from
+  // HubSpot.
+  hubspotLeadImport       Boolean   @default(false)
+  hubspotLeadFilter       Json?
+  hubspotWebhookSecret    String?
+  hubspotLeadsSyncedAt    DateTime?
+  salesforceLeadImport    Boolean   @default(false)
+  salesforceLeadFilter    Json?
+  salesforceLeadsSyncedAt DateTime?
+
   // DocuSign — a per-workspace OAuth connection to the WORKSPACE'S OWN
   // DocuSign account (not a SealMe-owned app installed like Slack; the
   // workspace authorizes SealMe against the DocuSign account they already

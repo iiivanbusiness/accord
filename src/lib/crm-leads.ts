@@ -1,0 +1,192 @@
+import { prisma } from "@/lib/db";
+import { normalizePhone } from "@/lib/phone";
+import { createNotification } from "@/lib/notifications";
+import { isValidTimeZone } from "@/lib/tasks";
+import { dayInZone } from "@/lib/viewer-time";
+
+// Leads that come IN from a workspace's HubSpot or Salesforce. The CRM is
+// the source of truth for who the person is (name, company, title, email,
+// phone, owner); everything SealMe adds on top (stage, interest, notes,
+// calls, tasks) is never touched by a sync.
+
+export type CrmSource = "hubspot" | "salesforce";
+
+export type CrmLeadRecord = {
+  source: CrmSource;
+  externalId: string;
+  recordType?: "Lead" | "Contact";
+  name: string | null;
+  company: string | null;
+  title: string | null;
+  email: string | null;
+  phone: string | null;
+  domain: string | null;
+  ownerEmail: string | null;
+};
+
+export type HubspotLeadFilter = { lifecycleStages: string[]; leadStatuses: string[]; teamOwnedOnly: boolean };
+export type SalesforceLeadFilter = { statuses: string[]; teamOwnedOnly: boolean };
+
+const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, 100) : []);
+
+export function readHubspotFilter(raw: unknown): HubspotLeadFilter {
+  const v = (raw ?? {}) as Record<string, unknown>;
+  return { lifecycleStages: strings(v.lifecycleStages), leadStatuses: strings(v.leadStatuses), teamOwnedOnly: v.teamOwnedOnly === true };
+}
+
+export function readSalesforceFilter(raw: unknown): SalesforceLeadFilter {
+  const v = (raw ?? {}) as Record<string, unknown>;
+  return { statuses: strings(v.statuses), teamOwnedOnly: v.teamOwnedOnly === true };
+}
+
+type Member = { id: string; name: string; timezone: string | null };
+
+// Active teammates by lowercased email, for matching the CRM's owner.
+export async function membersByEmail(workspaceId: string): Promise<Map<string, Member>> {
+  const users = await prisma.user.findMany({ where: { workspaceId, deactivatedAt: null }, select: { id: true, name: true, email: true, timezone: true } });
+  return new Map(users.map((u) => [u.email.toLowerCase(), { id: u.id, name: u.name, timezone: u.timezone }]));
+}
+
+const clean = (v: string | null | undefined, max = 200) => (v ? v.trim().slice(0, max) || null : null);
+
+export type UpsertResult = { outcome: "created" | "updated" | "unchanged" | "skipped"; assignedTo: string | null; leadName: string | null };
+
+// Creates or updates one lead from a CRM record. Matches an existing lead
+// by its CRM id first, then by email or phone (so a lead imported from a
+// spreadsheet gets linked rather than duplicated). When the CRM gives the
+// lead to someone on the team, SealMe gives it to them too, with a "call"
+// task for their today.
+export async function upsertCrmLead(workspaceId: string, rec: CrmLeadRecord, ctx: { members: Map<string, Member>; teamOwnedOnly: boolean; createdById?: string | null }): Promise<UpsertResult> {
+  const email = clean(rec.email, 200)?.toLowerCase() ?? null;
+  const phone = normalizePhone(rec.phone);
+  const name = clean(rec.name) ?? email;
+  if (!name) return { outcome: "skipped", assignedTo: null, leadName: null };
+
+  const ownerEmail = clean(rec.ownerEmail, 200)?.toLowerCase() ?? null;
+  const owner = ownerEmail ? (ctx.members.get(ownerEmail) ?? null) : null;
+
+  const idField = rec.source === "hubspot" ? { hubspotContactId: rec.externalId } : { salesforceRecordId: rec.externalId };
+  let existing = await prisma.lead.findFirst({ where: { workspaceId, ...idField } });
+  if (!existing && (email || phone)) {
+    existing = await prisma.lead.findFirst({
+      where: {
+        workspaceId,
+        OR: [...(email ? [{ email: { equals: email, mode: "insensitive" as const } }] : []), ...(phone ? [{ phone }] : [])],
+        ...(rec.source === "hubspot" ? { hubspotContactId: null } : { salesforceRecordId: null }),
+      },
+    });
+  }
+  if (!existing && ctx.teamOwnedOnly && !owner) return { outcome: "skipped", assignedTo: null, leadName: name };
+
+  const contact = {
+    name,
+    company: clean(rec.company),
+    title: clean(rec.title),
+    email,
+    phone,
+    domain: clean(rec.domain),
+    externalOwnerEmail: ownerEmail,
+  };
+
+  let leadId: string;
+  let assignedTo: string | null = null;
+  let outcome: UpsertResult["outcome"];
+  if (!existing) {
+    let created;
+    try {
+      created = await prisma.lead.create({
+        data: {
+          workspaceId,
+          ...contact,
+          ...idField,
+          ...(rec.source === "salesforce" ? { salesforceRecordType: rec.recordType ?? "Lead" } : {}),
+          source: rec.source,
+          ownerId: owner?.id ?? null,
+        },
+      });
+    } catch (err) {
+      // Two syncs at once (a webhook and "Sync now", say) can race to
+      // create the same record; the other one won, which is fine.
+      if ((err as { code?: string }).code === "P2002") return { outcome: "unchanged", assignedTo: null, leadName: name };
+      throw err;
+    }
+    leadId = created.id;
+    assignedTo = owner?.id ?? null;
+    outcome = "created";
+  } else {
+    // Only what the CRM actually has replaces what's here.
+    const changes: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(contact)) {
+      if (value !== null && value !== (existing as Record<string, unknown>)[key]) changes[key] = value;
+    }
+    if (rec.source === "hubspot" && !existing.hubspotContactId) changes.hubspotContactId = rec.externalId;
+    if (rec.source === "salesforce" && !existing.salesforceRecordId) {
+      changes.salesforceRecordId = rec.externalId;
+      changes.salesforceRecordType = rec.recordType ?? "Lead";
+    }
+    // Reassigned in the CRM to someone on the team: follow it. An owner
+    // the team doesn't have leaves SealMe's owner as it is.
+    if (owner && existing.ownerId !== owner.id) {
+      changes.ownerId = owner.id;
+      assignedTo = owner.id;
+    }
+    leadId = existing.id;
+    if (Object.keys(changes).length) {
+      await prisma.lead.update({ where: { id: existing.id }, data: changes });
+      outcome = "updated";
+    } else outcome = "unchanged";
+  }
+
+  if (assignedTo && owner) {
+    const open = await prisma.task.findFirst({ where: { leadId, assigneeId: owner.id, status: "open" }, select: { id: true } });
+    if (!open) {
+      const tz = owner.timezone && isValidTimeZone(owner.timezone) ? owner.timezone : "America/New_York";
+      await prisma.task.create({
+        data: {
+          workspaceId,
+          leadId,
+          assigneeId: owner.id,
+          createdById: ctx.createdById ?? null,
+          type: "cold_call",
+          dueDate: new Date(`${dayInZone(new Date(), tz)}T00:00:00Z`),
+          timezone: tz,
+          note: `Assigned to you in ${rec.source === "hubspot" ? "HubSpot" : "Salesforce"}`,
+        },
+      });
+    }
+  }
+  return { outcome, assignedTo, leadName: name };
+}
+
+// One in-app note per person per sync, not one per lead.
+export async function notifyCrmAssignments(workspaceId: string, source: CrmSource, results: UpsertResult[]): Promise<void> {
+  const byOwner = new Map<string, string[]>();
+  for (const r of results) if (r.assignedTo) byOwner.set(r.assignedTo, [...(byOwner.get(r.assignedTo) ?? []), r.leadName ?? "a lead"]);
+  const crm = source === "hubspot" ? "HubSpot" : "Salesforce";
+  for (const [userId, names] of byOwner) {
+    try {
+      await createNotification({
+        workspaceId,
+        userId,
+        type: "lead.assigned",
+        title: names.length === 1 ? `New lead from ${crm}: ${names[0]}` : `${names.length} new leads from ${crm}`,
+        body: names.length === 1 ? `Assigned to you in ${crm}. It's on your list for today.` : `Assigned to you in ${crm}. They're on your list for today.`,
+        linkUrl: "/today",
+      });
+    } catch (err) {
+      console.error("Failed to notify about CRM leads", err);
+    }
+  }
+}
+
+// more: stopped at the time or size cap; the next sync carries on.
+export type SyncSummary = { created: number; updated: number; skipped: number; more?: boolean };
+
+export function summarize(results: UpsertResult[], more = false): SyncSummary {
+  return {
+    more,
+    created: results.filter((r) => r.outcome === "created").length,
+    updated: results.filter((r) => r.outcome === "updated").length,
+    skipped: results.filter((r) => r.outcome === "skipped").length,
+  };
+}
