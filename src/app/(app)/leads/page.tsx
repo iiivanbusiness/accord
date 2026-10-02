@@ -104,7 +104,7 @@ export default async function LeadsPage({
         <div>
           <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Leads</h1>
           <div className="mt-1 text-[14px]" style={{ color: "var(--ink-muted)" }}>
-            {total} {total === 1 ? "lead" : "leads"}. {access.canViewAll ? "Prospects you call before they become deals" : "Your prospects, before they become deals"}
+            {total.toLocaleString("en-US")} {total === 1 ? "lead" : "leads"}. {access.canViewAll ? "Prospects you call before they become deals" : "Your prospects, before they become deals"}
           </div>
         </div>
         <div className="flex items-center gap-2">

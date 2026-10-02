@@ -7,7 +7,7 @@ import { leadAccess } from "@/lib/lead-visibility";
 import { normalizePhone } from "@/lib/phone";
 import { IMPORT_CHUNK_SIZE, rowName, type ImportRow } from "@/lib/lead-import";
 
-const SOURCES = new Set(["paste", "csv"]);
+const SOURCES = new Set(["paste", "csv", "xlsx"]);
 
 function clip(value: string | undefined, max: number): string | null {
   const v = value?.trim();

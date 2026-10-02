@@ -31,7 +31,7 @@ export default async function ImportLeadsPage() {
       <div className="mb-5">
         <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Import leads</h1>
         <div className="mt-1 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-          Paste rows from a spreadsheet or upload a CSV. People already here, by email or phone, aren&apos;t added twice.
+          Paste rows from a spreadsheet, or upload an Excel or CSV file. People already here, by email or phone, aren&apos;t added twice.
         </div>
       </div>
 

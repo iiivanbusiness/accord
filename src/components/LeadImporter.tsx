@@ -5,7 +5,9 @@ import { useMemo, useState } from "react";
 import { parseCsv } from "@/lib/csv";
 import { detectDelimiter, guessMapping, IMPORT_CHUNK_SIZE, IMPORT_FIELDS, MAX_IMPORT_ROWS, rowName, type ImportFieldKey, type ImportRow } from "@/lib/lead-import";
 
-type Parsed = { headers: string[]; rows: string[][]; source: "paste" | "csv"; fileName: string | null };
+type Source = "paste" | "csv" | "xlsx";
+type Parsed = { headers: string[]; rows: string[][]; source: Source; fileName: string | null };
+type Workbook = { fileName: string; sheets: { name: string; rows: string[][] }[]; current: number };
 type Result = { created: number; updated: number; skipped: number };
 
 export default function LeadImporter({
@@ -19,7 +21,9 @@ export default function LeadImporter({
   startAction: (source: string, fileName: string | null) => Promise<{ importId: string }>;
   chunkAction: (importId: string, rows: ImportRow[], ownerChoice: string | null) => Promise<Result>;
 }) {
-  const [mode, setMode] = useState<"paste" | "csv">("paste");
+  const [mode, setMode] = useState<"paste" | "file">("paste");
+  const [workbook, setWorkbook] = useState<Workbook | null>(null);
+  const [reading, setReading] = useState(false);
   const [pasted, setPasted] = useState("");
   const [parsed, setParsed] = useState<Parsed | null>(null);
   const [mapping, setMapping] = useState<(ImportFieldKey | "")[]>([]);
@@ -29,20 +33,29 @@ export default function LeadImporter({
   const [result, setResult] = useState<Result | null>(null);
 
   function load(text: string, source: "paste" | "csv", fileName: string | null) {
+    loadTable(parseCsv(text, detectDelimiter(text)), source, fileName);
+  }
+
+  function loadTable(all: string[][], source: Source, fileName: string | null): boolean {
     setError(null);
-    const all = parseCsv(text, detectDelimiter(text));
     if (all.length < 2) {
-      setError("We need a header row plus at least one lead. Copy the column names too.");
-      return;
+      setError(source === "paste" ? "We need a header row plus at least one lead. Copy the column names too." : "We need a header row plus at least one lead in that sheet.");
+      return false;
     }
     const headers = all[0].map((h, i) => h.trim() || `Column ${i + 1}`);
     const rows = all.slice(1);
     if (rows.length > MAX_IMPORT_ROWS) {
       setError(`That's ${rows.length.toLocaleString("en-US")} rows. Import up to ${MAX_IMPORT_ROWS.toLocaleString("en-US")} at a time.`);
-      return;
+      return false;
     }
     setParsed({ headers, rows, source, fileName });
     setMapping(guessMapping(headers));
+    return true;
+  }
+
+  function pickSheet(wb: Workbook, index: number) {
+    setWorkbook({ ...wb, current: index });
+    if (!loadTable(wb.sheets[index].rows, "xlsx", wb.fileName)) setParsed(null);
   }
 
   async function onFile(file: File | undefined) {
@@ -51,6 +64,36 @@ export default function LeadImporter({
       setError("That file is over 10 MB. Split it and import it in parts.");
       return;
     }
+    const lower = file.name.toLowerCase();
+    if (lower.endsWith(".xls")) {
+      setError("That's the old Excel format (.xls). In Excel, use File, Save As, and pick .xlsx or .csv, then upload that.");
+      return;
+    }
+    if (lower.endsWith(".xlsx")) {
+      setReading(true);
+      setError(null);
+      try {
+        // Loaded only when someone picks an Excel file, so it doesn't weigh
+        // down every other page.
+        const { default: readXlsxFile } = await import("read-excel-file/browser");
+        const sheets = (await readXlsxFile(file))
+          .map((s) => ({ name: s.sheet, rows: s.data.map((row) => row.map(cellText)).filter((row) => row.some((c) => c.trim())) }))
+          .filter((s) => s.rows.length > 0);
+        if (sheets.length === 0) {
+          setError("That workbook looks empty.");
+          return;
+        }
+        // Start on the first sheet that has a header and at least one row.
+        const first = Math.max(0, sheets.findIndex((s) => s.rows.length >= 2));
+        pickSheet({ fileName: file.name, sheets, current: first }, first);
+      } catch {
+        setError("We couldn't read that Excel file. If it's password-protected, remove the password, or save it as .csv and upload that.");
+      } finally {
+        setReading(false);
+      }
+      return;
+    }
+    setWorkbook(null);
     load(await file.text(), "csv", file.name);
   }
 
@@ -92,6 +135,7 @@ export default function LeadImporter({
 
   function reset() {
     setParsed(null);
+    setWorkbook(null);
     setMapping([]);
     setResult(null);
     setPasted("");
@@ -122,7 +166,7 @@ export default function LeadImporter({
     return (
       <div className="card flex max-w-[720px] flex-col gap-4 p-5 sm:p-6">
         <div className="flex flex-wrap gap-2">
-          {(["paste", "csv"] as const).map((m) => (
+          {(["paste", "file"] as const).map((m) => (
             <button
               key={m}
               type="button"
@@ -130,7 +174,7 @@ export default function LeadImporter({
               className="btn btn-sm"
               style={mode === m ? { background: "var(--primary)", color: "var(--on-primary)" } : { background: "var(--surface-1)", border: "1px solid var(--hairline)", color: "var(--ink-muted)" }}
             >
-              {m === "paste" ? "Paste from a sheet" : "Upload a CSV file"}
+              {m === "paste" ? "Paste from a sheet" : "Upload a file"}
             </button>
           ))}
         </div>
@@ -153,9 +197,16 @@ export default function LeadImporter({
         ) : (
           <>
             <div className="text-[13px]" style={{ color: "var(--ink-muted)" }}>
-              A CSV export from Apollo, Clay, HubSpot, Salesforce, or any spreadsheet. The first row should be the column names.
+              An Excel (.xlsx) or CSV file, like an export from Apollo, Clay, HubSpot, or Salesforce. The first row should be the column names.
             </div>
-            <input type="file" accept=".csv,.tsv,.txt,text/csv" onChange={(e) => onFile(e.target.files?.[0])} className="input text-[13px]" />
+            <input
+              type="file"
+              accept=".xlsx,.csv,.tsv,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              disabled={reading}
+              onChange={(e) => onFile(e.target.files?.[0])}
+              className="input text-[13px]"
+            />
+            {reading && <div className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>Reading the workbook…</div>}
           </>
         )}
         {error && <div className="chip chip-warn w-full justify-start px-4 py-2.5 text-[12.5px]">{error}</div>}
@@ -172,6 +223,18 @@ export default function LeadImporter({
             {parsed.fileName ? `${parsed.fileName}, ` : ""}{parsed.rows.length.toLocaleString("en-US")} {parsed.rows.length === 1 ? "row" : "rows"}. We matched what we could; change anything that&apos;s off.
           </div>
         </div>
+        {workbook && workbook.sheets.length > 1 && (
+          <label className="flex max-w-[320px] flex-col gap-1.5">
+            <span className="text-[12.5px] font-medium" style={{ color: "var(--ink-muted)" }}>Sheet</span>
+            <select value={workbook.current} onChange={(e) => pickSheet(workbook, Number(e.target.value))} className="input" disabled={Boolean(progress)}>
+              {workbook.sheets.map((s, i) => (
+                <option key={i} value={i} disabled={s.rows.length < 2}>
+                  {s.name} ({s.rows.length < 2 ? "no leads" : sheetRowCount(s.rows.length)})
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <div className="flex flex-col divide-y" style={{ borderColor: "var(--hairline-soft)" }}>
           {parsed.headers.map((header, i) => {
             const sample = parsed.rows.find((r) => r[i]?.trim())?.[i]?.trim() ?? "";
@@ -216,7 +279,8 @@ export default function LeadImporter({
         <div className="text-[13px]">
           {hasNameColumn ? (
             <>
-              <span className="font-medium">{withName.toLocaleString("en-US")}</span> of {mappedRows.length.toLocaleString("en-US")} rows have a name and will be imported.
+              <span className="font-medium">{withName.toLocaleString("en-US")}</span> of {mappedRows.length.toLocaleString("en-US")} {mappedRows.length === 1 ? "row" : "rows"}{" "}
+              {withName === 1 ? "has a name and will be imported." : "have a name and will be imported."}
               {withName < mappedRows.length && <span style={{ color: "var(--ink-muted)" }}> Rows without a name are skipped.</span>}
             </>
           ) : (
@@ -243,6 +307,21 @@ export default function LeadImporter({
       </div>
     </div>
   );
+}
+
+function sheetRowCount(rowsIncludingHeader: number): string {
+  const n = Math.max(0, rowsIncludingHeader - 1);
+  return `${n.toLocaleString("en-US")} ${n === 1 ? "row" : "rows"}`;
+}
+
+// Excel cells come back typed. Phone numbers stored as numbers become
+// digits (never 5.12E+9), dates become YYYY-MM-DD, empty cells "".
+function cellText(cell: unknown): string {
+  if (cell === null || cell === undefined) return "";
+  if (cell instanceof Date) return Number.isNaN(cell.getTime()) ? "" : cell.toISOString().slice(0, 10);
+  if (typeof cell === "number") return Number.isInteger(cell) ? cell.toFixed(0) : String(cell);
+  if (typeof cell === "boolean") return cell ? "TRUE" : "FALSE";
+  return String(cell);
 }
 
 function Stat({ label, value }: { label: string; value: number }) {
