@@ -7,6 +7,7 @@ import {
   detectDelimiter,
   guessMapping,
   IMPORT_CHUNK_SIZE,
+  englishHeader,
   isNotesHeader,
   MAX_IMPORT_ROWS,
   normalizeHeader,
@@ -139,7 +140,7 @@ export default function LeadImporter({
         if (!field || !value) return;
         // Several columns can land in notes: one line each, labeled with
         // the column name unless the column already is "Notes".
-        if (field === "notes") notes.push(isNotesHeader(parsed.headers[i]) ? value : `${parsed.headers[i]}: ${value}`);
+        if (field === "notes") notes.push(isNotesHeader(parsed.headers[i]) ? value : `${englishHeader(parsed.headers[i])}: ${value}`);
         else row[field] = value;
       });
       if (notes.length) row.notes = notes.join("\n");
@@ -481,7 +482,7 @@ function FieldPicker({
                 <span className="min-w-0">
                   <span className="block text-[13.5px] font-medium">{f.label}{isName ? " (always imported)" : ""}</span>
                   <span className="block truncate text-[12px]" style={{ color: "var(--ink-muted)" }}>
-                    {present ? `From ${f.sources.map((h) => `"${h}"`).join(" + ")}` : "Not in this file"}
+                    {present ? `From ${f.sources.map((h) => `"${englishHeader(h)}"`).join(" + ")} column${f.sources.length > 1 ? "s" : ""}` : "Not in this file"}
                   </span>
                 </span>
               </label>
@@ -497,7 +498,7 @@ function FieldPicker({
                 <label key={i} className="flex cursor-pointer items-start gap-2.5 pl-1">
                   <input type="checkbox" className={check} checked={noteColumns.has(i)} onChange={(e) => onToggleNote(i, e.target.checked)} />
                   <span className="min-w-0">
-                    <span className="block truncate text-[13px]">{header}</span>
+                    <span className="block truncate text-[13px]">{englishHeader(header)}</span>
                     <span className="block truncate text-[12px]" style={{ color: "var(--ink-muted)" }}>{sample || "Empty"}</span>
                   </span>
                 </label>
