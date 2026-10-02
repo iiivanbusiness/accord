@@ -1,18 +1,57 @@
-export const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/deals", label: "Deals" },
-  { href: "/calendar", label: "Calendar" },
-  { href: "/analytics", label: "Analytics" },
-  { href: "/clients", label: "Clients" },
-  { href: "/templates", label: "Templates" },
-  { href: "/feedback", label: "Feedback" },
-  { href: "/settings", label: "Settings" },
-] as const;
+export type NavItem = { href: string; label: string };
+export type NavGroup = { label: string; items: NavItem[] };
 
-export const ADMIN_ITEM = { href: "/admin", label: "Admin" } as const;
+// The sidebar, in groups. "Prospecting" (leads, tasks, calls) only shows
+// for workspaces with prospectingEnabled (see src/lib/prospecting.ts),
+// and Admin only for platform admins.
+const OVERVIEW: NavGroup = {
+  label: "Overview",
+  items: [
+    { href: "/dashboard", label: "Dashboard" },
+    { href: "/analytics", label: "Analytics" },
+    { href: "/calendar", label: "Calendar" },
+  ],
+};
+const PROSPECTING: NavGroup = { label: "Prospecting", items: [{ href: "/leads", label: "Leads" }] };
+const CLOSING: NavGroup = {
+  label: "Closing",
+  items: [
+    { href: "/deals", label: "Deals" },
+    { href: "/clients", label: "Clients" },
+    { href: "/templates", label: "Templates" },
+  ],
+};
+const WORKSPACE: NavGroup = {
+  label: "Workspace",
+  items: [
+    { href: "/feedback", label: "Feedback" },
+    { href: "/settings", label: "Settings" },
+  ],
+};
+export const ADMIN_ITEM: NavItem = { href: "/admin", label: "Admin" };
 
-// Only shown to workspaces with prospectingEnabled (see src/lib/prospecting.ts).
-export const PROSPECTING_ITEMS = [{ href: "/leads", label: "Leads" }] as const;
+export function navGroupsFor({ prospecting, admin }: { prospecting: boolean; admin: boolean }): NavGroup[] {
+  const workspace = admin ? { ...WORKSPACE, items: [...WORKSPACE.items, ADMIN_ITEM] } : WORKSPACE;
+  return prospecting ? [OVERVIEW, PROSPECTING, CLOSING, workspace] : [OVERVIEW, CLOSING, workspace];
+}
+
+// Every item a regular member sees, in sidebar order (the AI help chat
+// describes the app from this).
+export const NAV_ITEMS: NavItem[] = navGroupsFor({ prospecting: false, admin: false }).flatMap((g) => g.items);
+
+// The phone's bottom bar has room for four buttons plus "More". Reps live
+// in prospecting on the phone, so those come first when it's on; anything
+// not built yet is skipped and the next item fills its spot.
+const MOBILE_PRIORITY_PROSPECTING = ["/today", "/leads", "/calls", "/deals", "/dashboard"];
+const MOBILE_PRIORITY_DEFAULT = ["/dashboard", "/deals", "/calendar", "/clients"];
+
+export function mobilePrimaryItems(groups: NavGroup[], prospecting: boolean, count = 4): NavItem[] {
+  const all = groups.flatMap((g) => g.items);
+  const priority = prospecting ? MOBILE_PRIORITY_PROSPECTING : MOBILE_PRIORITY_DEFAULT;
+  const picked = priority.map((href) => all.find((i) => i.href === href)).filter((i): i is NavItem => Boolean(i));
+  for (const item of all) if (picked.length < count && !picked.includes(item)) picked.push(item);
+  return picked.slice(0, count);
+}
 
 const SCREEN_LABELS: { test: (path: string) => boolean; label: string }[] = [
   { test: (p) => p === "/dashboard", label: "Dashboard" },

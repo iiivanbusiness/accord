@@ -2,7 +2,7 @@ import { auth, signOut } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { requireWorkspace } from "@/lib/workspace";
 import { isAdminEmail } from "@/lib/admin";
-import { NAV_ITEMS, ADMIN_ITEM, PROSPECTING_ITEMS } from "@/lib/nav-config";
+import { navGroupsFor, mobilePrimaryItems } from "@/lib/nav-config";
 import ThemeToggle from "./ThemeToggle";
 import CompanionToggleButton from "./CompanionToggleButton";
 import BrandLogo from "./BrandLogo";
@@ -46,15 +46,15 @@ export default async function AppShell({ children }: { children: React.ReactNode
     ? await prisma.user.findUnique({ where: { email: session.user.email }, select: { aiDisclosureAcknowledgedAt: true } })
     : null;
   const { unreadCount, items: notificationItems } = await getUnreadNotifications();
-  const baseItems = workspace.prospectingEnabled ? [NAV_ITEMS[0], NAV_ITEMS[1], ...PROSPECTING_ITEMS, ...NAV_ITEMS.slice(2)] : NAV_ITEMS;
-  const items = isAdmin ? [...baseItems, ADMIN_ITEM] : baseItems;
-
-  const navItems = items.map((item) => {
+  const groups = navGroupsFor({ prospecting: workspace.prospectingEnabled, admin: isAdmin });
+  const withIcon = (item: { href: string; label: string }) => {
     const Icon = NAV_ICONS[item.href];
     return { href: item.href, label: item.label, icon: <Icon /> };
-  });
+  };
+  const navGroups = groups.map((g) => ({ label: g.label, items: g.items.map(withIcon) }));
+  const mobileItems = mobilePrimaryItems(groups, workspace.prospectingEnabled).map(withIcon);
 
-  const navLinks = <SidebarNav items={navItems} />;
+  const navLinks = <SidebarNav groups={navGroups} />;
 
   const workspaceFooter = (
     <div className="mt-3 flex flex-col gap-2.5 border-t pt-3" style={{ borderColor: "var(--hairline-soft)" }}>
@@ -122,7 +122,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
       <FaqChatWidget />
 
       <MobileNav
-        items={navItems}
+        items={mobileItems}
         drawerContent={
           <>
             <div className="mb-7 px-1">
