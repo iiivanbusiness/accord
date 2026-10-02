@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireProspecting } from "@/lib/prospecting";
 import { currentUserWithRole } from "@/lib/permissions";
+import { leadAccess } from "@/lib/lead-visibility";
 import { isLeadStage, LEAD_INTEREST_LABEL, LEAD_STAGE_CHIP, LEAD_STAGE_LABEL } from "@/lib/lead-stages";
 import { formatPhone } from "@/lib/phone";
 import LeadsFilterBar from "@/components/LeadsFilterBar";
@@ -44,10 +45,16 @@ export default async function LeadsPage({
 }) {
   const workspace = await requireProspecting();
   const user = await currentUserWithRole();
-  const { tab = "", q, stage, owner } = await searchParams;
+  const access = await leadAccess(user);
+  const params = await searchParams;
+  // A rep only ever sees their own leads, so the tabs and owner filter are
+  // a manager's view.
+  const tab = access.canViewAll ? (params.tab ?? "") : "";
+  const { q, stage, owner } = params;
 
   const where = {
     workspaceId: workspace.id,
+    ...access.where,
     ...(tab === "mine" ? { ownerId: user.id } : tab === "unassigned" ? { ownerId: null } : {}),
     ...(stage && isLeadStage(stage) ? { stage } : {}),
     ...(owner && tab === "" ? { ownerId: owner } : {}),
@@ -83,8 +90,10 @@ export default async function LeadsPage({
       orderBy: { updatedAt: "desc" },
       take: 500,
     }),
-    prisma.user.findMany({ where: { workspaceId: workspace.id, deactivatedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
-    prisma.lead.count({ where: { workspaceId: workspace.id } }),
+    access.canViewAll
+      ? prisma.user.findMany({ where: { workspaceId: workspace.id, deactivatedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } })
+      : Promise.resolve([]),
+    prisma.lead.count({ where: { workspaceId: workspace.id, ...access.where } }),
   ]);
 
   const tabHref = (key: string) => (key ? `/leads?tab=${key}` : "/leads");
@@ -95,7 +104,7 @@ export default async function LeadsPage({
         <div>
           <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Leads</h1>
           <div className="mt-1 text-[14px]" style={{ color: "var(--ink-muted)" }}>
-            {total} {total === 1 ? "lead" : "leads"}. Prospects you call before they become deals
+            {total} {total === 1 ? "lead" : "leads"}. {access.canViewAll ? "Prospects you call before they become deals" : "Your prospects, before they become deals"}
           </div>
         </div>
         <Link href="/leads/new" className="btn btn-primary">
@@ -103,6 +112,7 @@ export default async function LeadsPage({
         </Link>
       </div>
 
+      {access.canViewAll && (
       <div className="mb-3.5 flex flex-wrap gap-2">
         {TABS.map((t) => (
           <Link
@@ -115,8 +125,9 @@ export default async function LeadsPage({
           </Link>
         ))}
       </div>
+      )}
 
-      <LeadsFilterBar owners={owners} showOwnerFilter={tab === ""} />
+      <LeadsFilterBar owners={owners} showOwnerFilter={access.canViewAll && tab === ""} />
 
       {leads.length === 0 ? (
         <div className="card flex flex-col items-start gap-3 p-6">
@@ -165,7 +176,7 @@ export default async function LeadsPage({
                       { label: "Company", show: SHOW.company },
                       { label: "Stage", show: "" },
                       { label: "Interest", show: "" },
-                      { label: "Owner", show: SHOW.owner },
+                      ...(access.canViewAll ? [{ label: "Owner", show: SHOW.owner }] : []),
                       { label: "Next step", show: SHOW.next },
                       { label: "Updated", show: SHOW.updated },
                     ].map((col) => (
@@ -201,9 +212,11 @@ export default async function LeadsPage({
                           <span className={`chip whitespace-nowrap ${LEAD_STAGE_CHIP[lead.stage] ?? "chip-neutral"}`}>{LEAD_STAGE_LABEL[lead.stage] ?? lead.stage}</span>
                         </td>
                         <td className={`whitespace-nowrap ${cell}`} style={muted}>{lead.interest ? LEAD_INTEREST_LABEL[lead.interest] : "-"}</td>
-                        <td className={`${cell} ${SHOW.owner}`} style={muted}>
-                          <div className="max-w-[120px] truncate">{lead.owner?.name ?? "Unassigned"}</div>
-                        </td>
+                        {access.canViewAll && (
+                          <td className={`${cell} ${SHOW.owner}`} style={muted}>
+                            <div className="max-w-[120px] truncate">{lead.owner?.name ?? "Unassigned"}</div>
+                          </td>
+                        )}
                         <td className={`${cell} ${SHOW.next}`} style={muted}>
                           <div className="max-w-[180px] truncate" title={lead.nextStep ?? undefined}>
                             {[lead.nextStepAt ? formatDay(lead.nextStepAt) : null, lead.nextStep].filter(Boolean).join(" · ") || "-"}

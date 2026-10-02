@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { requireProspecting } from "@/lib/prospecting";
 import { normalizePhone } from "@/lib/phone";
 import { isLeadStage, LEAD_INTERESTS } from "@/lib/lead-stages";
+import { leadAccess } from "@/lib/lead-visibility";
 
 function text(formData: FormData, key: string): string | null {
   const value = String(formData.get(key) ?? "").trim();
@@ -55,8 +56,10 @@ function leadFieldsFrom(formData: FormData) {
 
 export async function createLead(formData: FormData) {
   const workspace = await requireProspecting();
+  const access = await leadAccess();
   const fields = leadFieldsFrom(formData);
-  const ownerId = await resolveOwner(workspace.id, text(formData, "ownerId"));
+  // Only managers hand leads to someone else; a rep's new lead is theirs.
+  const ownerId = access.canAssign ? await resolveOwner(workspace.id, text(formData, "ownerId")) : access.userId;
 
   const lead = await prisma.lead.create({
     data: { workspaceId: workspace.id, ownerId, source: "manual", ...fields },
@@ -68,11 +71,12 @@ export async function createLead(formData: FormData) {
 
 export async function updateLead(leadId: string, formData: FormData) {
   const workspace = await requireProspecting();
-  const existing = await prisma.lead.findFirst({ where: { id: leadId, workspaceId: workspace.id }, select: { id: true } });
+  const access = await leadAccess();
+  const existing = await prisma.lead.findFirst({ where: { id: leadId, workspaceId: workspace.id, ...access.where }, select: { id: true, ownerId: true } });
   if (!existing) throw new Error("Lead not found");
 
   const fields = leadFieldsFrom(formData);
-  const ownerId = await resolveOwner(workspace.id, text(formData, "ownerId"));
+  const ownerId = access.canAssign ? await resolveOwner(workspace.id, text(formData, "ownerId")) : existing.ownerId;
   await prisma.lead.update({ where: { id: leadId }, data: { ...fields, ownerId } });
   revalidatePath("/leads");
   revalidatePath(`/leads/${leadId}`);
@@ -81,8 +85,9 @@ export async function updateLead(leadId: string, formData: FormData) {
 
 export async function setLeadStage(leadId: string, stage: string) {
   const workspace = await requireProspecting();
+  const access = await leadAccess();
   if (!isLeadStage(stage)) throw new Error("Unknown stage");
-  const result = await prisma.lead.updateMany({ where: { id: leadId, workspaceId: workspace.id }, data: { stage } });
+  const result = await prisma.lead.updateMany({ where: { id: leadId, workspaceId: workspace.id, ...access.where }, data: { stage } });
   if (result.count === 0) throw new Error("Lead not found");
   revalidatePath("/leads");
   revalidatePath(`/leads/${leadId}`);

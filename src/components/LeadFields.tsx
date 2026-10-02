@@ -26,7 +26,17 @@ function Field({ label, children, wide }: { label: string; children: React.React
 }
 
 // The same inputs for "Add lead" and editing one, so both stay in step.
-export default function LeadFields({ values = {}, owners, full }: { values?: LeadValues; owners: { id: string; name: string }[]; full?: boolean }) {
+export default function LeadFields({
+  values = {},
+  owners,
+  full,
+  allowUnassigned = true,
+}: {
+  values?: LeadValues;
+  owners: { id: string; name: string }[];
+  full?: boolean;
+  allowUnassigned?: boolean;
+}) {
   const day = values.nextStepAt ? values.nextStepAt.toISOString().slice(0, 10) : "";
   const decision = values.isDecisionMaker === true ? "yes" : values.isDecisionMaker === false ? "no" : "";
   return (
@@ -41,8 +51,8 @@ export default function LeadFields({ values = {}, owners, full }: { values?: Lea
         <input name="title" defaultValue={values.title ?? ""} placeholder="Director of Revenue Operations" className="input" autoComplete="off" />
       </Field>
       <Field label="Owner">
-        <select name="ownerId" defaultValue={values.ownerId ?? ""} className="input">
-          <option value="">Unassigned</option>
+        <select name="ownerId" defaultValue={values.ownerId ?? ""} className="input" disabled={!allowUnassigned && owners.length <= 1}>
+          {allowUnassigned && <option value="">Unassigned</option>}
           {owners.map((o) => (
             <option key={o.id} value={o.id}>{o.name}</option>
           ))}

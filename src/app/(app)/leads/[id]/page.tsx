@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireProspecting } from "@/lib/prospecting";
+import { leadAccess } from "@/lib/lead-visibility";
 import { LEAD_STAGES, LEAD_STAGE_LABEL, LEAD_INTEREST_LABEL } from "@/lib/lead-stages";
 import { formatPhone } from "@/lib/phone";
 import LeadFields from "@/components/LeadFields";
@@ -23,11 +24,16 @@ export default async function LeadPage({
   const { id } = await params;
   const { created, saved } = await searchParams;
 
-  const [lead, owners] = await Promise.all([
-    prisma.lead.findFirst({ where: { id, workspaceId: workspace.id }, include: { owner: { select: { name: true } } } }),
-    prisma.user.findMany({ where: { workspaceId: workspace.id, deactivatedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+  const access = await leadAccess();
+  const [lead, members] = await Promise.all([
+    prisma.lead.findFirst({ where: { id, workspaceId: workspace.id, ...access.where }, include: { owner: { select: { id: true, name: true } } } }),
+    access.canAssign
+      ? prisma.user.findMany({ where: { workspaceId: workspace.id, deactivatedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } })
+      : Promise.resolve([]),
   ]);
   if (!lead) notFound();
+  // A rep can't reassign, so the owner field just shows who has it.
+  const owners = access.canAssign ? members : lead.owner ? [lead.owner] : [];
 
   const subtitle = [lead.title, lead.company].filter(Boolean).join(" · ");
 
@@ -56,7 +62,7 @@ export default async function LeadPage({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
         <form action={updateLead.bind(null, lead.id)} className="card order-2 flex min-w-0 flex-col gap-5 p-5 sm:p-6 lg:order-1">
           <div className="text-[14px] font-medium">Details</div>
-          <LeadFields owners={owners} full values={lead} />
+          <LeadFields owners={owners} full values={lead} allowUnassigned={access.canAssign} />
           <SubmitButton className="btn btn-primary w-full justify-center sm:w-auto sm:self-start" pendingText="Saving…">
             Save changes
           </SubmitButton>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireProspecting } from "@/lib/prospecting";
 import { currentUserWithRole } from "@/lib/permissions";
+import { leadAccess } from "@/lib/lead-visibility";
 import LeadFields from "@/components/LeadFields";
 import SubmitButton from "@/components/SubmitButton";
 import { createLead } from "../actions";
@@ -9,7 +10,10 @@ import { createLead } from "../actions";
 export default async function NewLeadPage() {
   const workspace = await requireProspecting();
   const user = await currentUserWithRole();
-  const owners = await prisma.user.findMany({ where: { workspaceId: workspace.id, deactivatedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } });
+  const access = await leadAccess(user);
+  const owners = access.canAssign
+    ? await prisma.user.findMany({ where: { workspaceId: workspace.id, deactivatedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } })
+    : [{ id: user.id, name: user.name }];
 
   return (
     <>
@@ -23,7 +27,7 @@ export default async function NewLeadPage() {
         </div>
       </div>
       <form action={createLead} className="card flex max-w-[640px] flex-col gap-5 p-5 sm:p-6">
-        <LeadFields owners={owners} values={{ ownerId: user.id }} />
+        <LeadFields owners={owners} values={{ ownerId: user.id }} allowUnassigned={access.canAssign} />
         <SubmitButton className="btn btn-primary w-full justify-center sm:w-auto sm:self-start" pendingText="Adding…">
           Add lead
         </SubmitButton>
