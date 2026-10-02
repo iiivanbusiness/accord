@@ -49,6 +49,7 @@ function leadFieldsFrom(formData: FormData) {
     isDecisionMaker: decisionMaker === "yes" ? true : decisionMaker === "no" ? false : null,
     painPoints: text(formData, "painPoints"),
     objections: text(formData, "objections"),
+    notes: text(formData, "notes")?.slice(0, 4000) ?? null,
     nextStep: text(formData, "nextStep"),
     nextStepAt: parseDay(text(formData, "nextStepAt")),
   };

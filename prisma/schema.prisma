@@ -1086,6 +1086,7 @@ model Lead {
   nextStep        String?
   nextStepAt      DateTime?
   summary         String? // from the most recent processed call
+  notes           String? // free text: research notes, or extra columns from an import
   lastContactedAt DateTime?
 
   source   String  @default("manual") // manual | paste | csv | xlsx | hubspot | salesforce | call

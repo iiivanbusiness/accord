@@ -12,6 +12,7 @@ type LeadValues = {
   isDecisionMaker?: boolean | null;
   painPoints?: string | null;
   objections?: string | null;
+  notes?: string | null;
   nextStep?: string | null;
   nextStepAt?: Date | null;
 };
@@ -95,6 +96,9 @@ export default function LeadFields({
           </Field>
           <Field label="Objections" wide>
             <textarea name="objections" rows={2} defaultValue={values.objections ?? ""} className="input" />
+          </Field>
+          <Field label="Notes" wide>
+            <textarea name="notes" rows={4} defaultValue={values.notes ?? ""} className="input" />
           </Field>
         </>
       )}

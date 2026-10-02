@@ -8,7 +8,9 @@ import {
   guessMapping,
   IMPORT_CHUNK_SIZE,
   IMPORT_FIELDS,
+  isNotesHeader,
   MAX_IMPORT_ROWS,
+  MULTI_FIELDS,
   rowName,
   type ImportAssignment,
   type ImportFieldKey,
@@ -117,12 +119,39 @@ export default function LeadImporter({
     if (!parsed) return [];
     return parsed.rows.map((cells) => {
       const row: ImportRow = {};
+      const notes: string[] = [];
       mapping.forEach((field, i) => {
-        if (field && cells[i]?.trim()) row[field] = cells[i].trim();
+        const value = cells[i]?.trim();
+        if (!field || !value) return;
+        // Several columns can land in notes: one line each, labeled with
+        // the column name unless the column already is "Notes".
+        if (field === "notes") notes.push(isNotesHeader(parsed.headers[i]) ? value : `${parsed.headers[i]}: ${value}`);
+        else row[field] = value;
       });
+      if (notes.length) row.notes = notes.join("\n");
       return row;
     });
   }, [parsed, mapping]);
+
+  // What each column was first guessed as, used when someone ticks a
+  // column back on.
+  const firstGuess = useMemo(() => (parsed ? guessMapping(parsed.headers) : []), [parsed]);
+  const fieldChoices = IMPORT_FIELDS.filter((f) => canAssign || f.key !== "ownerEmail");
+
+  function setColumn(i: number, field: ImportFieldKey | "") {
+    const next = mapping.map((v, j) => (j === i ? field : v));
+    setMapping(next);
+    // Owner column un-matched: fall back to one person.
+    if (assignMode === "column" && !next.includes("ownerEmail")) setAssignMode("one");
+  }
+
+  function toggleColumn(i: number, on: boolean) {
+    if (!on) return setColumn(i, "");
+    const guess = firstGuess[i];
+    const free = (f: ImportFieldKey) => MULTI_FIELDS.has(f) || !mapping.some((v, j) => j !== i && v === f);
+    const usable = guess && (canAssign || guess !== "ownerEmail") && free(guess) ? guess : "notes";
+    setColumn(i, usable);
+  }
 
   const withName = mappedRows.filter((r) => rowName(r)).length;
   const hasNameColumn = mapping.includes("name") || mapping.includes("firstName") || mapping.includes("lastName");
@@ -244,7 +273,7 @@ export default function LeadImporter({
         <div>
           <div className="text-[15px] font-medium">Match your columns</div>
           <div className="mt-1 text-[13px]" style={{ color: "var(--ink-muted)" }}>
-            {parsed.fileName ? `${parsed.fileName}, ` : ""}{parsed.rows.length.toLocaleString("en-US")} {parsed.rows.length === 1 ? "row" : "rows"}. We matched what we could; change anything that&apos;s off.
+            {parsed.fileName ? `${parsed.fileName}, ` : ""}{parsed.rows.length.toLocaleString("en-US")} {parsed.rows.length === 1 ? "row" : "rows"}. Tick the columns to bring in and pick where each one goes. Extra columns can go into Notes.
           </div>
         </div>
         {workbook && workbook.sheets.length > 1 && (
@@ -262,31 +291,44 @@ export default function LeadImporter({
         <div className="flex flex-col divide-y" style={{ borderColor: "var(--hairline-soft)" }}>
           {parsed.headers.map((header, i) => {
             const sample = parsed.rows.find((r) => r[i]?.trim())?.[i]?.trim() ?? "";
+            const field = mapping[i] ?? "";
+            const on = field !== "";
+            // Only fields no other column has taken (notes can take many).
+            const options = fieldChoices.filter((f) => f.key === field || MULTI_FIELDS.has(f.key) || !mapping.includes(f.key));
             return (
-              <div key={i} className="grid grid-cols-1 gap-2 py-2.5 sm:grid-cols-[minmax(0,1fr)_200px] sm:items-center sm:gap-4" style={{ borderColor: "var(--hairline-soft)" }}>
-                <div className="min-w-0">
+              <div
+                key={i}
+                className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 py-2.5 sm:grid-cols-[auto_minmax(0,1fr)_200px] sm:gap-x-4"
+                style={{ borderColor: "var(--hairline-soft)" }}
+              >
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={(e) => toggleColumn(i, e.target.checked)}
+                  disabled={Boolean(progress)}
+                  className="h-4 w-4"
+                  aria-label={`Import "${header}"`}
+                />
+                <div className="min-w-0" style={on ? undefined : { opacity: 0.55 }}>
                   <div className="truncate text-[13.5px] font-medium" title={header}>{header}</div>
                   <div className="truncate text-[12px]" style={{ color: "var(--ink-muted)" }} title={sample}>{sample || "Empty"}</div>
                 </div>
-                <select
-                  value={mapping[i] ?? ""}
-                  onChange={(e) => {
-                    const next = mapping.map((v, j) => (j === i ? (e.target.value as ImportFieldKey | "") : v));
-                    setMapping(next);
-                    // Owner column un-matched: fall back to one person.
-                    if (assignMode === "column" && !next.includes("ownerEmail")) setAssignMode("one");
-                  }}
-                  className="input"
-                  style={{ fontSize: "13px", padding: "7px 11px" }}
-                  aria-label={`What "${header}" is`}
-                >
-                  <option value="">Don&apos;t import</option>
-                  {IMPORT_FIELDS.filter((f) => canAssign || f.key !== "ownerEmail").map((f) => (
-                    <option key={f.key} value={f.key} disabled={mapping.includes(f.key) && mapping[i] !== f.key}>
-                      {f.label}
-                    </option>
-                  ))}
-                </select>
+                {on ? (
+                  <select
+                    value={field}
+                    onChange={(e) => setColumn(i, e.target.value as ImportFieldKey)}
+                    disabled={Boolean(progress)}
+                    className="input col-start-2 sm:col-start-3"
+                    style={{ fontSize: "13px", padding: "7px 11px" }}
+                    aria-label={`What "${header}" is`}
+                  >
+                    {options.map((f) => (
+                      <option key={f.key} value={f.key}>{f.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="col-start-2 text-[12.5px] sm:col-start-3" style={{ color: "var(--ink-muted)" }}>Not imported</div>
+                )}
               </div>
             );
           })}

@@ -22,6 +22,7 @@ type CleanRow = {
   phone: string | null;
   domain: string | null;
   ownerEmail: string | null;
+  notes: string | null;
 };
 
 function clean(row: ImportRow): CleanRow | null {
@@ -37,6 +38,7 @@ function clean(row: ImportRow): CleanRow | null {
     phone: normalizePhone(rawPhone) ?? rawPhone,
     domain: clip(row.domain, 253)?.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "") || null,
     ownerEmail: clip(row.ownerEmail, 254)?.toLowerCase() ?? null,
+    notes: clip(row.notes, 4000),
   };
 }
 
@@ -89,7 +91,7 @@ export async function importLeadsChunk(
   const existing = emails.length || phones.length
     ? await prisma.lead.findMany({
         where: { workspaceId: workspace.id, OR: [...(emails.length ? [{ email: { in: emails } }] : []), ...(phones.length ? [{ phone: { in: phones } }] : [])] },
-        select: { id: true, ownerId: true, name: true, company: true, title: true, email: true, phone: true, domain: true },
+        select: { id: true, ownerId: true, name: true, company: true, title: true, email: true, phone: true, domain: true, notes: true },
       })
     : [];
   const byEmail = new Map(existing.filter((l) => l.email).map((l) => [l.email!, l]));
@@ -117,7 +119,7 @@ export async function importLeadsChunk(
       continue;
     }
     const fill: Partial<CleanRow> = {};
-    for (const field of ["company", "title", "email", "phone", "domain"] as const) {
+    for (const field of ["company", "title", "email", "phone", "domain", "notes"] as const) {
       if (!match[field] && row[field]) fill[field] = row[field];
     }
     if (Object.keys(fill).length === 0) {
