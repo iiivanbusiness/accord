@@ -13,7 +13,7 @@ export default async function ImportLeadsPage() {
   const access = await leadAccess();
   const [owners, history] = await Promise.all([
     access.canAssign
-      ? prisma.user.findMany({ where: { workspaceId: workspace.id, deactivatedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } })
+      ? prisma.user.findMany({ where: { workspaceId: workspace.id, deactivatedAt: null }, select: { id: true, name: true, email: true }, orderBy: { name: "asc" } })
       : Promise.resolve([]),
     prisma.leadImport.findMany({
       where: { workspaceId: workspace.id, ...(access.canViewAll ? {} : { createdById: access.userId }) },

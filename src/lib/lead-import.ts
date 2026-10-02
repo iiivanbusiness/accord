@@ -10,6 +10,8 @@ export const IMPORT_FIELDS = [
   { key: "email", label: "Email" },
   { key: "phone", label: "Phone" },
   { key: "domain", label: "Website" },
+  // Managers only: who the lead goes to, by their SealMe login email.
+  { key: "ownerEmail", label: "Owner email" },
 ] as const;
 
 export type ImportFieldKey = (typeof IMPORT_FIELDS)[number]["key"];
@@ -29,7 +31,15 @@ const SYNONYMS: Record<ImportFieldKey, string[]> = {
   email: ["email", "work email", "email address", "e mail", "business email", "primary email", "contact email"],
   phone: ["phone", "phone number", "mobile", "mobile phone", "mobile number", "direct phone", "work phone", "corporate phone", "cell", "cell phone", "telephone", "direct dial"],
   domain: ["website", "domain", "company domain", "company website", "website url", "url", "web", "company url"],
+  ownerEmail: ["owner", "owner email", "owner email address", "lead owner", "contact owner", "account owner", "record owner", "hubspot owner", "sales rep", "sales rep email", "rep", "rep email", "assigned to", "assigned rep"],
 };
+
+// How a manager hands out the leads an import creates. Reps can't pick:
+// their imports are always theirs.
+export type ImportAssignment =
+  | { mode: "one"; ownerId: string | null }
+  | { mode: "even"; ownerIds: string[]; offset: number }
+  | { mode: "column"; fallbackOwnerId: string | null };
 
 function normalizeHeader(header: string): string {
   return header.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();

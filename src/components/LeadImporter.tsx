@@ -3,7 +3,17 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { parseCsv } from "@/lib/csv";
-import { detectDelimiter, guessMapping, IMPORT_CHUNK_SIZE, IMPORT_FIELDS, MAX_IMPORT_ROWS, rowName, type ImportFieldKey, type ImportRow } from "@/lib/lead-import";
+import {
+  detectDelimiter,
+  guessMapping,
+  IMPORT_CHUNK_SIZE,
+  IMPORT_FIELDS,
+  MAX_IMPORT_ROWS,
+  rowName,
+  type ImportAssignment,
+  type ImportFieldKey,
+  type ImportRow,
+} from "@/lib/lead-import";
 
 type Source = "paste" | "csv" | "xlsx";
 type Parsed = { headers: string[]; rows: string[][]; source: Source; fileName: string | null };
@@ -16,10 +26,10 @@ export default function LeadImporter({
   startAction,
   chunkAction,
 }: {
-  owners: { id: string; name: string }[];
+  owners: { id: string; name: string; email: string }[];
   canAssign: boolean;
   startAction: (source: string, fileName: string | null) => Promise<{ importId: string }>;
-  chunkAction: (importId: string, rows: ImportRow[], ownerChoice: string | null) => Promise<Result>;
+  chunkAction: (importId: string, rows: ImportRow[], assignment: ImportAssignment) => Promise<Result>;
 }) {
   const [mode, setMode] = useState<"paste" | "file">("paste");
   const [workbook, setWorkbook] = useState<Workbook | null>(null);
@@ -27,7 +37,10 @@ export default function LeadImporter({
   const [pasted, setPasted] = useState("");
   const [parsed, setParsed] = useState<Parsed | null>(null);
   const [mapping, setMapping] = useState<(ImportFieldKey | "")[]>([]);
+  const [assignMode, setAssignMode] = useState<"one" | "even" | "column">("one");
   const [owner, setOwner] = useState("");
+  const [evenIds, setEvenIds] = useState<string[]>(() => owners.map((o) => o.id));
+  const [fallbackOwner, setFallbackOwner] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [result, setResult] = useState<Result | null>(null);
@@ -49,7 +62,10 @@ export default function LeadImporter({
       return false;
     }
     setParsed({ headers, rows, source, fileName });
-    setMapping(guessMapping(headers));
+    // Only managers can route leads by an owner column.
+    const guessed = guessMapping(headers).map((f) => (f === "ownerEmail" && !canAssign ? "" : f));
+    setMapping(guessed);
+    setAssignMode(guessed.includes("ownerEmail") ? "column" : "one");
     return true;
   }
 
@@ -119,7 +135,15 @@ export default function LeadImporter({
       const { importId } = await startAction(parsed.source, parsed.fileName);
       const total: Result = { created: 0, updated: 0, skipped: 0 };
       for (let i = 0; i < mappedRows.length; i += IMPORT_CHUNK_SIZE) {
-        const r = await chunkAction(importId, mappedRows.slice(i, i + IMPORT_CHUNK_SIZE), owner || null);
+        // "even" continues the rotation where the last batch left off, so
+        // a 1,200-row import still splits evenly across everyone.
+        const assignment: ImportAssignment =
+          assignMode === "even"
+            ? { mode: "even", ownerIds: evenIds, offset: total.created }
+            : assignMode === "column"
+              ? { mode: "column", fallbackOwnerId: fallbackOwner || null }
+              : { mode: "one", ownerId: owner || null };
+        const r = await chunkAction(importId, mappedRows.slice(i, i + IMPORT_CHUNK_SIZE), assignment);
         total.created += r.created;
         total.updated += r.updated;
         total.skipped += r.skipped;
@@ -246,13 +270,18 @@ export default function LeadImporter({
                 </div>
                 <select
                   value={mapping[i] ?? ""}
-                  onChange={(e) => setMapping((m) => m.map((v, j) => (j === i ? (e.target.value as ImportFieldKey | "") : v)))}
+                  onChange={(e) => {
+                    const next = mapping.map((v, j) => (j === i ? (e.target.value as ImportFieldKey | "") : v));
+                    setMapping(next);
+                    // Owner column un-matched: fall back to one person.
+                    if (assignMode === "column" && !next.includes("ownerEmail")) setAssignMode("one");
+                  }}
                   className="input"
                   style={{ fontSize: "13px", padding: "7px 11px" }}
                   aria-label={`What "${header}" is`}
                 >
                   <option value="">Don&apos;t import</option>
-                  {IMPORT_FIELDS.map((f) => (
+                  {IMPORT_FIELDS.filter((f) => canAssign || f.key !== "ownerEmail").map((f) => (
                     <option key={f.key} value={f.key} disabled={mapping.includes(f.key) && mapping[i] !== f.key}>
                       {f.label}
                     </option>
@@ -266,15 +295,21 @@ export default function LeadImporter({
 
       <div className="card flex flex-col gap-4 p-5 sm:p-6">
         {canAssign && (
-          <label className="flex max-w-[320px] flex-col gap-1.5">
-            <span className="text-[12.5px] font-medium" style={{ color: "var(--ink-muted)" }}>Assign these leads to</span>
-            <select value={owner} onChange={(e) => setOwner(e.target.value)} className="input">
-              <option value="">Nobody yet (Unassigned)</option>
-              {owners.map((o) => (
-                <option key={o.id} value={o.id}>{o.name}</option>
-              ))}
-            </select>
-          </label>
+          <AssignControls
+            owners={owners}
+            mode={assignMode}
+            setMode={setAssignMode}
+            owner={owner}
+            setOwner={setOwner}
+            evenIds={evenIds}
+            setEvenIds={setEvenIds}
+            fallbackOwner={fallbackOwner}
+            setFallbackOwner={setFallbackOwner}
+            hasOwnerColumn={mapping.includes("ownerEmail")}
+            ownerEmailsInFile={mappedRows.filter((r) => rowName(r)).map((r) => r.ownerEmail?.trim().toLowerCase() ?? "")}
+            leadCount={withName}
+            disabled={Boolean(progress)}
+          />
         )}
         <div className="text-[13px]">
           {hasNameColumn ? (
@@ -299,12 +334,115 @@ export default function LeadImporter({
         )}
         {error && <div className="chip chip-warn w-full justify-start px-4 py-2.5 text-[12.5px]">{error}</div>}
         <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={!hasNameColumn || withName === 0 || Boolean(progress)} onClick={runImport} className="btn btn-primary">
+          <button
+            type="button"
+            disabled={!hasNameColumn || withName === 0 || Boolean(progress) || (assignMode === "even" && evenIds.length === 0) || (assignMode === "column" && !mapping.includes("ownerEmail"))}
+            onClick={runImport}
+            className="btn btn-primary"
+          >
             {progress ? "Importing…" : `Import ${withName.toLocaleString("en-US")} ${withName === 1 ? "lead" : "leads"}`}
           </button>
           <button type="button" disabled={Boolean(progress)} onClick={reset} className="btn btn-secondary">Start over</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function AssignControls({
+  owners,
+  mode,
+  setMode,
+  owner,
+  setOwner,
+  evenIds,
+  setEvenIds,
+  fallbackOwner,
+  setFallbackOwner,
+  hasOwnerColumn,
+  ownerEmailsInFile,
+  leadCount,
+  disabled,
+}: {
+  owners: { id: string; name: string; email: string }[];
+  mode: "one" | "even" | "column";
+  setMode: (m: "one" | "even" | "column") => void;
+  owner: string;
+  setOwner: (v: string) => void;
+  evenIds: string[];
+  setEvenIds: (v: string[]) => void;
+  fallbackOwner: string;
+  setFallbackOwner: (v: string) => void;
+  hasOwnerColumn: boolean;
+  ownerEmailsInFile: string[];
+  leadCount: number;
+  disabled: boolean;
+}) {
+  const known = new Set(owners.map((o) => o.email.toLowerCase()));
+  const matched = ownerEmailsInFile.filter((e) => e && known.has(e)).length;
+  const each = evenIds.length ? Math.floor(leadCount / evenIds.length) : 0;
+  const choice = (value: typeof mode, label: string, hint: string, enabled = true) => (
+    <label className={`flex cursor-pointer items-start gap-2.5 ${enabled ? "" : "cursor-not-allowed opacity-50"}`}>
+      <input type="radio" name="assign-mode" checked={mode === value} disabled={!enabled || disabled} onChange={() => setMode(value)} className="mt-[3px]" />
+      <span className="min-w-0">
+        <span className="block text-[13.5px] font-medium">{label}</span>
+        <span className="block text-[12px]" style={{ color: "var(--ink-muted)" }}>{hint}</span>
+      </span>
+    </label>
+  );
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="text-[13.5px] font-medium">Who gets these leads</div>
+      {choice("one", "One person", "Everyone in the file goes to the same rep, or stays unassigned.")}
+      {mode === "one" && (
+        <select value={owner} onChange={(e) => setOwner(e.target.value)} className="input ml-6 max-w-[300px]" disabled={disabled} aria-label="Assign to">
+          <option value="">Nobody yet (Unassigned)</option>
+          {owners.map((o) => (
+            <option key={o.id} value={o.id}>{o.name}</option>
+          ))}
+        </select>
+      )}
+      {choice("even", "Spread evenly", "Takes turns, so each rep gets the same number of new leads.")}
+      {mode === "even" && (
+        <div className="ml-6 flex flex-col gap-1.5">
+          {owners.map((o) => (
+            <label key={o.id} className="flex items-center gap-2 text-[13px]">
+              <input
+                type="checkbox"
+                checked={evenIds.includes(o.id)}
+                disabled={disabled}
+                onChange={(e) => setEvenIds(e.target.checked ? [...evenIds, o.id] : evenIds.filter((id) => id !== o.id))}
+              />
+              <span className="min-w-0 truncate">{o.name}</span>
+            </label>
+          ))}
+          <div className="text-[12px]" style={{ color: evenIds.length ? "var(--ink-muted)" : "var(--warn)" }}>
+            {evenIds.length
+              ? `About ${each.toLocaleString("en-US")}${leadCount % evenIds.length ? ` to ${(each + 1).toLocaleString("en-US")}` : ""} each, before duplicates.`
+              : "Pick at least one rep."}
+          </div>
+        </div>
+      )}
+      {choice(
+        "column",
+        "By the owner column in the file",
+        hasOwnerColumn ? "Matches each row's owner email to a teammate's SealMe login." : "Match a column to Owner email above to use this.",
+        hasOwnerColumn
+      )}
+      {mode === "column" && hasOwnerColumn && (
+        <div className="ml-6 flex flex-col gap-1.5">
+          <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
+            {matched.toLocaleString("en-US")} of {leadCount.toLocaleString("en-US")} rows match a teammate. The rest go to:
+          </div>
+          <select value={fallbackOwner} onChange={(e) => setFallbackOwner(e.target.value)} className="input max-w-[300px]" disabled={disabled} aria-label="Rows with no match go to">
+            <option value="">Nobody yet (Unassigned)</option>
+            {owners.map((o) => (
+              <option key={o.id} value={o.id}>{o.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
     </div>
   );
 }

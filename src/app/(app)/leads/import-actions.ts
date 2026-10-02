@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { requireProspecting } from "@/lib/prospecting";
 import { leadAccess } from "@/lib/lead-visibility";
 import { normalizePhone } from "@/lib/phone";
-import { IMPORT_CHUNK_SIZE, rowName, type ImportRow } from "@/lib/lead-import";
+import { IMPORT_CHUNK_SIZE, rowName, type ImportAssignment, type ImportRow } from "@/lib/lead-import";
 
 const SOURCES = new Set(["paste", "csv", "xlsx"]);
 
@@ -14,7 +14,15 @@ function clip(value: string | undefined, max: number): string | null {
   return v ? v.slice(0, max) : null;
 }
 
-type CleanRow = { name: string; company: string | null; title: string | null; email: string | null; phone: string | null; domain: string | null };
+type CleanRow = {
+  name: string;
+  company: string | null;
+  title: string | null;
+  email: string | null;
+  phone: string | null;
+  domain: string | null;
+  ownerEmail: string | null;
+};
 
 function clean(row: ImportRow): CleanRow | null {
   const name = rowName(row).slice(0, 200);
@@ -28,6 +36,7 @@ function clean(row: ImportRow): CleanRow | null {
     email: email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null,
     phone: normalizePhone(rawPhone) ?? rawPhone,
     domain: clip(row.domain, 253)?.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "") || null,
+    ownerEmail: clip(row.ownerEmail, 254)?.toLowerCase() ?? null,
   };
 }
 
@@ -44,11 +53,12 @@ export async function startLeadImport(source: string, fileName: string | null): 
 
 // One batch of an import. New people become leads; someone already in the
 // workspace (same email, or same phone) only gets their empty fields filled
-// in, never overwritten, since what's there may have come from a call.
+// in, never overwritten, since what's there may have come from a call, and
+// keeps whoever already owns them.
 export async function importLeadsChunk(
   importId: string,
   rows: ImportRow[],
-  ownerChoice: string | null
+  assignment: ImportAssignment
 ): Promise<{ created: number; updated: number; skipped: number }> {
   const workspace = await requireProspecting();
   const access = await leadAccess();
@@ -57,13 +67,14 @@ export async function importLeadsChunk(
   const run = await prisma.leadImport.findFirst({ where: { id: importId, workspaceId: workspace.id, createdById: access.userId }, select: { id: true, source: true } });
   if (!run) throw new Error("Import not found");
 
-  // Only managers pick the owner; a rep's imported leads are theirs.
-  let ownerId: string | null = access.userId;
-  if (access.canAssign) {
-    ownerId = ownerChoice
-      ? ((await prisma.user.findFirst({ where: { id: ownerChoice, workspaceId: workspace.id, deactivatedAt: null }, select: { id: true } }))?.id ?? null)
-      : null;
-  }
+  // Anyone an import can hand leads to: active members of this workspace.
+  // Every id or email coming from the browser is checked against this list.
+  const members = access.canAssign
+    ? await prisma.user.findMany({ where: { workspaceId: workspace.id, deactivatedAt: null }, select: { id: true, email: true } })
+    : [];
+  const memberIds = new Set(members.map((m) => m.id));
+  const memberByEmail = new Map(members.map((m) => [m.email.toLowerCase(), m.id]));
+  const member = (id: string | null | undefined) => (id && memberIds.has(id) ? id : null);
 
   let skipped = 0;
   const cleaned: CleanRow[] = [];
@@ -117,9 +128,28 @@ export async function importLeadsChunk(
     updated++;
   }
 
+  // Only managers hand leads out; a rep's imported leads are theirs.
+  const evenIds = assignment?.mode === "even" ? [...new Set(assignment.ownerIds)].filter((id) => memberIds.has(id)) : [];
+  const evenOffset = assignment?.mode === "even" && Number.isInteger(assignment.offset) && assignment.offset >= 0 ? assignment.offset : 0;
+  function ownerFor(row: CleanRow, index: number): string | null {
+    if (!access.canAssign) return access.userId;
+    if (assignment?.mode === "even") return evenIds.length ? evenIds[(evenOffset + index) % evenIds.length] : null;
+    if (assignment?.mode === "column") return (row.ownerEmail && memberByEmail.get(row.ownerEmail)) || member(assignment.fallbackOwnerId);
+    return member(assignment?.mode === "one" ? assignment.ownerId : null);
+  }
+
   if (toCreate.length) {
     await prisma.lead.createMany({
-      data: toCreate.map((r) => ({ workspaceId: workspace.id, ownerId, source: run.source, importId: run.id, ...r })),
+      data: toCreate.map(({ ownerEmail, ...r }, i) => ({
+        workspaceId: workspace.id,
+        ownerId: ownerFor({ ownerEmail, ...r }, i),
+        // Kept even when nobody here matches, so a manager can see who the
+        // file meant and reassign.
+        externalOwnerEmail: access.canAssign ? ownerEmail : null,
+        source: run.source,
+        importId: run.id,
+        ...r,
+      })),
     });
   }
 
