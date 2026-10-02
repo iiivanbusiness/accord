@@ -35,10 +35,13 @@ const WORKSPACE: NavGroup = {
   ],
 };
 export const ADMIN_ITEM: NavItem = { href: "/admin", label: "Admin" };
+// Only for people who can manage the team (they assign the work).
+const TEAM_ITEM: NavItem = { href: "/team", label: "Team" };
 
-export function navGroupsFor({ prospecting, admin }: { prospecting: boolean; admin: boolean }): NavGroup[] {
+export function navGroupsFor({ prospecting, admin, manager = false }: { prospecting: boolean; admin: boolean; manager?: boolean }): NavGroup[] {
   const workspace = admin ? { ...WORKSPACE, items: [...WORKSPACE.items, ADMIN_ITEM] } : WORKSPACE;
-  return prospecting ? [OVERVIEW, PROSPECTING, CLOSING, workspace] : [OVERVIEW, CLOSING, workspace];
+  const prospectingGroup = manager ? { ...PROSPECTING, items: [...PROSPECTING.items, TEAM_ITEM] } : PROSPECTING;
+  return prospecting ? [OVERVIEW, prospectingGroup, CLOSING, workspace] : [OVERVIEW, CLOSING, workspace];
 }
 
 // Every item a regular member sees, in sidebar order (the AI help chat
@@ -62,6 +65,7 @@ export function mobilePrimaryItems(groups: NavGroup[], prospecting: boolean, cou
 const SCREEN_LABELS: { test: (path: string) => boolean; label: string }[] = [
   { test: (p) => p === "/dashboard", label: "Dashboard" },
   { test: (p) => p === "/today", label: "Today" },
+  { test: (p) => p === "/team", label: "Team" },
   { test: (p) => p === "/deals/new", label: "Start a call" },
   { test: (p) => /^\/deals\/[^/]+\/contract$/.test(p), label: "Contract review" },
   { test: (p) => /^\/deals\/[^/]+\/send$/.test(p), label: "Send contract" },

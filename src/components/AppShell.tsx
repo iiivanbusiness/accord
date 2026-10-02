@@ -24,6 +24,7 @@ const NAV_ICONS: Record<string, () => React.ReactNode> = {
   "/deals": DealsIcon,
   "/today": TodayIcon,
   "/leads": LeadsIcon,
+  "/team": TeamIcon,
   "/calendar": CalendarIcon,
   "/analytics": AnalyticsIcon,
   "/clients": ClientsIcon,
@@ -45,10 +46,10 @@ export default async function AppShell({ children }: { children: React.ReactNode
   const isAdmin = isAdminEmail(session?.user?.email);
 
   const currentUser = session?.user?.email
-    ? await prisma.user.findUnique({ where: { email: session.user.email }, select: { aiDisclosureAcknowledgedAt: true } })
+    ? await prisma.user.findUnique({ where: { email: session.user.email }, select: { aiDisclosureAcknowledgedAt: true, role: { select: { canManageTeam: true } } } })
     : null;
   const { unreadCount, items: notificationItems } = await getUnreadNotifications();
-  const groups = navGroupsFor({ prospecting: workspace.prospectingEnabled, admin: isAdmin });
+  const groups = navGroupsFor({ prospecting: workspace.prospectingEnabled, admin: isAdmin, manager: Boolean(currentUser?.role?.canManageTeam) });
   const withIcon = (item: { href: string; label: string }) => {
     const Icon = NAV_ICONS[item.href];
     return { href: item.href, label: item.label, icon: <Icon /> };
@@ -188,6 +189,18 @@ function TodayIcon() {
     <svg {...iconProps()}>
       <circle cx="10" cy="10" r="3.2" />
       <path d="M10 2.6v1.8M10 15.6v1.8M2.6 10h1.8M15.6 10h1.8M4.8 4.8l1.3 1.3M13.9 13.9l1.3 1.3M4.8 15.2l1.3-1.3M13.9 6.1l1.3-1.3" />
+    </svg>
+  );
+}
+
+function TeamIcon() {
+  return (
+    <svg {...iconProps()}>
+      <circle cx="10" cy="6.2" r="2.4" />
+      <circle cx="4.6" cy="8.4" r="1.8" />
+      <circle cx="15.4" cy="8.4" r="1.8" />
+      <path d="M5.6 16.4c.4-2.7 2.2-4.2 4.4-4.2s4 1.5 4.4 4.2" />
+      <path d="M1.8 15.2c.3-1.8 1.4-2.8 2.8-2.8M18.2 15.2c-.3-1.8-1.4-2.8-2.8-2.8" />
     </svg>
   );
 }

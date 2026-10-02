@@ -88,8 +88,16 @@ export async function setLeadStage(leadId: string, stage: string) {
   const workspace = await requireProspecting();
   const access = await leadAccess();
   if (!isLeadStage(stage)) throw new Error("Unknown stage");
-  const result = await prisma.lead.updateMany({ where: { id: leadId, workspaceId: workspace.id, ...access.where }, data: { stage } });
+  // convertedAt records the first time it became a customer (for /team);
+  // moving it back out of "converted" clears it.
+  const result = await prisma.lead.updateMany({
+    where: { id: leadId, workspaceId: workspace.id, ...access.where },
+    data: stage === "converted" ? { stage } : { stage, convertedAt: null },
+  });
   if (result.count === 0) throw new Error("Lead not found");
+  if (stage === "converted") {
+    await prisma.lead.updateMany({ where: { id: leadId, workspaceId: workspace.id, convertedAt: null }, data: { convertedAt: new Date() } });
+  }
   revalidatePath("/leads");
   revalidatePath(`/leads/${leadId}`);
 }

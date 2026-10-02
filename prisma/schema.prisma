@@ -1096,6 +1096,8 @@ model Lead {
   // Set once the lead becomes a customer; the Client and Deal carry on from here.
   convertedClientId String?
   convertedDealId   String?
+  // When the lead was marked converted, for "converted this week" on /team.
+  convertedAt       DateTime?
 
   // Ids in the customer's own CRM, for de-duplicating imports and writing call notes back.
   hubspotContactId     String?
