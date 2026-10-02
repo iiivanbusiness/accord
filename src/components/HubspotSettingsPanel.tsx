@@ -37,8 +37,9 @@ export default function HubspotSettingsPanel({
           </div>
         )}
         <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
-          In your HubSpot account: <strong>Settings → Integrations → Private Apps → Create a private app</strong>, grant the
-          contacts/deals read+write scopes, then paste the token it gives you.
+          In HubSpot: <strong>Development → Legacy Apps → Create legacy app (private)</strong>. Give it the contacts and deals
+          read and write scopes, plus owners read and contacts schema read for bringing leads in, then paste its access token
+          from the <strong>Auth</strong> tab here.
         </div>
         <form action={(formData) => run(() => connectAction(formData))} className="flex items-center gap-2">
           <input

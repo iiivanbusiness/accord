@@ -8,6 +8,18 @@ import { readHubspotFilter, readSalesforceFilter, type CrmSource, type SyncSumma
 import { hubspotLeadOptions, syncHubspotLeads } from "@/lib/hubspot-leads";
 import { salesforceLeadStatuses, syncSalesforceLeads } from "@/lib/salesforce-leads";
 import { Prisma } from "@/generated/prisma/client";
+import { reportError } from "@/lib/error-report";
+
+// A rejected login or token means the connection itself needs redoing,
+// which is worth saying plainly; anything else gets the general message.
+function crmErrorMessage(err: unknown, crm: CrmSource, fallback: string): string {
+  const text = err instanceof Error ? err.message : String(err);
+  const name = crm === "hubspot" ? "HubSpot" : "Salesforce";
+  if (/token request failed|invalid_grant|app_not_found|INVALID_SESSION_ID|expired|401|403/i.test(text)) {
+    return `${name} turned down SealMe's connection. Disconnect ${name} above and connect it again.`;
+  }
+  return fallback;
+}
 
 type Option = { value: string; label: string };
 export type CrmLeadOptions = { groups: { key: string; label: string; options: Option[] }[] };
@@ -54,8 +66,10 @@ export async function loadCrmLeadOptions(crm: CrmSource): Promise<CrmLeadOptions
       };
     }
     return { groups: [{ key: "statuses", label: "Lead Status", options: await salesforceLeadStatuses(workspace.id) }] };
-  } catch {
-    return { error: "Couldn't read the options from your CRM. Check the connection and try again." };
+  } catch (err) {
+    console.error("Loading CRM lead options failed", err);
+    await reportError(err, "CRM lead import options", { workspaceId: user.workspaceId });
+    return { error: crmErrorMessage(err, crmOf(crm), "Couldn't read the options from your CRM. Check the connection and try again.") };
   }
 }
 
@@ -68,8 +82,10 @@ export async function syncCrmLeadsNow(crm: CrmSource): Promise<SyncSummary | { e
     revalidatePath("/settings");
     revalidatePath("/leads");
     return summary;
-  } catch {
-    return { error: "The sync didn't finish. Check the connection and try again." };
+  } catch (err) {
+    console.error("CRM lead sync failed", err);
+    await reportError(err, "CRM lead sync now", { workspaceId: user.workspaceId });
+    return { error: crmErrorMessage(err, crmOf(crm), "The sync didn't finish. Check the connection and try again.") };
   }
 }
 
