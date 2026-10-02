@@ -57,8 +57,11 @@ export default function SidebarNav({ groups }: { groups: SidebarNavGroup[] }) {
       {pill && (
         <div
           aria-hidden="true"
-          className="nav-pill-wrap absolute left-0 right-0 transition-[top,height] duration-300 ease-out"
-          style={{ top: pill.top, height: pill.height }}
+          className="nav-pill-wrap left-0 right-0 transition-[top,height] duration-300 ease-out"
+          // Inline, not the `absolute` class: .nav-pill-wrap in globals.css
+          // sets position: relative and beats the utility, which put the
+          // pill in the flow and pushed every item down a row.
+          style={{ position: "absolute", top: pill.top, height: pill.height }}
         >
           <div className="nav-pill" />
         </div>
