@@ -1,16 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { parseCsv } from "@/lib/csv";
 import {
   detectDelimiter,
   guessMapping,
   IMPORT_CHUNK_SIZE,
-  IMPORT_FIELDS,
   isNotesHeader,
   MAX_IMPORT_ROWS,
-  MULTI_FIELDS,
+  normalizeHeader,
   rowName,
   type ImportAssignment,
   type ImportFieldKey,
@@ -38,7 +37,11 @@ export default function LeadImporter({
   const [reading, setReading] = useState(false);
   const [pasted, setPasted] = useState("");
   const [parsed, setParsed] = useState<Parsed | null>(null);
-  const [mapping, setMapping] = useState<(ImportFieldKey | "")[]>([]);
+  // What each column was recognized as; the picker only turns fields on
+  // and off, it never re-points a column.
+  const [guess, setGuess] = useState<(ImportFieldKey | "")[]>([]);
+  const [enabledFields, setEnabledFields] = useState<Set<string>>(new Set());
+  const [noteColumns, setNoteColumns] = useState<Set<number>>(new Set());
   const [assignMode, setAssignMode] = useState<"one" | "even" | "column">("one");
   const [owner, setOwner] = useState("");
   const [evenIds, setEvenIds] = useState<string[]>(() => owners.map((o) => o.id));
@@ -66,7 +69,9 @@ export default function LeadImporter({
     setParsed({ headers, rows, source, fileName });
     // Only managers can route leads by an owner column.
     const guessed = guessMapping(headers).map((f) => (f === "ownerEmail" && !canAssign ? "" : f));
-    setMapping(guessed);
+    setGuess(guessed);
+    setEnabledFields(new Set(guessed.filter((f): f is ImportFieldKey => Boolean(f) && f !== "notes").map(fieldGroup)));
+    setNoteColumns(new Set(guessed.flatMap((f, i) => (f === "notes" ? [i] : []))));
     setAssignMode(guessed.includes("ownerEmail") ? "column" : "one");
     return true;
   }
@@ -115,6 +120,15 @@ export default function LeadImporter({
     load(await file.text(), "csv", file.name);
   }
 
+  const mapping = useMemo<(ImportFieldKey | "")[]>(
+    () =>
+      guess.map((f, i) => {
+        if (f && f !== "notes") return enabledFields.has(fieldGroup(f)) ? f : "";
+        return noteColumns.has(i) ? "notes" : "";
+      }),
+    [guess, enabledFields, noteColumns]
+  );
+
   const mappedRows = useMemo<ImportRow[]>(() => {
     if (!parsed) return [];
     return parsed.rows.map((cells) => {
@@ -133,24 +147,20 @@ export default function LeadImporter({
     });
   }, [parsed, mapping]);
 
-  // What each column was first guessed as, used when someone ticks a
-  // column back on.
-  const firstGuess = useMemo(() => (parsed ? guessMapping(parsed.headers) : []), [parsed]);
-  const fieldChoices = IMPORT_FIELDS.filter((f) => canAssign || f.key !== "ownerEmail");
-
-  function setColumn(i: number, field: ImportFieldKey | "") {
-    const next = mapping.map((v, j) => (j === i ? field : v));
-    setMapping(next);
-    // Owner column un-matched: fall back to one person.
-    if (assignMode === "column" && !next.includes("ownerEmail")) setAssignMode("one");
+  function toggleField(key: string, on: boolean) {
+    const next = new Set(enabledFields);
+    if (on) next.add(key);
+    else next.delete(key);
+    setEnabledFields(next);
+    // Owner column turned off: fall back to one person.
+    if (key === "ownerEmail" && !on && assignMode === "column") setAssignMode("one");
   }
 
-  function toggleColumn(i: number, on: boolean) {
-    if (!on) return setColumn(i, "");
-    const guess = firstGuess[i];
-    const free = (f: ImportFieldKey) => MULTI_FIELDS.has(f) || !mapping.some((v, j) => j !== i && v === f);
-    const usable = guess && (canAssign || guess !== "ownerEmail") && free(guess) ? guess : "notes";
-    setColumn(i, usable);
+  function toggleNoteColumn(i: number, on: boolean) {
+    const next = new Set(noteColumns);
+    if (on) next.add(i);
+    else next.delete(i);
+    setNoteColumns(next);
   }
 
   const withName = mappedRows.filter((r) => rowName(r)).length;
@@ -189,7 +199,9 @@ export default function LeadImporter({
   function reset() {
     setParsed(null);
     setWorkbook(null);
-    setMapping([]);
+    setGuess([]);
+    setEnabledFields(new Set());
+    setNoteColumns(new Set());
     setResult(null);
     setPasted("");
     setError(null);
@@ -271,9 +283,9 @@ export default function LeadImporter({
     <div className="flex max-w-[860px] flex-col gap-4">
       <div className="card flex flex-col gap-4 p-5 sm:p-6">
         <div>
-          <div className="text-[15px] font-medium">Match your columns</div>
+          <div className="text-[15px] font-medium">Choose what to import</div>
           <div className="mt-1 text-[13px]" style={{ color: "var(--ink-muted)" }}>
-            {parsed.fileName ? `${parsed.fileName}, ` : ""}{parsed.rows.length.toLocaleString("en-US")} {parsed.rows.length === 1 ? "row" : "rows"}. Tick the columns to bring in and pick where each one goes. Extra columns can go into Notes.
+            {parsed.fileName ? `${parsed.fileName}, ` : ""}{parsed.rows.length.toLocaleString("en-US")} {parsed.rows.length === 1 ? "row" : "rows"}. We matched your columns to lead fields. Untick anything you don&apos;t want.
           </div>
         </div>
         {workbook && workbook.sheets.length > 1 && (
@@ -288,51 +300,18 @@ export default function LeadImporter({
             </select>
           </label>
         )}
-        <div className="flex flex-col divide-y" style={{ borderColor: "var(--hairline-soft)" }}>
-          {parsed.headers.map((header, i) => {
-            const sample = parsed.rows.find((r) => r[i]?.trim())?.[i]?.trim() ?? "";
-            const field = mapping[i] ?? "";
-            const on = field !== "";
-            // Only fields no other column has taken (notes can take many).
-            const options = fieldChoices.filter((f) => f.key === field || MULTI_FIELDS.has(f.key) || !mapping.includes(f.key));
-            return (
-              <div
-                key={i}
-                className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 py-2.5 sm:grid-cols-[auto_minmax(0,1fr)_200px] sm:gap-x-4"
-                style={{ borderColor: "var(--hairline-soft)" }}
-              >
-                <input
-                  type="checkbox"
-                  checked={on}
-                  onChange={(e) => toggleColumn(i, e.target.checked)}
-                  disabled={Boolean(progress)}
-                  className="h-4 w-4"
-                  aria-label={`Import "${header}"`}
-                />
-                <div className="min-w-0" style={on ? undefined : { opacity: 0.55 }}>
-                  <div className="truncate text-[13.5px] font-medium" title={header}>{header}</div>
-                  <div className="truncate text-[12px]" style={{ color: "var(--ink-muted)" }} title={sample}>{sample || "Empty"}</div>
-                </div>
-                {on ? (
-                  <select
-                    value={field}
-                    onChange={(e) => setColumn(i, e.target.value as ImportFieldKey)}
-                    disabled={Boolean(progress)}
-                    className="input col-start-2 sm:col-start-3"
-                    style={{ fontSize: "13px", padding: "7px 11px" }}
-                    aria-label={`What "${header}" is`}
-                  >
-                    {options.map((f) => (
-                      <option key={f.key} value={f.key}>{f.label}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className="col-start-2 text-[12.5px] sm:col-start-3" style={{ color: "var(--ink-muted)" }}>Not imported</div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <FieldPicker
+          headers={parsed.headers}
+          rows={parsed.rows}
+          guess={guess}
+          enabledFields={enabledFields}
+          noteColumns={noteColumns}
+          canAssign={canAssign}
+          onToggleField={toggleField}
+          onToggleNote={toggleNoteColumn}
+          disabled={Boolean(progress)}
+        />
+        <ImportPreview rows={mappedRows.slice(0, 3)} mapping={mapping} />
       </div>
 
       <div className="card flex flex-col gap-4 p-5 sm:p-6">
@@ -386,6 +365,194 @@ export default function LeadImporter({
           </button>
           <button type="button" disabled={Boolean(progress)} onClick={reset} className="btn btn-secondary">Start over</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+const NAME_FIELDS: ReadonlySet<string> = new Set(["name", "firstName", "lastName"]);
+
+// Full name, first name, and last name are one choice: "Name".
+function fieldGroup(field: ImportFieldKey): string {
+  return NAME_FIELDS.has(field) ? "name" : field;
+}
+
+// Row numbers and ids from the sheet aren't worth keeping as notes.
+const JUNK_HEADERS = new Set(["", "no", "nr", "br", "id", "rb", "redni broj", "row", "row number", "number"]);
+
+const PICKER_FIELDS: { key: string; label: string; managerOnly?: boolean }[] = [
+  { key: "name", label: "Name" },
+  { key: "company", label: "Company" },
+  { key: "title", label: "Title" },
+  { key: "email", label: "Email" },
+  { key: "phone", label: "Phone" },
+  { key: "domain", label: "Website" },
+  { key: "ownerEmail", label: "Owner email", managerOnly: true },
+];
+
+function FieldPicker({
+  headers,
+  rows,
+  guess,
+  enabledFields,
+  noteColumns,
+  canAssign,
+  onToggleField,
+  onToggleNote,
+  disabled,
+}: {
+  headers: string[];
+  rows: string[][];
+  guess: (ImportFieldKey | "")[];
+  enabledFields: Set<string>;
+  noteColumns: Set<number>;
+  canAssign: boolean;
+  onToggleField: (key: string, on: boolean) => void;
+  onToggleNote: (i: number, on: boolean) => void;
+  disabled: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const sourcesFor = (key: string) => headers.filter((_, i) => guess[i] && fieldGroup(guess[i] as ImportFieldKey) === key);
+  const fields = PICKER_FIELDS.filter((f) => canAssign || !f.managerOnly).map((f) => ({ ...f, sources: sourcesFor(f.key) }));
+  // Columns that could go into notes: the ones that already say "notes",
+  // and anything we didn't recognize.
+  const noteCandidates = headers
+    .map((header, i) => ({ header, i, sample: rows.find((r) => r[i]?.trim())?.[i]?.trim() ?? "" }))
+    .filter(({ header, i }) => guess[i] === "notes" || (!guess[i] && !JUNK_HEADERS.has(normalizeHeader(header))));
+
+  const chosen = [
+    ...fields.filter((f) => f.sources.length && enabledFields.has(f.key)).map((f) => f.label),
+    ...(noteColumns.size ? ["Notes"] : []),
+  ];
+
+  const check = "mt-[2px] h-4 w-4 flex-none";
+  return (
+    <div ref={boxRef} className="relative">
+      <div className="mb-1.5 text-[12.5px] font-medium" style={{ color: "var(--ink-muted)" }}>Fields to import</div>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        disabled={disabled}
+        aria-expanded={open}
+        aria-haspopup="true"
+        className="input flex w-full items-center justify-between gap-3 text-left sm:max-w-[460px]"
+        style={{ fontSize: "13.5px" }}
+      >
+        <span className="min-w-0 truncate">{chosen.join(", ") || "Nothing selected"}</span>
+        <span aria-hidden="true" className="flex-none text-[11px]" style={{ color: "var(--ink-muted)" }}>{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div
+          role="group"
+          aria-label="Fields to import"
+          className="absolute left-0 right-0 z-30 mt-1.5 flex max-h-[60vh] flex-col gap-3 overflow-y-auto rounded-[14px] border p-4 sm:right-auto sm:w-[460px]"
+          style={{ background: "var(--surface-1)", borderColor: "var(--hairline)", boxShadow: "var(--shadow-card)" }}
+        >
+          {fields.map((f) => {
+            const present = f.sources.length > 0;
+            const isName = f.key === "name";
+            return (
+              <label key={f.key} className={`flex items-start gap-2.5 ${present && !isName ? "cursor-pointer" : ""}`} style={present ? undefined : { opacity: 0.5 }}>
+                <input
+                  type="checkbox"
+                  className={check}
+                  checked={present && (isName || enabledFields.has(f.key))}
+                  disabled={!present || isName}
+                  onChange={(e) => onToggleField(f.key, e.target.checked)}
+                />
+                <span className="min-w-0">
+                  <span className="block text-[13.5px] font-medium">{f.label}{isName ? " (always imported)" : ""}</span>
+                  <span className="block truncate text-[12px]" style={{ color: "var(--ink-muted)" }}>
+                    {present ? `From ${f.sources.map((h) => `"${h}"`).join(" + ")}` : "Not in this file"}
+                  </span>
+                </span>
+              </label>
+            );
+          })}
+          {noteCandidates.length > 0 && (
+            <div className="flex flex-col gap-2.5 border-t pt-3" style={{ borderColor: "var(--hairline-soft)" }}>
+              <div>
+                <div className="text-[13.5px] font-medium">Notes</div>
+                <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>Other columns, saved to the lead&apos;s notes</div>
+              </div>
+              {noteCandidates.map(({ header, i, sample }) => (
+                <label key={i} className="flex cursor-pointer items-start gap-2.5 pl-1">
+                  <input type="checkbox" className={check} checked={noteColumns.has(i)} onChange={(e) => onToggleNote(i, e.target.checked)} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-[13px]">{header}</span>
+                    <span className="block truncate text-[12px]" style={{ color: "var(--ink-muted)" }}>{sample || "Empty"}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+          <button type="button" onClick={() => setOpen(false)} className="btn btn-secondary btn-sm self-start">Done</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const PREVIEW_COLUMNS: { label: string; get: (r: ImportRow) => string | undefined; when: (m: (ImportFieldKey | "")[]) => boolean }[] = [
+  { label: "Name", get: (r) => rowName(r), when: () => true },
+  { label: "Company", get: (r) => r.company, when: (m) => m.includes("company") },
+  { label: "Title", get: (r) => r.title, when: (m) => m.includes("title") },
+  { label: "Email", get: (r) => r.email, when: (m) => m.includes("email") },
+  { label: "Phone", get: (r) => r.phone, when: (m) => m.includes("phone") },
+  { label: "Website", get: (r) => r.domain, when: (m) => m.includes("domain") },
+  { label: "Owner", get: (r) => r.ownerEmail, when: (m) => m.includes("ownerEmail") },
+  { label: "Notes", get: (r) => r.notes?.replace(/\n/g, " · "), when: (m) => m.includes("notes") },
+];
+
+// The first few leads as they'll be saved, so a wrong match shows up
+// before anything is imported.
+function ImportPreview({ rows, mapping }: { rows: ImportRow[]; mapping: (ImportFieldKey | "")[] }) {
+  const cols = PREVIEW_COLUMNS.filter((c) => c.when(mapping));
+  if (rows.length === 0) return null;
+  return (
+    <div>
+      <div className="mb-1.5 text-[12.5px] font-medium" style={{ color: "var(--ink-muted)" }}>Preview</div>
+      <div className="overflow-x-auto rounded-[12px] border" style={{ borderColor: "var(--hairline)" }}>
+        <table className="w-full border-collapse text-[12.5px]">
+          <thead>
+            <tr>
+              {cols.map((c) => (
+                <th key={c.label} className="whitespace-nowrap border-b px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wide" style={{ borderColor: "var(--hairline)", color: "var(--ink-muted)" }}>
+                  {c.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                {cols.map((c) => (
+                  <td key={c.label} className="border-b px-3 py-2 align-top" style={{ borderColor: "var(--hairline-soft)" }}>
+                    <div className="max-w-[220px] truncate" title={c.get(r) ?? ""}>{c.get(r) || "-"}</div>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
