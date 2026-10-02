@@ -11,6 +11,7 @@ import { setTaskStatus } from "../leads/task-actions";
 
 const DAY = 24 * 60 * 60 * 1000;
 const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
+const CONTRACTS_SHOWN = 8;
 
 type TaskRow = {
   id: string;
@@ -125,7 +126,13 @@ export default async function TodayPage() {
   const approvals = pendingSteps.filter((s) => s.contract.reviewSteps[0]?.id === s.id).map((s) => s.contract.deal);
   const needsYou = myDeals.filter((d) => d.status !== "sent");
   const awaitingSignature = myDeals.filter((d) => d.status === "sent");
-  const contractCount = approvals.length + needsYou.length + awaitingSignature.length;
+  // Approvals first: someone else is waiting on those.
+  const contractItems = [
+    ...approvals.map((d) => ({ ...d, label: "Waiting for your approval", chip: "chip-warn" })),
+    ...needsYou.map((d) => ({ ...d, label: STATUS_LABEL[d.status] ?? d.status, chip: STATUS_CHIP[d.status] ?? "chip-neutral" })),
+    ...awaitingSignature.map((d) => ({ ...d, label: "Waiting for signature", chip: "chip-neutral" })),
+  ];
+  const contractCount = contractItems.length;
 
   const left = overdue.length + dueToday.length;
   const done = finished.length;
@@ -151,7 +158,7 @@ export default async function TodayPage() {
         <div>
           <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>Today</h1>
           <div className="mt-1 text-[14px]" style={{ color: "var(--ink-muted)" }}>
-            {dateLabel} · {left === 0 && done === 0 ? "nothing due" : `${done.toLocaleString("en-US")} finished, ${left.toLocaleString("en-US")} to go`}
+            {dateLabel} · {left === 0 && done === 0 ? "no tasks due" : `${done.toLocaleString("en-US")} finished, ${left.toLocaleString("en-US")} to go`}
           </div>
         </div>
         <Link href="/leads" className="btn btn-secondary">
@@ -182,11 +189,7 @@ export default async function TodayPage() {
 
         {contractCount > 0 && (
           <Section title="Contracts" count={contractCount} className="order-5 md:order-3">
-            {[
-              ...approvals.map((d) => ({ ...d, label: "Waiting for your approval", chip: "chip-warn" })),
-              ...needsYou.map((d) => ({ ...d, label: STATUS_LABEL[d.status] ?? d.status, chip: STATUS_CHIP[d.status] ?? "chip-neutral" })),
-              ...awaitingSignature.map((d) => ({ ...d, label: "Waiting for signature", chip: "chip-neutral" })),
-            ].map((d, i) => (
+            {contractItems.slice(0, CONTRACTS_SHOWN).map((d, i) => (
               <Link
                 key={`${d.id}-${i}`}
                 href={`/deals/${d.id}`}
@@ -200,6 +203,11 @@ export default async function TodayPage() {
                 <span className={`chip flex-none whitespace-nowrap ${d.chip}`}>{d.label}</span>
               </Link>
             ))}
+            {contractCount > CONTRACTS_SHOWN && (
+              <Link href="/deals" className="block px-4 py-3 text-[13px] font-medium sm:px-5" style={{ borderTop: "1px solid var(--hairline-soft)", color: "var(--accent-blue)" }}>
+                {plural(contractCount - CONTRACTS_SHOWN, "more", "more")} in Deals
+              </Link>
+            )}
           </Section>
         )}
 
