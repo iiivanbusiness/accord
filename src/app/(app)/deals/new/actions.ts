@@ -72,6 +72,8 @@ export async function createDeal(formData: FormData) {
 export async function createDealFromTranscript(formData: FormData) {
   const transcript = String(formData.get("transcript") ?? "").trim();
   const templateId = String(formData.get("templateId") ?? "").trim();
+  // The transcript came from an uploaded video/audio file rather than text.
+  const fromRecording = formData.get("source") === "recording";
 
   if (!transcript) throw new Error("Paste a call transcript first");
   if (!templateId) throw new Error("Choose a template");
@@ -116,7 +118,7 @@ export async function createDealFromTranscript(formData: FormData) {
       summary: extracted.summary,
       source: "upload",
       fields: { create: fieldRows },
-      calls: { create: { transcript, source: "upload", endedAt: new Date() } },
+      calls: { create: { transcript, source: fromRecording ? "recording" : "upload", endedAt: new Date() } },
     },
     include: { calls: true },
   });

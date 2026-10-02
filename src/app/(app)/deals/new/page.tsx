@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { isExtractionConfigured } from "@/lib/extract-deal";
 import { requireWorkspaceId } from "@/lib/workspace";
 import LocalCaptureForm from "@/components/LocalCaptureForm";
+import CallUploadForm from "@/components/CallUploadForm";
 import SubmitButton from "@/components/SubmitButton";
 import { createDeal, createDealFromTranscript } from "./actions";
 
@@ -23,7 +24,7 @@ function ModeTab({ href, active, children }: { href: string; active: boolean; ch
   return (
     <Link
       href={href}
-      className="btn btn-sm"
+      className="btn btn-sm whitespace-nowrap"
       style={active ? { background: "var(--primary)", color: "var(--on-primary)" } : { background: "var(--surface-1)", border: "1px solid var(--hairline)", color: "var(--ink-muted)" }}
     >
       {children}
@@ -58,13 +59,13 @@ export default async function NewDealPage({
           ? "SealMe records your system audio for the call. Nothing joins as a visible participant."
           : isManual
             ? "Enter what the call covered and it'll drop straight into the review flow."
-            : "Paste the call transcript and SealMe will pull out the deal terms for you to review."}
+            : "Upload the call recording or its transcript, and SealMe will pull out the deal terms for you to review."}
       </div>
     </div>
 
-    <div className="mb-5 flex gap-2">
+    <div className="mb-5 flex flex-wrap gap-2">
       <ModeTab href="/deals/new?mode=local" active={isLocal}>Record locally</ModeTab>
-      <ModeTab href="/deals/new" active={isTranscript}>Paste a transcript</ModeTab>
+      <ModeTab href="/deals/new" active={isTranscript}>Recording or transcript</ModeTab>
       <ModeTab href="/deals/new?mode=manual" active={isManual}>Enter manually</ModeTab>
     </div>
 
@@ -112,44 +113,14 @@ export default async function NewDealPage({
       )
     ) : !extractionConfigured ? (
       <div className="card max-w-[560px] p-6 text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-        Transcript extraction isn&apos;t set up yet. It needs an <span className="font-mono-tab">ANTHROPIC_API_KEY</span> in <span className="font-mono-tab">.env</span>. Use{" "}
+        Call processing isn&apos;t set up yet. It needs an <span className="font-mono-tab">ANTHROPIC_API_KEY</span> in <span className="font-mono-tab">.env</span>. Use{" "}
         <Link href="/deals/new?mode=manual" className="font-medium" style={{ color: "var(--accent-blue)" }}>
           manual entry
         </Link>{" "}
         for now.
       </div>
     ) : (
-      <form action={createDealFromTranscript} className="card flex max-w-[560px] flex-col gap-4 p-6">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-medium">Call transcript</span>
-          <textarea
-            name="transcript"
-            required
-            rows={12}
-            placeholder="Agency: Hey, thanks for hopping on...
-Client: Of course, excited to talk about..."
-            className="input font-mono-tab text-[12.5px]"
-          />
-        </label>
-
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-medium">Template</span>
-          <select name="templateId" required className="input">
-            <option value="" style={{ background: "var(--surface-1)" }}>
-              Choose a template
-            </option>
-            {templates.map((t) => (
-              <option key={t.id} value={t.id} style={{ background: "var(--surface-1)" }}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <SubmitButton className="btn btn-primary mt-2 w-full justify-center" pendingText="Reading the call, this can take up to a minute…">
-          Extract deal terms
-        </SubmitButton>
-      </form>
+      <CallUploadForm templates={templates.map((t) => ({ id: t.id, name: t.name }))} action={createDealFromTranscript} />
     )}
     </>
   );

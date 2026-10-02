@@ -496,7 +496,7 @@ model Call {
   dealId     String
   deal       Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
   transcript String    @default("")
-  source     String // local | upload
+  source     String // local | upload (pasted or text file) | recording (uploaded video/audio)
   startedAt  DateTime  @default(now())
   endedAt    DateTime?
 

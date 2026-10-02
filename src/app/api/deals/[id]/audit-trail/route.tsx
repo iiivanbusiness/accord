@@ -7,6 +7,7 @@ import { AuditTrailPdfDocument, type AuditEvent } from "@/lib/audit-trail-pdf";
 const CALL_SOURCE_LABEL: Record<string, string> = {
   local: "Recorded locally",
   upload: "Pasted transcript",
+  recording: "Uploaded recording",
 };
 
 // Compliance-sensitive (review decisions, signer IPs) — gated on

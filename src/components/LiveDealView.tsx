@@ -51,6 +51,7 @@ type NoteItem = { id: string; authorName: string; authorEmail: string; body: str
 const CALL_SOURCE_LABEL: Record<string, string> = {
   local: "Recorded locally",
   upload: "Pasted transcript",
+  recording: "Uploaded recording",
 };
 
 const STATUS_LABEL: Record<string, string> = {
