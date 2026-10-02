@@ -139,6 +139,15 @@ model Workspace {
   // admin turns on in /admin see them, until they're finished and the
   // current App Store build has been reviewed. See src/lib/prospecting.ts.
   prospectingEnabled Boolean @default(false)
+  // What happens when a rep calls a number in an all-party consent state
+  // (or one we can't place): "skip" calls it without SealMe on the line,
+  // "announce" records with a disclosure. Only an Owner can pick "announce".
+  allPartyStatePolicy String @default("skip") // skip | announce
+  leads        Lead[]
+  tasks        Task[]
+  leadImports  LeadImport[]
+  phoneCalls   PhoneCall[]
+  callIntents  CallIntent[]
   createdAt          DateTime @default(now())
 
   users             User[]
@@ -281,6 +290,17 @@ model User {
   emailVerificationTokens EmailVerificationToken[]
   feedbackPosts           FeedbackPost[]
   feedbackVotes           FeedbackVote[]
+
+  // The rep's own mobile number, E.164. Calls into the SealMe number are
+  // matched to the rep by caller ID, so two users can't share one.
+  phone String? @unique
+
+  ownedLeads    Lead[]       @relation("LeadOwner")
+  assignedTasks Task[]       @relation("TaskAssignee")
+  createdTasks  Task[]       @relation("TaskCreator")
+  leadImports   LeadImport[]
+  phoneCalls    PhoneCall[]
+  callIntents   CallIntent[]
 }
 
 // tokenHash stores SHA-256 of the raw token emailed to the user — same
@@ -431,6 +451,8 @@ model Deal {
   actionItems    ActionItem[]
   callHighlights CallHighlight[]
   notes          DealNote[]
+  tasks          Task[]
+  phoneCalls     PhoneCall[]
 }
 
 // A free-form internal note on a deal — the "leave a comment for a
@@ -1034,4 +1056,193 @@ model WebhookDelivery {
   createdAt      DateTime        @default(now())
 
   @@index([endpointId, createdAt])
+}
+
+// A prospect a rep calls before they become a Client and Deal. Comes in by
+// hand, from a pasted sheet, a CSV/XLSX file, or HubSpot/Salesforce, and
+// is enriched after every processed cold call.
+model Lead {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  // The rep it's assigned to. Null means unassigned (also what happens when
+  // the owner is removed from the workspace, so a manager can reassign).
+  ownerId String?
+  owner   User?   @relation("LeadOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  name    String
+  company String?
+  title   String?
+  email   String?
+  phone   String? // E.164 when it parses as one; area code drives the consent rule
+  domain  String?
+
+  stage           String    @default("new") // new | contacted | interested | meeting | converted | lost
+  interest        String? // cold | warm | hot
+  isDecisionMaker Boolean?
+  painPoints      String?
+  objections      String?
+  nextStep        String?
+  nextStepAt      DateTime?
+  summary         String? // from the most recent processed call
+  lastContactedAt DateTime?
+
+  source   String  @default("manual") // manual | paste | csv | xlsx | hubspot | salesforce | call
+  importId String?
+  import   LeadImport? @relation(fields: [importId], references: [id], onDelete: SetNull)
+
+  // Set once the lead becomes a customer; the Client and Deal carry on from here.
+  convertedClientId String?
+  convertedDealId   String?
+
+  // Ids in the customer's own CRM, for de-duplicating imports and writing call notes back.
+  hubspotContactId     String?
+  salesforceRecordId   String?
+  salesforceRecordType String? // Lead | Contact
+  externalOwnerEmail   String? // owner as the CRM had it, kept even when no SealMe user matches
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tasks       Task[]
+  phoneCalls  PhoneCall[]
+  callIntents CallIntent[]
+
+  @@unique([workspaceId, hubspotContactId])
+  @@unique([workspaceId, salesforceRecordId])
+  @@index([workspaceId, ownerId])
+  @@index([workspaceId, stage])
+  @@index([workspaceId, email])
+  @@index([workspaceId, phone])
+}
+
+// A to-do a manager hands a rep, ClickUp style: call these leads on
+// Thursday, sales call with X at 14:00. Closes itself when a processed call
+// covers the lead.
+model Task {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  type String @default("cold_call") // cold_call | sales_call | follow_up | other
+
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  dealId String?
+  deal   Deal?   @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  // Null when the assignee was removed from the workspace: the task stays
+  // open and shows up as unassigned for a manager to hand to someone else.
+  assigneeId  String?
+  assignee    User?   @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  createdById String?
+  createdBy   User?   @relation("TaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  // A calendar day plus an optional wall-clock time, both in `timezone`
+  // (the assigner's), so "Thursday 14:00" means the same thing to everyone.
+  dueDate  DateTime @db.Date
+  dueTime  String? // HH:mm
+  timezone String   @default("UTC")
+
+  priority    String    @default("normal") // low | normal | high | urgent
+  status      String    @default("open") // open | done | skipped
+  note        String?
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId, assigneeId, status, dueDate])
+  @@index([leadId])
+}
+
+// One run of a lead import, for the history list and the counts it shows.
+model LeadImport {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  createdById String?
+  createdBy   User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  source   String // manual | paste | csv | xlsx | hubspot | salesforce
+  fileName String?
+  created  Int    @default(0)
+  updated  Int    @default(0)
+  skipped  Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  leads Lead[]
+
+  @@index([workspaceId, createdAt])
+}
+
+// A phone call a rep made with SealMe on the line. Nothing is transcribed
+// or sent to AI until the rep confirms it ("pending" -> "processing").
+model PhoneCall {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  dealId String?
+  deal   Deal?   @relation(fields: [dealId], references: [id], onDelete: SetNull)
+
+  mode   String @default("unknown") // cold | sales | unknown
+  status String @default("recording") // recording | pending | processing | processed | discarded | failed | skipped
+
+  fromNumber String? // the rep's phone, as caller ID showed it
+  toNumber   String? // the lead's number, when we know it
+
+  // The consent decision, kept as evidence for every call.
+  consentState String? // US state code from the area code
+  consentRule  String? // one_party | all_party | unknown | non_us | toll_free
+  recorded     Boolean @default(false)
+
+  telnyxCallControlId String? @unique
+  telnyxRecordingId   String?
+  templateId          String? // sales calls: which contract template to draft with
+
+  durationSec Int?
+  transcript  String?
+  summary     String?
+  extracted   Json?
+
+  // Usage, so the real cost per call can be checked against the estimate.
+  sttSeconds     Int?
+  aiInputTokens  Int?
+  aiOutputTokens Int?
+
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+  processedAt DateTime?
+
+  @@index([workspaceId, status])
+  @@index([userId, status])
+  @@index([leadId])
+}
+
+// "I'm about to call this lead": made when a rep taps Call on a lead, and
+// matched to the next call that comes in from the rep's number before it
+// expires (10 minutes).
+model CallIntent {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leadId      String?
+  lead        Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  mode       String // cold | sales
+  templateId String?
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, expiresAt])
 }

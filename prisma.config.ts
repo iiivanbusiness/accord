@@ -8,7 +8,10 @@ export default defineConfig({
   migrations: {
     path: "prisma/migrations",
   },
+  // The CLI (migrate, db execute) needs the direct connection: through
+  // Neon's pooler, migrate's session advisory lock outlives the command
+  // and blocks the next migration. The app itself keeps using DATABASE_URL.
   datasource: {
-    url: process.env["DATABASE_URL"],
+    url: process.env["DATABASE_URL_UNPOOLED"] ?? process.env["DATABASE_URL"],
   },
 });
