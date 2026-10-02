@@ -9,9 +9,11 @@ import LeadFields from "@/components/LeadFields";
 import SubmitButton from "@/components/SubmitButton";
 import LeadTasks from "@/components/LeadTasks";
 import LeadCalls from "@/components/LeadCalls";
+import ConvertLeadButton from "@/components/ConvertLeadButton";
 import { setLeadStage, updateLead } from "../actions";
 import { createLeadTask, deleteTask, setTaskStatus } from "../task-actions";
 import { processColdCallTranscript } from "../call-actions";
+import { convertLeadToDeal } from "../convert-actions";
 
 // Processing a pasted call transcript (an action on this page) waits on
 // Claude; give it room beyond the default.
@@ -33,7 +35,7 @@ export default async function LeadPage({
   const { created, saved } = await searchParams;
 
   const access = await leadAccess();
-  const [lead, members, tasks, calls] = await Promise.all([
+  const [lead, members, tasks, calls, templates] = await Promise.all([
     prisma.lead.findFirst({ where: { id, workspaceId: workspace.id, ...access.where }, include: { owner: { select: { id: true, name: true } } } }),
     access.canAssign
       ? prisma.user.findMany({ where: { workspaceId: workspace.id, deactivatedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } })
@@ -50,8 +52,12 @@ export default async function LeadPage({
       orderBy: { startedAt: "desc" },
       take: 50,
     }),
+    prisma.contractTemplate.findMany({ where: { workspaceId: workspace.id }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
   if (!lead) notFound();
+  const convertedDeal = lead.convertedDealId
+    ? await prisma.deal.findFirst({ where: { id: lead.convertedDealId, workspaceId: workspace.id, trashedAt: null }, select: { id: true } })
+    : null;
   // A rep can't reassign, so the owner field just shows who has it.
   const owners = access.canAssign ? members : lead.owner ? [lead.owner] : [];
 
@@ -69,7 +75,8 @@ export default async function LeadPage({
         </div>
       )}
 
-      <div className="mb-5 min-w-0">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+      <div className="min-w-0">
         <h1 className="break-words text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>{lead.name}</h1>
         {subtitle && <div className="mt-1 break-words text-[13.5px]" style={{ color: "var(--ink-muted)" }}>{subtitle}</div>}
         <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
@@ -77,6 +84,18 @@ export default async function LeadPage({
           {lead.email && <a href={`mailto:${lead.email}`} className="break-all font-medium" style={{ color: "var(--accent-blue)" }}>{lead.email}</a>}
           <span style={{ color: "var(--ink-muted)" }}>{lead.owner ? `Owner: ${lead.owner.name}` : "Unassigned"}</span>
         </div>
+      </div>
+      {convertedDeal ? (
+        <Link href={`/deals/${convertedDeal.id}`} className="btn btn-secondary">
+          Open deal →
+        </Link>
+      ) : (
+        <ConvertLeadButton
+          defaults={{ clientName: lead.name, company: lead.company ?? "", email: lead.email ?? "" }}
+          templates={templates}
+          convertAction={convertLeadToDeal.bind(null, lead.id)}
+        />
+      )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
