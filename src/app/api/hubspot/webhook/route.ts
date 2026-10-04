@@ -45,6 +45,7 @@ export async function POST(req: Request) {
         try {
           await importHubspotContacts(w.id, contactIds);
         } catch (err) {
+          console.error("HubSpot webhook import failed", err);
           await reportError(err, "HubSpot webhook import", { workspaceId: w.id });
         }
       }

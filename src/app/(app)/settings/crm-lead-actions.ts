@@ -1,5 +1,6 @@
 "use server";
 
+import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/permissions";
@@ -97,6 +98,18 @@ export async function saveHubspotWebhookSecret(secret: string): Promise<{ error?
   if (value && !/^[A-Za-z0-9-]{20,100}$/.test(value)) return { error: "That doesn't look like a HubSpot client secret" };
   await prisma.workspace.update({ where: { id: user.workspaceId }, data: { hubspotWebhookSecret: value || null } });
   await logAudit({ workspaceId: user.workspaceId, actorEmail: user.email, action: value ? "hubspot.webhook_secret.saved" : "hubspot.webhook_secret.cleared" });
+  revalidatePath("/settings");
+  return {};
+}
+
+// The key in the URL a Salesforce Flow's outbound message calls. Turning
+// it on (or asking for a new one) makes a fresh random key, and the old URL
+// stops working; off removes it.
+export async function setSalesforceWebhookKey(on: boolean): Promise<{ error?: string }> {
+  const user = await requirePermission("canManageWorkspace");
+  const key = on ? crypto.randomBytes(24).toString("hex") : null;
+  await prisma.workspace.update({ where: { id: user.workspaceId }, data: { salesforceWebhookKey: key } });
+  await logAudit({ workspaceId: user.workspaceId, actorEmail: user.email, action: on ? "salesforce.webhook_key.created" : "salesforce.webhook_key.removed" });
   revalidatePath("/settings");
   return {};
 }

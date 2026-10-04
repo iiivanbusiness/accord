@@ -8,7 +8,8 @@ import type { CrmSource, SyncSummary } from "@/lib/crm-leads";
 type Filter = Record<string, string[] | boolean>;
 
 // "Lead import" inside a connected CRM's card in Settings: turn it on,
-// pick which records come in, sync, and (HubSpot) set up instant updates.
+// pick which records come in, sync, and set up instant updates (HubSpot:
+// the private app's webhook; Salesforce: a Flow with an outbound message).
 export default function CrmLeadImportPanel({
   crm,
   enabled,
@@ -20,6 +21,8 @@ export default function CrmLeadImportPanel({
   loadOptionsAction,
   syncAction,
   saveSecretAction,
+  salesforceWebhook,
+  setWebhookKeyAction,
 }: {
   crm: CrmSource;
   enabled: boolean;
@@ -31,6 +34,8 @@ export default function CrmLeadImportPanel({
   loadOptionsAction: (crm: CrmSource) => Promise<CrmLeadOptions | { error: string }>;
   syncAction: (crm: CrmSource) => Promise<SyncSummary | { error: string }>;
   saveSecretAction?: (secret: string) => Promise<{ error?: string }>;
+  salesforceWebhook?: { url: string | null };
+  setWebhookKeyAction?: (on: boolean) => Promise<{ error?: string }>;
 }) {
   const name = crm === "hubspot" ? "HubSpot" : "Salesforce";
   const [filter, setFilter] = useState<Filter>(initialFilter);
@@ -184,6 +189,79 @@ export default function CrmLeadImportPanel({
           {crm === "salesforce" && (
             <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
               SealMe also checks for changes whenever someone opens Leads, and once a day.
+            </div>
+          )}
+
+          {crm === "salesforce" && salesforceWebhook && setWebhookKeyAction && (
+            <div className="flex flex-col gap-2 rounded-[12px] border p-3.5" style={{ borderColor: "var(--hairline)" }}>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[12.5px] font-medium">Instant updates</span>
+                <span className={`chip ${salesforceWebhook.url ? "chip-success" : "chip-neutral"}`}>{salesforceWebhook.url ? "On" : "Off"}</span>
+              </div>
+              <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
+                A Salesforce Flow tells SealMe the moment a Lead is created or changed, so it shows up here within seconds. Your Salesforce admin sets it up once, in about five minutes, with no code.
+              </div>
+              {salesforceWebhook.url ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <input readOnly value={salesforceWebhook.url} className="input min-w-0 flex-1 font-mono-tab" style={{ fontSize: "12px", padding: "7px 10px" }} onFocus={(e) => e.currentTarget.select()} aria-label="Salesforce endpoint URL" />
+                    <button type="button" onClick={() => navigator.clipboard?.writeText(salesforceWebhook.url ?? "")} className="btn btn-secondary btn-sm flex-none">
+                      Copy
+                    </button>
+                  </div>
+                  <div className="text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
+                    Keep this URL private: anyone with it can ask SealMe to re-read Leads from your Salesforce.
+                  </div>
+                  <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-[12px]">
+                    <li>
+                      In Salesforce <strong>Setup</strong>, search <strong>Outbound Messages</strong> and click <strong>New Outbound Message</strong>. Object: <strong>Lead</strong>. Name: <strong>SealMe</strong>. Endpoint URL: the URL above. Fields to send: <strong>Id</strong>. Save.
+                    </li>
+                    <li>
+                      In Setup, search <strong>Flows</strong>, click <strong>New Flow</strong> and pick <strong>Record-Triggered Flow</strong>. Object: <strong>Lead</strong>. Trigger: <strong>A record is created or updated</strong>. Optimize for: <strong>Actions and Related Records</strong>.
+                    </li>
+                    <li>
+                      Add an <strong>Action</strong>, search <strong>SealMe</strong> and pick the outbound message. Save the flow as <strong>Send Leads to SealMe</strong> and click <strong>Activate</strong>.
+                    </li>
+                    <li>Create a test Lead in Salesforce. It should show up in Leads here within a few seconds.</li>
+                  </ol>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => run(async () => {
+                        const res = await setWebhookKeyAction(true);
+                        setMessage(res.error ? { tone: "warn", text: res.error } : { tone: "ok", text: "New URL made. Paste it into the outbound message in Salesforce; the old one no longer works." });
+                      })}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      Make a new URL
+                    </button>
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => run(async () => {
+                        const res = await setWebhookKeyAction(false);
+                        setMessage(res.error ? { tone: "warn", text: res.error } : { tone: "ok", text: "Instant updates are off. You can deactivate the flow in Salesforce too." });
+                      })}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      Turn off
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => run(async () => {
+                    const res = await setWebhookKeyAction(true);
+                    if (res.error) setMessage({ tone: "warn", text: res.error });
+                  })}
+                  className="btn btn-secondary btn-sm self-start"
+                >
+                  Set up instant updates
+                </button>
+              )}
             </div>
           )}
 

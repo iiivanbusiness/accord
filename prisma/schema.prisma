@@ -105,7 +105,8 @@ model Workspace {
   // Off until turned on in Settings. The filters pick which records come in
   // (see src/lib/crm-leads.ts). hubspotWebhookSecret is the Private App's
   // client secret, used to check that webhook calls really come from
-  // HubSpot.
+  // HubSpot. salesforceWebhookKey is SealMe's own random key, part of the
+  // URL a Salesforce Flow's outbound message calls.
   hubspotLeadImport       Boolean   @default(false)
   hubspotLeadFilter       Json?
   hubspotWebhookSecret    String?
@@ -113,6 +114,7 @@ model Workspace {
   salesforceLeadImport    Boolean   @default(false)
   salesforceLeadFilter    Json?
   salesforceLeadsSyncedAt DateTime?
+  salesforceWebhookKey    String?   @unique
 
   // DocuSign — a per-workspace OAuth connection to the WORKSPACE'S OWN
   // DocuSign account (not a SealMe-owned app installed like Slack; the

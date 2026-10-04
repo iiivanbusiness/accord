@@ -33,6 +33,7 @@ export const authConfig = {
         request.nextUrl.pathname.startsWith("/api/v1") ||
         request.nextUrl.pathname.startsWith("/api/docusign/webhook") ||
         request.nextUrl.pathname.startsWith("/api/hubspot/webhook") ||
+        request.nextUrl.pathname.startsWith("/api/salesforce/webhook") ||
         request.nextUrl.pathname.startsWith("/terms") ||
         request.nextUrl.pathname.startsWith("/privacy") ||
         request.nextUrl.pathname.startsWith("/support") ||

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { salesforceGet, SALESFORCE_API_VERSION } from "@/lib/salesforce";
-import { membersByEmail, notifyCrmAssignments, readSalesforceFilter, summarize, upsertCrmLead, type SyncSummary, type UpsertResult } from "@/lib/crm-leads";
+import { membersByEmail, notifyCrmAssignments, readSalesforceFilter, summarize, upsertCrmLead, type CrmLeadRecord, type SyncSummary, type UpsertResult } from "@/lib/crm-leads";
 
 type SfLead = {
   Id: string;
@@ -12,6 +12,7 @@ type SfLead = {
   MobilePhone?: string | null;
   Website?: string | null;
   Owner?: { Email?: string | null } | null;
+  Status?: string | null;
   LastModifiedDate: string;
 };
 type LeadDescribe = { fields: { name: string; picklistValues?: { value: string; label: string; active: boolean }[] }[] };
@@ -25,6 +26,32 @@ function describeLead(workspaceId: string): Promise<LeadDescribe> {
   return salesforceGet<LeadDescribe>(workspaceId, `/services/data/${SALESFORCE_API_VERSION}/sobjects/Lead/describe`);
 }
 type QueryPage<T> = { records: T[]; nextRecordsUrl?: string; done: boolean };
+
+function leadFields(available: Set<string>): string[] {
+  return [
+    "Id",
+    "Name",
+    ...OPTIONAL_FIELDS.filter((f) => available.has(f)),
+    ...(available.has("Status") ? ["Status"] : []),
+    ...(available.has("OwnerId") ? ["Owner.Email"] : []),
+    "LastModifiedDate",
+  ];
+}
+
+function toRecord(r: SfLead): CrmLeadRecord {
+  return {
+    source: "salesforce",
+    externalId: r.Id,
+    recordType: "Lead",
+    name: r.Name,
+    company: r.Company && r.Company !== "[not provided]" ? r.Company : null,
+    title: r.Title ?? null,
+    email: r.Email ?? null,
+    phone: r.Phone || r.MobilePhone || null,
+    domain: r.Website ? r.Website.replace(/^https?:\/\//, "").replace(/\/.*$/, "") : null,
+    ownerEmail: r.Owner?.Email ?? null,
+  };
+}
 
 // One sync can't run forever; anything past this comes in on the next one.
 const MAX_PER_SYNC = 5000;
@@ -53,13 +80,7 @@ export async function syncSalesforceLeads(workspaceId: string, options: { full?:
   const since = !options.full && workspace.salesforceLeadsSyncedAt ? new Date(workspace.salesforceLeadsSyncedAt.getTime() - 60_000) : null;
 
   const available = new Set((await describeLead(workspaceId)).fields.map((f) => f.name));
-  const fields = [
-    "Id",
-    "Name",
-    ...OPTIONAL_FIELDS.filter((f) => available.has(f)),
-    ...(available.has("OwnerId") ? ["Owner.Email"] : []),
-    "LastModifiedDate",
-  ];
+  const fields = leadFields(available);
   const where = [
     "IsConverted = false",
     ...(since ? [`LastModifiedDate > ${since.toISOString().replace(/\.\d{3}Z$/, "Z")}`] : []),
@@ -75,24 +96,7 @@ export async function syncSalesforceLeads(workspaceId: string, options: { full?:
     const page: QueryPage<SfLead> = await salesforceGet<QueryPage<SfLead>>(workspaceId, path);
     for (const r of page.records) {
       if (Date.now() >= deadline) break;
-      results.push(
-        await upsertCrmLead(
-          workspaceId,
-          {
-            source: "salesforce",
-            externalId: r.Id,
-            recordType: "Lead",
-            name: r.Name,
-            company: r.Company && r.Company !== "[not provided]" ? r.Company : null,
-            title: r.Title ?? null,
-            email: r.Email ?? null,
-            phone: r.Phone || r.MobilePhone || null,
-            domain: r.Website ? r.Website.replace(/^https?:\/\//, "").replace(/\/.*$/, "") : null,
-            ownerEmail: r.Owner?.Email ?? null,
-          },
-          { members, teamOwnedOnly: filter.teamOwnedOnly },
-        ),
-      );
+      results.push(await upsertCrmLead(workspaceId, toRecord(r), { members, teamOwnedOnly: filter.teamOwnedOnly }));
       lastModified = r.LastModifiedDate;
     }
     path = page.done ? undefined : page.nextRecordsUrl;
@@ -106,3 +110,56 @@ export async function syncSalesforceLeads(workspaceId: string, options: { full?:
   await notifyCrmAssignments(workspaceId, "salesforce", results);
   return summarize(results, more);
 }
+
+// Webhook path: the Leads a Flow's outbound message just told us about,
+// re-read through the API (so the owner's email and the filter apply the
+// same way as a sync). A Lead that doesn't match the filter (yet) isn't
+// brought in; one already here keeps updating.
+export async function importSalesforceLeads(workspaceId: string, leadIds: string[]): Promise<SyncSummary> {
+  const workspace = await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } });
+  if (!workspace.salesforceRefreshToken || !workspace.salesforceLeadImport) return { created: 0, updated: 0, skipped: 0 };
+  const filter = readSalesforceFilter(workspace.salesforceLeadFilter);
+  const ids = [...new Set(leadIds.filter((id) => SALESFORCE_LEAD_ID.test(id)))].slice(0, 500);
+  if (ids.length === 0) return { created: 0, updated: 0, skipped: 0 };
+
+  const available = new Set((await describeLead(workspaceId)).fields.map((f) => f.name));
+  const fields = leadFields(available);
+  const members = await membersByEmail(workspaceId);
+  const results: UpsertResult[] = [];
+  for (let i = 0; i < ids.length; i += 100) {
+    const soql = `SELECT ${fields.join(", ")} FROM Lead WHERE IsConverted = false AND Id IN (${ids.slice(i, i + 100).map(soqlString).join(", ")})`;
+    const page = await salesforceGet<QueryPage<SfLead>>(workspaceId, `/services/data/${SALESFORCE_API_VERSION}/query?q=${encodeURIComponent(soql)}`);
+    for (const r of page.records) {
+      const known = await prisma.lead.findFirst({ where: { workspaceId, salesforceRecordId: r.Id }, select: { id: true } });
+      if (!known && filter.statuses.length && !(r.Status && filter.statuses.includes(r.Status))) continue;
+      results.push(await upsertCrmLead(workspaceId, toRecord(r), { members, teamOwnedOnly: filter.teamOwnedOnly }));
+    }
+  }
+  await notifyCrmAssignments(workspaceId, "salesforce", results);
+  return summarize(results);
+}
+
+// Lead record ids start with 00Q (15 or 18 characters).
+const SALESFORCE_LEAD_ID = /^00Q[a-zA-Z0-9]{12}(?:[a-zA-Z0-9]{3})?$/;
+
+// The record ids in a Salesforce outbound message (SOAP). Each
+// <Notification> carries its own id plus the record's, so only ids inside
+// <sObject> count.
+export function leadIdsFromOutboundMessage(xml: string): string[] {
+  const ids: string[] = [];
+  for (const m of xml.matchAll(/<(?:\w+:)?sObject\b[^>]*>([\s\S]*?)<\/(?:\w+:)?sObject>/g)) {
+    const id = /<(?:\w+:)?Id>\s*([a-zA-Z0-9]{15,18})\s*<\/(?:\w+:)?Id>/.exec(m[1])?.[1];
+    if (id && SALESFORCE_LEAD_ID.test(id)) ids.push(id);
+  }
+  return [...new Set(ids)];
+}
+
+// What Salesforce expects back; anything else and it retries for 24 hours.
+export const OUTBOUND_MESSAGE_ACK = `<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+  <soapenv:Body>
+    <notificationsResponse xmlns="http://soap.sforce.com/2005/09/outbound">
+      <Ack>true</Ack>
+    </notificationsResponse>
+  </soapenv:Body>
+</soapenv:Envelope>`;
