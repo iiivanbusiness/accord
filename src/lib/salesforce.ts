@@ -140,11 +140,27 @@ async function getWorkspaceCreds(workspaceId: string): Promise<{ accessToken: st
   };
 }
 
+// Salesforce rotates refresh tokens (required for external client apps):
+// every refresh hands back a new one and the old one stops working, so the
+// new one has to be saved or the connection dies on the next refresh. When
+// two refreshes race with the same old token, the loser is turned down;
+// it then uses whatever the winner saved.
 async function refreshAccessToken(workspaceId: string, refreshToken: string): Promise<string> {
-  const refreshed = await requestToken(new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }));
+  let refreshed: SalesforceTokenResponse;
+  try {
+    refreshed = await requestToken(new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }));
+  } catch (err) {
+    const current = await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { salesforceRefreshToken: true, salesforceAccessToken: true } });
+    if (current?.salesforceAccessToken && current.salesforceRefreshToken && current.salesforceRefreshToken !== refreshToken) return current.salesforceAccessToken;
+    throw err;
+  }
   await prisma.workspace.update({
     where: { id: workspaceId },
-    data: { salesforceAccessToken: refreshed.access_token, salesforceTokenExpiresAt: null },
+    data: {
+      salesforceAccessToken: refreshed.access_token,
+      salesforceTokenExpiresAt: null,
+      ...(refreshed.refresh_token ? { salesforceRefreshToken: refreshed.refresh_token } : {}),
+    },
   });
   return refreshed.access_token;
 }

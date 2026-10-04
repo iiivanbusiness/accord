@@ -97,7 +97,13 @@ async function getValidAccessToken(workspaceId: string): Promise<{ accessToken: 
   const refreshed = await requestToken(new URLSearchParams({ grant_type: "refresh_token", refresh_token: workspace.docusignRefreshToken }));
   await prisma.workspace.update({
     where: { id: workspaceId },
-    data: { docusignAccessToken: refreshed.access_token, docusignTokenExpiresAt: new Date(Date.now() + refreshed.expires_in * 1000) },
+    // DocuSign hands back a new refresh token too; the old one only lasts
+    // 30 days from when it was issued, so keep the newest.
+    data: {
+      docusignAccessToken: refreshed.access_token,
+      docusignTokenExpiresAt: new Date(Date.now() + refreshed.expires_in * 1000),
+      ...(refreshed.refresh_token ? { docusignRefreshToken: refreshed.refresh_token } : {}),
+    },
   });
   return { accessToken: refreshed.access_token, baseUri: workspace.docusignBaseUri, accountId: workspace.docusignAccountId };
 }
