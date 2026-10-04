@@ -3,6 +3,7 @@ import { normalizePhone } from "@/lib/phone";
 import { createNotification } from "@/lib/notifications";
 import { isValidTimeZone } from "@/lib/tasks";
 import { dayInZone } from "@/lib/viewer-time";
+import { dispatchLeadsCreated } from "@/lib/webhooks";
 
 // Leads that come IN from a workspace's HubSpot or Salesforce. The CRM is
 // the source of truth for who the person is (name, company, title, email,
@@ -49,7 +50,7 @@ export async function membersByEmail(workspaceId: string): Promise<Map<string, M
 
 const clean = (v: string | null | undefined, max = 200) => (v ? v.trim().slice(0, max) || null : null);
 
-export type UpsertResult = { outcome: "created" | "updated" | "unchanged" | "skipped"; assignedTo: string | null; leadName: string | null };
+export type UpsertResult = { outcome: "created" | "updated" | "unchanged" | "skipped"; assignedTo: string | null; leadName: string | null; leadId?: string };
 
 // Creates or updates one lead from a CRM record. Matches an existing lead
 // by its CRM id first, then by email or phone (so a lead imported from a
@@ -155,7 +156,7 @@ export async function upsertCrmLead(workspaceId: string, rec: CrmLeadRecord, ctx
       });
     }
   }
-  return { outcome, assignedTo, leadName: name };
+  return { outcome, assignedTo, leadName: name, leadId };
 }
 
 // One in-app note per person per sync, not one per lead.
@@ -189,4 +190,10 @@ export function summarize(results: UpsertResult[], more = false): SyncSummary {
     updated: results.filter((r) => r.outcome === "updated").length,
     skipped: results.filter((r) => r.outcome === "skipped").length,
   };
+}
+
+// lead.created webhooks for the leads a sync or webhook import just made.
+export async function announceCreatedLeads(workspaceId: string, results: UpsertResult[]): Promise<void> {
+  const ids = results.filter((r) => r.outcome === "created" && r.leadId).map((r) => r.leadId as string);
+  if (ids.length) await dispatchLeadsCreated(workspaceId, ids);
 }

@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { dispatchWebhookEvent } from "@/lib/webhooks";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
 import { notifyChangesRequested } from "@/lib/review";
@@ -70,8 +71,18 @@ export async function declineToSign(contractId: string, token: string, formData:
   await prisma.contract.update({ where: { id: contractId }, data: { status: "changes_requested" } });
   await prisma.deal.update({ where: { id: contract.dealId }, data: { status: "changes_requested" } });
 
+  const { workspaceId } = await prisma.deal.findUniqueOrThrow({ where: { id: contract.dealId }, select: { workspaceId: true } });
+  await dispatchWebhookEvent(workspaceId, "contract.declined", {
+    dealId: contract.dealId,
+    contractId,
+    signerName: signer.name,
+    signerEmail: signer.email,
+    reason: reason || null,
+    declinedAt: new Date().toISOString(),
+  });
+
   await logAudit({
-    workspaceId: (await prisma.deal.findUniqueOrThrow({ where: { id: contract.dealId }, select: { workspaceId: true } })).workspaceId,
+    workspaceId,
     actorEmail: signer.email,
     action: "contract.countersign_declined",
     targetType: "Contract",

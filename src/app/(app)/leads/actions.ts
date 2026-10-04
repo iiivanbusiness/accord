@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
+import { dispatchLeadsCreated } from "@/lib/webhooks";
 import { requireProspecting } from "@/lib/prospecting";
 import { normalizePhone } from "@/lib/phone";
 import { isLeadStage, LEAD_INTERESTS } from "@/lib/lead-stages";
@@ -68,6 +69,7 @@ export async function createLead(formData: FormData) {
     data: { workspaceId: workspace.id, ownerId, source: "manual", ...fields },
     select: { id: true },
   });
+  await dispatchLeadsCreated(workspace.id, [lead.id]);
   revalidatePath("/leads");
   redirect(`/leads/${lead.id}?created=1`);
 }

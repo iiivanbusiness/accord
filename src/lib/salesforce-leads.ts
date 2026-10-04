@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { salesforceGet, SALESFORCE_API_VERSION } from "@/lib/salesforce";
-import { membersByEmail, notifyCrmAssignments, readSalesforceFilter, summarize, upsertCrmLead, type CrmLeadRecord, type SyncSummary, type UpsertResult } from "@/lib/crm-leads";
+import { announceCreatedLeads, membersByEmail, notifyCrmAssignments, readSalesforceFilter, summarize, upsertCrmLead, type CrmLeadRecord, type SyncSummary, type UpsertResult } from "@/lib/crm-leads";
 
 type SfLead = {
   Id: string;
@@ -108,6 +108,7 @@ export async function syncSalesforceLeads(workspaceId: string, options: { full?:
   const syncedTo = more && lastModified ? new Date(lastModified) : startedAt;
   await prisma.workspace.update({ where: { id: workspaceId }, data: { salesforceLeadsSyncedAt: syncedTo } });
   await notifyCrmAssignments(workspaceId, "salesforce", results);
+  await announceCreatedLeads(workspaceId, results);
   return summarize(results, more);
 }
 
@@ -136,6 +137,7 @@ export async function importSalesforceLeads(workspaceId: string, leadIds: string
     }
   }
   await notifyCrmAssignments(workspaceId, "salesforce", results);
+  await announceCreatedLeads(workspaceId, results);
   return summarize(results);
 }
 

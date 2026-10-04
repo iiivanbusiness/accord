@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/permissions";
-import { WEBHOOK_EVENTS } from "@/lib/webhooks";
+import { MAX_WEBHOOK_ATTEMPTS, WEBHOOK_EVENTS } from "@/lib/webhooks";
 import ApiKeysPanel from "@/components/ApiKeysPanel";
 import WebhooksPanel from "@/components/WebhooksPanel";
-import { createApiKey, revokeApiKey, createWebhookEndpoint, toggleWebhookEndpoint, deleteWebhookEndpoint, sendTestWebhookEvent } from "../developer-actions";
+import { createApiKey, revokeApiKey, createWebhookEndpoint, toggleWebhookEndpoint, deleteWebhookEndpoint, sendTestWebhookEvent, resendWebhookDeliveryAction } from "../developer-actions";
 
 export default async function DeveloperSettingsPage() {
   const user = await requirePermission("canManageWorkspace");
@@ -13,7 +13,7 @@ export default async function DeveloperSettingsPage() {
     prisma.apiKey.findMany({ where: { workspaceId: user.workspaceId, revokedAt: null }, orderBy: { createdAt: "desc" } }),
     prisma.webhookEndpoint.findMany({
       where: { workspaceId: user.workspaceId },
-      include: { deliveries: { orderBy: { createdAt: "desc" }, take: 5 } },
+      include: { deliveries: { orderBy: { createdAt: "desc" }, take: 8 } },
       orderBy: { createdAt: "desc" },
     }),
   ]);
@@ -47,7 +47,7 @@ export default async function DeveloperSettingsPage() {
       <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
         <h2 className="text-[15px] font-medium">Webhooks</h2>
         <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
-          We POST a signed JSON payload to your URL when one of these happens. Verify it with the <code className="font-mono-tab">X-SealMe-Signature</code> header (HMAC-SHA256 of the raw body, using the secret below).
+          We POST a signed JSON payload to your URL when one of these happens. Verify it with the <code className="font-mono-tab">X-SealMe-Signature</code> header (HMAC-SHA256 of the raw body, using the secret below). Anything but a 2xx answer is retried for about a day, so ignore an event whose <code className="font-mono-tab">id</code> you&apos;ve already handled.
         </div>
       </div>
       <WebhooksPanel
@@ -57,13 +57,15 @@ export default async function DeveloperSettingsPage() {
           secret: e.secret,
           events: JSON.parse(e.events) as string[],
           enabled: e.enabled,
-          deliveries: e.deliveries.map((d) => ({ id: d.id, event: d.event, responseStatus: d.responseStatus, error: d.error, createdAt: d.createdAt.toISOString() })),
+          deliveries: e.deliveries.map((d) => ({ id: d.id, event: d.event, status: d.status, attempts: d.attempts, nextAttemptAt: d.nextAttemptAt?.toISOString() ?? null, responseStatus: d.responseStatus, error: d.error, createdAt: d.createdAt.toISOString() })),
         }))}
         availableEvents={[...WEBHOOK_EVENTS]}
+        maxAttempts={MAX_WEBHOOK_ATTEMPTS}
         createAction={createWebhookEndpoint}
         toggleAction={toggleWebhookEndpoint}
         deleteAction={deleteWebhookEndpoint}
         testAction={sendTestWebhookEvent}
+        resendAction={resendWebhookDeliveryAction}
       />
     </div>
     </>

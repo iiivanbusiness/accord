@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { dispatchWebhookEvent } from "@/lib/webhooks";
 import { sendAdminAlertEmail, sendReminderEmail } from "@/lib/email";
 import { logAudit } from "@/lib/audit";
 
@@ -66,6 +67,7 @@ export async function GET(req: Request) {
     for (const contract of expiredResult) {
       await prisma.contract.update({ where: { id: contract.id }, data: { status: "expired" } });
       await logAudit({ workspaceId: contract.deal.workspaceId, action: "contract.expired", targetType: "Contract", targetId: contract.id });
+      await dispatchWebhookEvent(contract.deal.workspaceId, "contract.expired", { dealId: contract.deal.id, contractId: contract.id, sentAt: contract.sentAt?.toISOString() ?? null, expiredAt: new Date().toISOString() });
       expired++;
     }
   } catch (err) {

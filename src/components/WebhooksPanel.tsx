@@ -3,23 +3,40 @@
 import { useState, useTransition } from "react";
 import ClientText from "@/components/ClientText";
 
-type Delivery = { id: string; event: string; responseStatus: number | null; error: string | null; createdAt: string };
+type Delivery = { id: string; event: string; status: string; attempts: number; nextAttemptAt: string | null; responseStatus: number | null; error: string | null; createdAt: string };
 type Endpoint = { id: string; url: string; secret: string; events: string[]; enabled: boolean; deliveries: Delivery[] };
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+function DeliveryStatus({ d, maxAttempts }: { d: Delivery; maxAttempts: number }) {
+  if (d.status === "delivered") return <span style={{ color: "var(--accent-blue)" }}>Delivered{d.responseStatus ? ` · ${d.responseStatus}` : ""}</span>;
+  const why = d.error ?? (d.responseStatus ? `Answered ${d.responseStatus}` : null);
+  if (d.status === "pending") {
+    return (
+      <span className="chip chip-warn" style={{ fontSize: 10.5 }} title={why ?? undefined}>
+        {d.attempts === 0 ? "Sending" : <>Retrying · {d.attempts} of {maxAttempts}{d.nextAttemptAt && <> · next <ClientText text={() => formatDate(d.nextAttemptAt as string)} /></>}</>}
+      </span>
+    );
+  }
+  return <span style={{ color: "#c0392b" }} title={why ?? undefined}>Failed{why ? ` · ${why}` : ""}</span>;
+}
+
 function EndpointCard({
   endpoint,
+  maxAttempts,
   toggleAction,
   deleteAction,
   testAction,
+  resendAction,
 }: {
   endpoint: Endpoint;
+  maxAttempts: number;
   toggleAction: (id: string) => Promise<{ error?: string }>;
   deleteAction: (id: string) => Promise<{ error?: string }>;
   testAction: (id: string) => Promise<{ error?: string }>;
+  resendAction: (deliveryId: string) => Promise<{ error?: string }>;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [showSecret, setShowSecret] = useState(false);
@@ -79,14 +96,21 @@ function EndpointCard({
       {endpoint.deliveries.length > 0 && (
         <div className="mt-2.5 border-t pt-2" style={{ borderColor: "var(--hairline-soft)" }}>
           <div className="mb-1 text-[10.5px] font-medium" style={{ color: "var(--ink-muted)" }}>RECENT DELIVERIES</div>
-          {endpoint.deliveries.map((d) => (
-            <div key={d.id} className="flex items-center justify-between text-[11px]" style={{ color: "var(--ink-muted)" }}>
-              <span>{d.event} · <ClientText text={() => formatDate(d.createdAt)} /></span>
-              <span style={{ color: d.responseStatus && d.responseStatus < 300 ? "var(--accent-blue)" : "#c0392b" }}>
-                {d.error ? "failed" : d.responseStatus}
-              </span>
-            </div>
-          ))}
+          <div className="flex flex-col gap-1">
+            {endpoint.deliveries.map((d) => (
+              <div key={d.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-[11px]" style={{ color: "var(--ink-muted)" }}>
+                <span className="min-w-0">{d.event} · <ClientText text={() => formatDate(d.createdAt)} /></span>
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="min-w-0 break-words text-right"><DeliveryStatus d={d} maxAttempts={maxAttempts} /></span>
+                  {d.status === "failed" && d.event !== "test" && (
+                    <button type="button" disabled={isPending} onClick={() => run(() => resendAction(d.id))} className="flex-none font-medium" style={{ color: "var(--accent-blue)" }}>
+                      Resend
+                    </button>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -96,26 +120,36 @@ function EndpointCard({
 export default function WebhooksPanel({
   endpoints,
   availableEvents,
+  maxAttempts,
   createAction,
   toggleAction,
   deleteAction,
   testAction,
+  resendAction,
 }: {
   endpoints: Endpoint[];
   availableEvents: string[];
+  maxAttempts: number;
   createAction: (formData: FormData) => Promise<{ error?: string }>;
   toggleAction: (id: string) => Promise<{ error?: string }>;
   deleteAction: (id: string) => Promise<{ error?: string }>;
   testAction: (id: string) => Promise<{ error?: string }>;
+  resendAction: (deliveryId: string) => Promise<{ error?: string }>;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function runCreate(formData: FormData) {
+  // Not a form action: React would clear the form even when the address
+  // is turned down, losing what was typed. Cleared only once it's added.
+  function runCreate(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const formData = new FormData(form);
     setError(null);
     startTransition(async () => {
       const result = await createAction(formData);
       if (result.error) setError(result.error);
+      else form.reset();
     });
   }
 
@@ -127,7 +161,7 @@ export default function WebhooksPanel({
 
       <div className="flex flex-col gap-2.5">
         {endpoints.map((e) => (
-          <EndpointCard key={e.id} endpoint={e} toggleAction={toggleAction} deleteAction={deleteAction} testAction={testAction} />
+          <EndpointCard key={e.id} endpoint={e} maxAttempts={maxAttempts} toggleAction={toggleAction} deleteAction={deleteAction} testAction={testAction} resendAction={resendAction} />
         ))}
       </div>
 
@@ -137,7 +171,7 @@ export default function WebhooksPanel({
             {error}
           </div>
         )}
-        <form action={runCreate} className="flex flex-col gap-2">
+        <form onSubmit={runCreate} className="flex flex-col gap-2">
           <input name="url" type="url" required placeholder="https://your-system.com/webhooks/sealme" className="input" style={{ fontSize: "12.5px", padding: "7px 10px" }} />
           <div className="flex flex-wrap gap-3">
             {availableEvents.map((event) => (

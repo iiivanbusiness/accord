@@ -6,7 +6,8 @@ import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { requirePermission } from "@/lib/permissions";
 import { generateApiKey, hashApiKey } from "@/lib/api-auth";
-import { isWebhookEvent, sendTestWebhook } from "@/lib/webhooks";
+import { isWebhookEvent, resendWebhookDelivery, sendTestWebhook } from "@/lib/webhooks";
+import { checkPublicHttpsUrl } from "@/lib/outbound-url";
 import { logAudit } from "@/lib/audit";
 
 export async function createApiKey(formData: FormData): Promise<string> {
@@ -40,7 +41,8 @@ export async function revokeApiKey(keyId: string): Promise<{ error?: string }> {
 export async function createWebhookEndpoint(formData: FormData): Promise<{ error?: string }> {
   const user = await requirePermission("canManageWorkspace");
   const url = String(formData.get("url") ?? "").trim();
-  if (!/^https:\/\//.test(url)) return { error: "Webhook URL must be an https:// address" };
+  const unsafe = await checkPublicHttpsUrl(url);
+  if (unsafe) return { error: unsafe };
 
   const events = formData.getAll("events").map(String).filter(isWebhookEvent);
   if (events.length === 0) return { error: "Choose at least one event" };
@@ -85,6 +87,20 @@ export async function sendTestWebhookEvent(endpointId: string): Promise<{ error?
   if (!endpoint) return { error: "Endpoint not found" };
 
   await sendTestWebhook(endpointId);
+  revalidatePath("/settings/developers");
+  return {};
+}
+
+// Sends a past event again (same event id) to the endpoint it was meant for.
+export async function resendWebhookDeliveryAction(deliveryId: string): Promise<{ error?: string }> {
+  const user = await requirePermission("canManageWorkspace");
+  const delivery = await prisma.webhookDelivery.findFirst({ where: { id: deliveryId, endpoint: { workspaceId: user.workspaceId } }, select: { id: true } });
+  if (!delivery) return { error: "Delivery not found" };
+  try {
+    await resendWebhookDelivery(delivery.id);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Couldn't resend" };
+  }
   revalidatePath("/settings/developers");
   return {};
 }

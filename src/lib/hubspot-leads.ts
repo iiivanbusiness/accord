@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
-import { membersByEmail, notifyCrmAssignments, readHubspotFilter, summarize, upsertCrmLead, type CrmLeadRecord, type HubspotLeadFilter, type SyncSummary, type UpsertResult } from "@/lib/crm-leads";
+import { announceCreatedLeads, membersByEmail, notifyCrmAssignments, readHubspotFilter, summarize, upsertCrmLead, type CrmLeadRecord, type HubspotLeadFilter, type SyncSummary, type UpsertResult } from "@/lib/crm-leads";
 
 const API = "https://api.hubapi.com";
 const CONTACT_PROPS = ["firstname", "lastname", "email", "phone", "mobilephone", "company", "jobtitle", "website", "hubspot_owner_id", "lifecyclestage", "hs_lead_status", "lastmodifieddate"];
@@ -117,6 +117,7 @@ export async function syncHubspotLeads(workspaceId: string, options: { full?: bo
   const syncedTo = more && lastModified ? new Date(Number(lastModified) || Date.parse(lastModified)) : startedAt;
   await prisma.workspace.update({ where: { id: workspaceId }, data: { hubspotLeadsSyncedAt: Number.isNaN(syncedTo.getTime()) ? startedAt : syncedTo } });
   await notifyCrmAssignments(workspaceId, "hubspot", results);
+  await announceCreatedLeads(workspaceId, results);
   return summarize(results, more);
 }
 
@@ -144,6 +145,7 @@ export async function importHubspotContacts(workspaceId: string, contactIds: str
     }
   }
   await notifyCrmAssignments(workspaceId, "hubspot", results);
+  await announceCreatedLeads(workspaceId, results);
   return summarize(results);
 }
 

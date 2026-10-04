@@ -7,6 +7,7 @@ import { runTaskDigest } from "@/lib/task-digest";
 import { syncCrmLeadsIfDue } from "@/lib/crm-lead-autosync";
 import { cleanupRateLimitHits } from "@/lib/rate-limit-cleanup";
 import { reportError } from "@/lib/error-report";
+import { retryDueWebhookDeliveries } from "@/lib/webhooks";
 
 const WINDOW_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -154,6 +155,18 @@ export async function GET(req: Request) {
       console.error("CRM lead sync (piggybacked on renewals cron) crashed", err);
     }
 
+    // Webhook retries that came due while nobody was using the app, and
+    // delivery history older than 30 days.
+    let webhookRetries = { attempted: 0, pruned: 0 };
+    try {
+      const { attempted } = await retryDueWebhookDeliveries({ limit: 200, budgetMs: 20_000 });
+      const pruned = await prisma.webhookDelivery.deleteMany({ where: { createdAt: { lt: new Date(now.getTime() - 30 * 86_400_000) }, status: { not: "pending" } } });
+      webhookRetries = { attempted, pruned: pruned.count };
+    } catch (err) {
+      console.error("Webhook retries (piggybacked on renewals cron) crashed", err);
+      await reportError(err, "Webhook retries");
+    }
+
     let rateLimitResult = { deleted: 0 };
     try {
       rateLimitResult = await cleanupRateLimitHits();
@@ -183,7 +196,7 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ renewals: { checked: dueContracts.length, sent }, overdueReviews: overdueReviewResult, staleDeals: staleResult, taskDigest: taskDigestResult, crmLeadSync, rateLimitCleanup: rateLimitResult, monthlyReset });
+    return NextResponse.json({ renewals: { checked: dueContracts.length, sent }, overdueReviews: overdueReviewResult, staleDeals: staleResult, taskDigest: taskDigestResult, crmLeadSync, webhookRetries, rateLimitCleanup: rateLimitResult, monthlyReset });
   } catch (err) {
     console.error("Renewal reminder cron crashed", err);
     try {

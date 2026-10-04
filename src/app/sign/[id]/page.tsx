@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { dispatchWebhookEvent } from "@/lib/webhooks";
 import { fillClauses } from "@/lib/contract";
 import { signContract, requestClauseChange } from "./actions";
 import BrandLogo from "@/components/BrandLogo";
@@ -17,7 +18,12 @@ export default async function SignPage({ params, searchParams }: { params: Promi
   if (!contract || !contract.template) notFound();
 
   if (!contract.viewedAt) {
-    await prisma.contract.update({ where: { id: contract.id }, data: { viewedAt: new Date() } });
+    // updateMany so two tabs opening at once announce it only once.
+    const viewedAt = new Date();
+    const first = await prisma.contract.updateMany({ where: { id: contract.id, viewedAt: null }, data: { viewedAt } });
+    if (first.count === 1) {
+      await dispatchWebhookEvent(contract.deal.workspaceId, "contract.viewed", { dealId: contract.dealId, contractId: contract.id, clientName: contract.deal.client.name, viewedAt: viewedAt.toISOString() });
+    }
   }
 
   const clauses = fillClauses(contract.template.clauses, contract.deal.fields);

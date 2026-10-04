@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "crypto";
 import { prisma } from "@/lib/db";
+import { scheduleWebhookRetries } from "@/lib/webhooks";
 
 const KEY_PREFIX_LEN = 12; // "sk_live_" + 4 chars — enough to recognize a key in a list, not enough to authenticate with
 
@@ -30,6 +31,7 @@ export async function authenticateApiRequest(req: Request): Promise<{ workspaceI
   // Best-effort — a failure here should never block the actual request.
   prisma.apiKey.update({ where: { id: key.id }, data: { lastUsedAt: new Date() } }).catch(() => {});
 
+  scheduleWebhookRetries();
   return { workspaceId: key.workspaceId, apiKeyId: key.id };
 }
 

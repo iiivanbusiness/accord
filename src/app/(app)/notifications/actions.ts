@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { scheduleWebhookRetries } from "@/lib/webhooks";
 
 export type NotificationItem = {
   id: string;
@@ -19,6 +20,8 @@ export type NotificationItem = {
 // file's "use server" makes it network-callable from the client bundle
 // without a separate API route.
 export async function getUnreadNotifications(): Promise<{ unreadCount: number; items: NotificationItem[] }> {
+  // Open tabs poll this, so it doubles as the clock for webhook retries.
+  scheduleWebhookRetries();
   const session = await auth();
   const email = session?.user?.email;
   if (!email) return { unreadCount: 0, items: [] };

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
+import { dispatchLeadsCreated } from "@/lib/webhooks";
 import { requireProspecting } from "@/lib/prospecting";
 import { leadAccess } from "@/lib/lead-visibility";
 import { normalizePhone } from "@/lib/phone";
@@ -141,7 +142,7 @@ export async function importLeadsChunk(
   }
 
   if (toCreate.length) {
-    await prisma.lead.createMany({
+    const created = await prisma.lead.createManyAndReturn({
       data: toCreate.map(({ ownerEmail, ...r }, i) => ({
         workspaceId: workspace.id,
         ownerId: ownerFor({ ownerEmail, ...r }, i),
@@ -152,7 +153,9 @@ export async function importLeadsChunk(
         importId: run.id,
         ...r,
       })),
+      select: { id: true },
     });
+    await dispatchLeadsCreated(workspace.id, created.map((l) => l.id));
   }
 
   await prisma.leadImport.update({

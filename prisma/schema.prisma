@@ -1069,21 +1069,29 @@ model WebhookEndpoint {
   @@index([workspaceId])
 }
 
-// A log line per delivery attempt, purely for the admin to debug "why
-// didn't my webhook fire" from Settings — not itself retried automatically.
-// responseStatus null means the request itself failed (DNS, timeout,
-// connection refused) rather than the endpoint responding with an error
-// code.
+// One event going to one endpoint. Created "pending" when the event
+// happens, sent right away, and retried with backoff (see
+// src/lib/webhooks.ts) until the endpoint answers 2xx or the attempts run
+// out. payload is the exact JSON body, re-sent unchanged; eventId is the
+// same for every endpoint and every retry of one event, so receivers can
+// ignore duplicates.
 model WebhookDelivery {
   id             String          @id @default(cuid())
   endpointId     String
   endpoint       WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
   event          String
+  eventId        String?
+  payload        String?
+  status         String          @default("pending") // pending | delivered | failed
+  attempts       Int             @default(0)
+  nextAttemptAt  DateTime?
+  deliveredAt    DateTime?
   responseStatus Int?
   error          String?
   createdAt      DateTime        @default(now())
 
   @@index([endpointId, createdAt])
+  @@index([status, nextAttemptAt])
 }
 
 // A prospect a rep calls before they become a Client and Deal. Comes in by

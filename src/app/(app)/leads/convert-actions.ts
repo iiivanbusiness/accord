@@ -129,6 +129,7 @@ export async function convertLeadToDeal(leadId: string, input: ConvertInput): Pr
   after(async () => {
     try {
       await dispatchWebhookEvent(workspace.id, "deal.created", { dealId: deal.id, clientName, company, service, feeDisplay: fee, status: deal.status });
+      await dispatchWebhookEvent(workspace.id, "lead.converted", { leadId: lead.id, dealId: deal.id, clientId: deal.clientId, name: lead.name, company: lead.company, convertedAt: new Date().toISOString() });
       await notifySlack(workspace.id, { type: "deal.created", dealId: deal.id, clientName, service });
       await syncDealToHubspot(workspace.id, deal.id);
       await syncDealToSalesforce(workspace.id, deal.id);
