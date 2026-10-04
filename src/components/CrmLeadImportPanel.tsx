@@ -199,7 +199,7 @@ export default function CrmLeadImportPanel({
                 <span className={`chip ${salesforceWebhook.url ? "chip-success" : "chip-neutral"}`}>{salesforceWebhook.url ? "On" : "Off"}</span>
               </div>
               <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
-                A Salesforce Flow tells SealMe the moment a Lead is created or changed, so it shows up here within seconds. Your Salesforce admin sets it up once, in about five minutes, with no code.
+                A Salesforce Flow tells SealMe the moment a Lead is created or changed, so it shows up here within seconds. Your Salesforce admin sets it up once, in about five minutes, with no code. It needs Salesforce Enterprise Edition or above, or a Developer Edition org; on other editions Leads still come in through the checks above.
               </div>
               {salesforceWebhook.url ? (
                 <>
