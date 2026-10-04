@@ -175,6 +175,7 @@ const SOURCE_LABEL: Record<string, string> = {
   hubspot: "HubSpot",
   salesforce: "Salesforce",
   call: "From a call",
+  api: "Through the API",
 };
 
 function Row({ label, value }: { label: string; value: string }) {

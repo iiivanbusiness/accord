@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/permissions";
 import { MAX_WEBHOOK_ATTEMPTS, WEBHOOK_EVENTS } from "@/lib/webhooks";
+import { API_RATE_LIMIT } from "@/lib/api-auth";
 import ApiKeysPanel from "@/components/ApiKeysPanel";
 import WebhooksPanel from "@/components/WebhooksPanel";
 import { createApiKey, revokeApiKey, createWebhookEndpoint, toggleWebhookEndpoint, deleteWebhookEndpoint, sendTestWebhookEvent, resendWebhookDeliveryAction } from "../developer-actions";
@@ -33,11 +34,11 @@ export default async function DeveloperSettingsPage() {
         <h2 className="text-[15px] font-medium">API keys</h2>
         <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
           Authenticate REST requests with <code className="font-mono-tab">Authorization: Bearer &lt;key&gt;</code> against{" "}
-          <code className="font-mono-tab">{process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/v1</code>. Deals, clients, and contracts, read and (for clients) write.
+          <code className="font-mono-tab">{process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/v1</code>: deals, clients, contracts, templates and leads. A read-only key can&apos;t create or change anything. {API_RATE_LIMIT} requests a minute per key.
         </div>
       </div>
       <ApiKeysPanel
-        keys={apiKeys.map((k) => ({ id: k.id, name: k.name, keyPrefix: k.keyPrefix, lastUsedAt: k.lastUsedAt?.toISOString() ?? null, createdAt: k.createdAt.toISOString() }))}
+        keys={apiKeys.map((k) => ({ id: k.id, name: k.name, keyPrefix: k.keyPrefix, access: k.access, lastUsedAt: k.lastUsedAt?.toISOString() ?? null, createdAt: k.createdAt.toISOString() }))}
         createAction={createApiKey}
         revokeAction={revokeApiKey}
       />

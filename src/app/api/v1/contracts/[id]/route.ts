@@ -1,17 +1,13 @@
 import { prisma } from "@/lib/db";
-import { authenticateApiRequest, apiJson, apiError } from "@/lib/api-auth";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { apiGuard, apiJson, apiError } from "@/lib/api-auth";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await authenticateApiRequest(req);
-  if (!auth) return apiError(401, "Invalid or missing API key");
-
-  const allowed = await checkRateLimit(`api:${auth.apiKeyId}`, 120, 60_000);
-  if (!allowed) return apiError(429, "Rate limit exceeded. Try again shortly");
+  const auth = await apiGuard(req);
+  if (auth instanceof Response) return auth;
 
   const { id } = await params;
   const contract = await prisma.contract.findFirst({
-    where: { id, deal: { workspaceId: auth.workspaceId } },
+    where: { id, deal: { workspaceId: auth.workspaceId, trashedAt: null } },
     include: { deal: { include: { client: true } } },
   });
   if (!contract) return apiError(404, "Contract not found");
@@ -22,7 +18,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     dealId: contract.dealId,
     client: { id: contract.deal.client.id, name: contract.deal.client.name, company: contract.deal.client.company },
     sentAt: contract.sentAt?.toISOString() ?? null,
+    viewedAt: contract.viewedAt?.toISOString() ?? null,
     signedAt: contract.signedAt?.toISOString() ?? null,
+    expiresAt: contract.expiresAt?.toISOString() ?? null,
     signerName: contract.signerName,
     renewalDate: contract.renewalDate?.toISOString() ?? null,
     autoRenews: contract.autoRenews,

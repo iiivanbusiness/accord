@@ -12,13 +12,14 @@ import { logAudit } from "@/lib/audit";
 
 export async function createApiKey(formData: FormData): Promise<string> {
   const user = await requirePermission("canManageWorkspace");
-  const name = String(formData.get("name") ?? "").trim() || "Untitled key";
+  const name = String(formData.get("name") ?? "").trim().slice(0, 100) || "Untitled key";
+  const access = formData.get("access") === "read_write" ? "read_write" : "read";
 
   const { raw, prefix } = generateApiKey();
-  await prisma.apiKey.create({ data: { workspaceId: user.workspaceId, name, keyPrefix: prefix, keyHash: hashApiKey(raw) } });
+  await prisma.apiKey.create({ data: { workspaceId: user.workspaceId, name, access, keyPrefix: prefix, keyHash: hashApiKey(raw) } });
 
   const session = await auth();
-  await logAudit({ workspaceId: user.workspaceId, actorEmail: session?.user?.email, action: "api_key.created", metadata: { name } });
+  await logAudit({ workspaceId: user.workspaceId, actorEmail: session?.user?.email, action: "api_key.created", metadata: { name, access } });
 
   revalidatePath("/settings/developers");
   return raw;

@@ -1,26 +1,12 @@
 import { prisma } from "@/lib/db";
-import { authenticateApiRequest, apiJson, apiError } from "@/lib/api-auth";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { apiGuard, apiJson, apiError, readJsonObject } from "@/lib/api-auth";
+import { serializeClient } from "@/lib/api-serialize";
 
 const PAGE_SIZE = 50;
 
-function serializeClient(client: { id: string; name: string; company: string; email: string | null; billingAddress: string | null; createdAt: Date }) {
-  return {
-    id: client.id,
-    name: client.name,
-    company: client.company,
-    email: client.email,
-    billingAddress: client.billingAddress,
-    createdAt: client.createdAt.toISOString(),
-  };
-}
-
 export async function GET(req: Request) {
-  const auth = await authenticateApiRequest(req);
-  if (!auth) return apiError(401, "Invalid or missing API key");
-
-  const allowed = await checkRateLimit(`api:${auth.apiKeyId}`, 120, 60_000);
-  if (!allowed) return apiError(429, "Rate limit exceeded. Try again shortly");
+  const auth = await apiGuard(req);
+  if (auth instanceof Response) return auth;
 
   const url = new URL(req.url);
   const cursor = url.searchParams.get("cursor");
@@ -43,25 +29,18 @@ export async function GET(req: Request) {
 // minimal (name/company/email) — a client on its own doesn't do anything
 // until a deal is started against it from inside the app.
 export async function POST(req: Request) {
-  const auth = await authenticateApiRequest(req);
-  if (!auth) return apiError(401, "Invalid or missing API key");
+  const auth = await apiGuard(req, { write: true });
+  if (auth instanceof Response) return auth;
 
-  const allowed = await checkRateLimit(`api:${auth.apiKeyId}`, 120, 60_000);
-  if (!allowed) return apiError(429, "Rate limit exceeded. Try again shortly");
-
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return apiError(400, "Invalid JSON body");
-  }
-  const { name, company, email, billingAddress } = (body ?? {}) as Record<string, unknown>;
+  const body = await readJsonObject(req);
+  if (!body) return apiError(400, "The body must be a JSON object");
+  const { name, company, email, billingAddress } = body;
   if (typeof name !== "string" || !name.trim()) return apiError(400, "\"name\" is required");
 
   const client = await prisma.client.create({
     data: {
       workspaceId: auth.workspaceId,
-      name: name.trim(),
+      name: name.trim().slice(0, 200),
       company: typeof company === "string" && company.trim() ? company.trim() : name.trim(),
       email: typeof email === "string" && email.trim() ? email.trim() : null,
       billingAddress: typeof billingAddress === "string" && billingAddress.trim() ? billingAddress.trim() : null,

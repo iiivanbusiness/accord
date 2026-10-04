@@ -53,6 +53,7 @@ const CALL_SOURCE_LABEL: Record<string, string> = {
   local: "Recorded locally",
   upload: "Pasted transcript",
   recording: "Uploaded recording",
+  api: "Sent through the API",
 };
 
 const STATUS_LABEL: Record<string, string> = {
