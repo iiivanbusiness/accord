@@ -10,7 +10,7 @@ import { extractCallHighlights } from "@/lib/extract-call-highlights";
 import { extractPlaceholderKeys } from "@/lib/contract";
 import { requireWorkspace } from "@/lib/workspace";
 import { currentUserWithRole } from "@/lib/permissions";
-import { dispatchWebhookEvent } from "@/lib/webhooks";
+import { dispatchDealCreated } from "@/lib/webhooks";
 import { notifySlack } from "@/lib/slack";
 import { syncDealToHubspot } from "@/lib/hubspot";
 import { syncDealToSalesforce } from "@/lib/salesforce";
@@ -61,7 +61,7 @@ export async function createDeal(formData: FormData) {
     data: { callsUsedThisMonth: { increment: 1 } },
   });
 
-  await dispatchWebhookEvent(workspaceId, "deal.created", { dealId: deal.id, clientName, company, service, feeDisplay, status: deal.status });
+  await dispatchDealCreated(workspaceId, deal.id);
   await notifySlack(workspaceId, { type: "deal.created", dealId: deal.id, clientName, service });
   await syncDealToHubspot(workspaceId, deal.id);
   await syncDealToSalesforce(workspaceId, deal.id);
@@ -143,7 +143,7 @@ export async function createDealFromTranscript(formData: FormData) {
         await reportError(err, "Call highlight extraction", { dealId: deal.id });
       }),
     ]);
-    await dispatchWebhookEvent(workspaceId, "deal.created", { dealId: deal.id, clientName: extracted.clientName, service, feeDisplay: fee, status: deal.status });
+    await dispatchDealCreated(workspaceId, deal.id);
     await notifySlack(workspaceId, { type: "deal.created", dealId: deal.id, clientName: extracted.clientName, service });
     await syncDealToHubspot(workspaceId, deal.id);
     await syncDealToSalesforce(workspaceId, deal.id);
@@ -194,7 +194,7 @@ export async function startLocalCapture(formData: FormData): Promise<{ dealId: s
     data: { callsUsedThisMonth: { increment: 1 } },
   });
 
-  await dispatchWebhookEvent(workspaceId, "deal.created", { dealId: deal.id, clientName, status: deal.status });
+  await dispatchDealCreated(workspaceId, deal.id);
   await notifySlack(workspaceId, { type: "deal.created", dealId: deal.id, clientName, service: "" });
   await syncDealToHubspot(workspaceId, deal.id);
   await syncDealToSalesforce(workspaceId, deal.id);

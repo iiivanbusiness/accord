@@ -238,3 +238,29 @@ export async function dispatchLeadsCreated(workspaceId: string, leadIds: string[
     console.error("Couldn't queue lead.created", err);
   }
 }
+
+// deal.created, the same shape however the deal was made: the call
+// recorder, a pasted transcript, a lead conversion, a renewal or the API.
+export async function dispatchDealCreated(workspaceId: string, dealId: string): Promise<void> {
+  try {
+    const deal = await prisma.deal.findUnique({
+      where: { id: dealId },
+      select: { id: true, status: true, source: true, service: true, feeDisplay: true, createdAt: true, client: { select: { id: true, name: true, company: true } }, owner: { select: { name: true, email: true } } },
+    });
+    if (!deal) return;
+    await dispatchWebhookEvent(workspaceId, "deal.created", {
+      dealId: deal.id,
+      clientId: deal.client.id,
+      clientName: deal.client.name,
+      company: deal.client.company,
+      service: deal.service,
+      feeDisplay: deal.feeDisplay,
+      status: deal.status,
+      source: deal.source,
+      owner: deal.owner ? { name: deal.owner.name, email: deal.owner.email } : null,
+      createdAt: deal.createdAt.toISOString(),
+    });
+  } catch (err) {
+    console.error("Couldn't queue deal.created", err);
+  }
+}

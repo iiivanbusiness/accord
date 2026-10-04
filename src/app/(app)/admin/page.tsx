@@ -103,7 +103,9 @@ export default async function AdminPage() {
   await requireAdmin();
 
   const [workspaces, pendingRequests, onboardingProfiles, auditLogs] = await Promise.all([
+    // Sandboxes belong to a customer's workspace; they aren't customers.
     prisma.workspace.findMany({
+      where: { sandboxOfId: null },
       include: { users: true },
       orderBy: { createdAt: "desc" },
     }),

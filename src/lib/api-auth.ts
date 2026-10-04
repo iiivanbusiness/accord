@@ -16,9 +16,10 @@ export function hashApiKey(key: string): string {
 }
 
 // Returns the raw key exactly once — same one-time-reveal pattern as
-// generateScimToken. Only the hash is ever stored.
-export function generateApiKey(): { raw: string; prefix: string } {
-  const raw = `sk_live_${randomBytes(24).toString("hex")}`;
+// generateScimToken. Only the hash is ever stored. Sandbox keys start with
+// sk_test_ so nobody mistakes one for the real thing.
+export function generateApiKey(kind: "live" | "test" = "live"): { raw: string; prefix: string } {
+  const raw = `sk_${kind}_${randomBytes(24).toString("hex")}`;
   return { raw, prefix: raw.slice(0, KEY_PREFIX_LEN) };
 }
 

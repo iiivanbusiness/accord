@@ -163,6 +163,13 @@ model Workspace {
   leadImports  LeadImport[]
   phoneCalls   PhoneCall[]
   callIntents  CallIntent[]
+  // A sandbox is a separate workspace with sample data for building an
+  // integration against: its own sk_test_ keys and webhooks, no users, no
+  // CRM, so nothing in it reaches real clients. Managed from the parent's
+  // Settings → API & webhooks; sandboxOfId points at that parent.
+  sandboxOfId        String?    @unique
+  sandboxOf          Workspace? @relation("Sandbox", fields: [sandboxOfId], references: [id])
+  sandbox            Workspace? @relation("Sandbox")
   createdAt          DateTime @default(now())
 
   users             User[]

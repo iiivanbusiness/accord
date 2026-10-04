@@ -3,7 +3,7 @@ import { extractDealFromTranscript, buildDealFieldRows } from "@/lib/extract-dea
 import { extractActionItems } from "@/lib/extract-action-items";
 import { extractCallHighlights } from "@/lib/extract-call-highlights";
 import { extractPlaceholderKeys } from "@/lib/contract";
-import { dispatchWebhookEvent } from "@/lib/webhooks";
+import { dispatchDealCreated } from "@/lib/webhooks";
 import { notifySlack } from "@/lib/slack";
 import { syncDealToHubspot } from "@/lib/hubspot";
 import { syncDealToSalesforce } from "@/lib/salesforce";
@@ -14,15 +14,7 @@ import { reportError } from "@/lib/error-report";
 export async function announceNewDeal(workspaceId: string, dealId: string): Promise<void> {
   const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { client: true } });
   if (!deal) return;
-  await dispatchWebhookEvent(workspaceId, "deal.created", {
-    dealId: deal.id,
-    clientName: deal.client.name,
-    company: deal.client.company,
-    service: deal.service,
-    feeDisplay: deal.feeDisplay,
-    status: deal.status,
-    source: deal.source,
-  });
+  await dispatchDealCreated(workspaceId, dealId);
   await notifySlack(workspaceId, { type: "deal.created", dealId: deal.id, clientName: deal.client.name, service: deal.service });
   await syncDealToHubspot(workspaceId, deal.id);
   await syncDealToSalesforce(workspaceId, deal.id);

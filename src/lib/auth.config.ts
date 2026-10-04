@@ -24,7 +24,6 @@ export const authConfig = {
         request.nextUrl.pathname.startsWith("/forgot-password") ||
         request.nextUrl.pathname.startsWith("/reset-password") ||
         request.nextUrl.pathname.startsWith("/api/contracts") ||
-        request.nextUrl.pathname.startsWith("/api/recall") ||
         request.nextUrl.pathname.startsWith("/api/local-capture") ||
         request.nextUrl.pathname.startsWith("/updates") ||
         request.nextUrl.pathname.startsWith("/api/cron") ||
@@ -34,6 +33,9 @@ export const authConfig = {
         request.nextUrl.pathname.startsWith("/api/docusign/webhook") ||
         request.nextUrl.pathname.startsWith("/api/hubspot/webhook") ||
         request.nextUrl.pathname.startsWith("/api/salesforce/webhook") ||
+        request.nextUrl.pathname.startsWith("/developers") ||
+        request.nextUrl.pathname === "/api/health" ||
+        request.nextUrl.pathname.startsWith("/security") ||
         request.nextUrl.pathname.startsWith("/terms") ||
         request.nextUrl.pathname.startsWith("/privacy") ||
         request.nextUrl.pathname.startsWith("/support") ||

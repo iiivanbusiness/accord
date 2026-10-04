@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
+import { dispatchDealCreated } from "@/lib/webhooks";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { applyExtractionToDeal, syncCoreDealFields } from "@/lib/deal-live";
 import { extractPlaceholderKeys } from "@/lib/contract";
@@ -363,6 +364,7 @@ export async function startRenewal(dealId: string) {
     targetId: newDeal.id,
     metadata: { fromDealId: dealId },
   });
+  await dispatchDealCreated(workspaceId, newDeal.id);
 
   redirect(`/deals/${newDeal.id}/contract`);
 }
