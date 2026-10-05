@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/db";
 import { createDealFromTranscriptText, finishTranscriptDealInBackground } from "@/lib/transcript-deal";
 import { leadHistoryNote } from "@/lib/lead-history";
+import { clientCrmIds } from "@/lib/crm-leads";
 import { autoGenerateAndSendContract } from "@/lib/auto-send";
 import { createNotification } from "@/lib/notifications";
 import { sendContractReadyEmail } from "@/lib/email";
@@ -67,7 +68,7 @@ export async function applySalesCall(callId: string): Promise<void> {
     transcript: call.transcript,
     callSource: call.source === "phone" ? "phone" : "recording",
     dealSource: "phone",
-    knownClient: { name: lead.name, company: lead.company, email: lead.email, phone: lead.phone },
+    knownClient: { name: lead.name, company: lead.company, email: lead.email, phone: lead.phone, ...clientCrmIds(lead) },
     requireEmail: true,
     note: { authorEmail: user.email, authorName: user.name, body: leadHistoryNote(lead, lead.phoneCalls, `after ${user.name}'s sales call`) },
   });

@@ -10,6 +10,7 @@ import { currentUserWithRole } from "@/lib/permissions";
 import { buildDealFieldRows } from "@/lib/extract-deal";
 import { extractPlaceholderKeys } from "@/lib/contract";
 import { leadHistoryNote } from "@/lib/lead-history";
+import { clientCrmIds } from "@/lib/crm-leads";
 import { dispatchDealCreated, dispatchWebhookEvent } from "@/lib/webhooks";
 import { notifySlack } from "@/lib/slack";
 import { syncDealToHubspot } from "@/lib/hubspot";
@@ -79,7 +80,7 @@ export async function convertLeadToDeal(leadId: string, input: ConvertInput): Pr
 
   const deal = await prisma.$transaction(async (tx) => {
     const client =
-      existingClient ?? (await tx.client.create({ data: { workspaceId: workspace.id, name: clientName, company, email, phone: lead.phone } }));
+      existingClient ?? (await tx.client.create({ data: { workspaceId: workspace.id, name: clientName, company, email, phone: lead.phone, ...clientCrmIds(lead) } }));
     const deal = await tx.deal.create({
       data: {
         workspaceId: workspace.id,

@@ -52,6 +52,20 @@ const clean = (v: string | null | undefined, max = 200) => (v ? v.trim().slice(0
 
 export type UpsertResult = { outcome: "created" | "updated" | "unchanged" | "skipped"; assignedTo: string | null; leadName: string | null; leadId?: string };
 
+// The CRM record a lead came from, carried over to the client it becomes,
+// so pushing the deal updates that person in the CRM instead of making a
+// second one. Salesforce only has a Contact to reuse; a Salesforce Lead
+// stays a Lead there.
+export function clientCrmIds(lead: { hubspotContactId: string | null; salesforceRecordId: string | null; salesforceRecordType: string | null }): {
+  hubspotContactId?: string;
+  salesforceContactId?: string;
+} {
+  return {
+    ...(lead.hubspotContactId ? { hubspotContactId: lead.hubspotContactId } : {}),
+    ...(lead.salesforceRecordId && lead.salesforceRecordType === "Contact" ? { salesforceContactId: lead.salesforceRecordId } : {}),
+  };
+}
+
 // Creates or updates one lead from a CRM record. Matches an existing lead
 // by its CRM id first, then by email or phone (so a lead imported from a
 // spreadsheet gets linked rather than duplicated). When the CRM gives the
@@ -78,6 +92,14 @@ export async function upsertCrmLead(workspaceId: string, rec: CrmLeadRecord, ctx
     });
   }
   if (!existing && ctx.teamOwnedOnly && !owner) return { outcome: "skipped", assignedTo: null, leadName: name };
+  // A client SealMe itself put into the CRM (a deal's push) comes back as
+  // a new contact; they're already a client, not a lead.
+  if (!existing) {
+    const clientIdField = rec.source === "hubspot" ? { hubspotContactId: rec.externalId } : rec.recordType === "Contact" ? { salesforceContactId: rec.externalId } : null;
+    if (clientIdField && (await prisma.client.findFirst({ where: { workspaceId, ...clientIdField }, select: { id: true } }))) {
+      return { outcome: "skipped", assignedTo: null, leadName: name };
+    }
+  }
 
   const contact = {
     name,

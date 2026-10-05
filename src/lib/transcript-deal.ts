@@ -8,7 +8,7 @@ import { reportError } from "@/lib/error-report";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-type KnownClient = { name: string; company: string | null; email: string | null; phone: string | null };
+type KnownClient = { name: string; company: string | null; email: string | null; phone: string | null; hubspotContactId?: string; salesforceContactId?: string };
 
 export type TranscriptDeal = { dealId: string; callId: string; clientId: string; clientName: string; service: string; summary: string | null; hasMissing: boolean };
 
@@ -19,8 +19,9 @@ export type TranscriptDeal = { dealId: string; callId: string; clientId: string;
 // the caller decides what the rep sees.
 //
 // knownClient: who the call was with, when SealMe already knows (a lead).
-// Their name and contact details win over what the model heard, and a
-// client with the same email is reused. requireEmail adds a "Client email"
+// Their name and contact details win over what the model heard, a client
+// with the same email is reused, and a new client keeps the lead's CRM
+// record. requireEmail adds a "Client email"
 // detail to fill in when neither the lead nor the call gave one, so the
 // contract can't be sent to nobody.
 export async function createDealFromTranscriptText(options: {
@@ -58,7 +59,19 @@ export async function createDealFromTranscriptText(options: {
   const existingClient = knownClient && email ? await prisma.client.findFirst({ where: { workspaceId, email: { equals: email, mode: "insensitive" } } }) : null;
 
   const deal = await prisma.$transaction(async (tx) => {
-    const client = existingClient ?? (await tx.client.create({ data: { workspaceId, name: clientName, company, email, ...(knownClient?.phone ? { phone: knownClient.phone } : {}) } }));
+    const client =
+      existingClient ??
+      (await tx.client.create({
+        data: {
+          workspaceId,
+          name: clientName,
+          company,
+          email,
+          ...(knownClient?.phone ? { phone: knownClient.phone } : {}),
+          ...(knownClient?.hubspotContactId ? { hubspotContactId: knownClient.hubspotContactId } : {}),
+          ...(knownClient?.salesforceContactId ? { salesforceContactId: knownClient.salesforceContactId } : {}),
+        },
+      }));
     const created = await tx.deal.create({
       data: {
         workspaceId,

@@ -35,10 +35,17 @@ export async function validateHubspotToken(accessToken: string): Promise<{ porta
   return { portalId: String(data.portalId) };
 }
 
+// SealMe keeps one name; HubSpot shows firstname + lastname, so the full
+// name in firstname alone doubles up on a contact that has a last name.
+export function hubspotNameParts(name: string): { firstname: string; lastname?: string } {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return parts.length > 1 ? { firstname: parts[0], lastname: parts.slice(1).join(" ") } : { firstname: parts[0] ?? name };
+}
+
 // Creates the Contact on first sync, updates it on every later one —
 // hubspotContactId on our Client row is the join key.
 async function upsertContact(accessToken: string, client: { id: string; name: string; company: string; email: string | null; hubspotContactId: string | null }): Promise<string> {
-  const properties = { email: client.email ?? undefined, firstname: client.name, company: client.company };
+  const properties = { email: client.email ?? undefined, ...hubspotNameParts(client.name), company: client.company };
   if (client.hubspotContactId) {
     await hubspotFetch(accessToken, `/crm/v3/objects/contacts/${client.hubspotContactId}`, { method: "PATCH", body: JSON.stringify({ properties }) });
     return client.hubspotContactId;
