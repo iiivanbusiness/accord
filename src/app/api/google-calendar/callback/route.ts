@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { exchangeCodeForTokens, getUserEmail } from "@/lib/google-calendar";
+import { exchangeCodeForTokens, getUserEmail, hasCalendarScope, revokeGoogleToken } from "@/lib/google-calendar";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { isValidOAuthState } from "@/lib/oauth-state";
 
@@ -22,6 +22,12 @@ export async function GET(req: Request) {
       return NextResponse.redirect(new URL("/calendar?error=google_invalid_state", req.url));
     }
     const tokens = await exchangeCodeForTokens(code);
+    if (!hasCalendarScope(tokens.scope)) {
+      // Signed in but left calendar access unticked: keep nothing, so the
+      // page doesn't claim a connection that can't read any events.
+      await revokeGoogleToken(tokens.refresh_token ?? tokens.access_token);
+      return NextResponse.redirect(new URL("/calendar?error=google_calendar_not_shared", req.url));
+    }
     const email = await getUserEmail(tokens.access_token);
 
     const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });

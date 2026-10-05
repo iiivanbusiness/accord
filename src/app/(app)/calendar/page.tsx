@@ -25,6 +25,7 @@ const ERROR_MESSAGE: Record<string, string> = {
   google_invalid_state: "That connection link expired or came from somewhere else. Click Connect again.",
   google_sync_failed: "Couldn't sync your calendar. Your connection may have expired. Try reconnecting.",
   google_access_denied: "Access was declined on Google's side, so nothing was connected.",
+  google_calendar_not_shared: "Google didn't share your calendar, so nothing was connected. Click Connect again and tick \"View events on all your calendars\" on Google's screen.",
 };
 
 export default async function CalendarPage({

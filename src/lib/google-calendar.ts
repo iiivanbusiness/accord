@@ -3,7 +3,15 @@ import { prisma } from "@/lib/db";
 // Only events on the primary calendar are read, so ask for events-only
 // read access rather than calendar.readonly (Google's review asks for the
 // narrowest scope that does the job).
-const SCOPE = "https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/userinfo.email";
+const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events.readonly";
+const SCOPE = `${CALENDAR_SCOPE} https://www.googleapis.com/auth/userinfo.email`;
+
+// Google's consent screen lets people untick individual permissions, so a
+// successful sign-in can come back without calendar access. `granted` is the
+// space-separated `scope` field of the token response.
+export function hasCalendarScope(granted: string | undefined): boolean {
+  return (granted ?? "").split(" ").includes(CALENDAR_SCOPE);
+}
 
 export function isGoogleCalendarConfigured(): boolean {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
@@ -40,7 +48,7 @@ export async function exchangeCodeForTokens(code: string) {
     }),
   });
   if (!res.ok) throw new Error(`Google token exchange failed: ${res.status} ${await res.text()}`);
-  return res.json() as Promise<{ access_token: string; refresh_token?: string; expires_in: number }>;
+  return res.json() as Promise<{ access_token: string; refresh_token?: string; expires_in: number; scope?: string }>;
 }
 
 async function refreshAccessToken(refreshToken: string) {
