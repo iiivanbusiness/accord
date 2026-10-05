@@ -99,7 +99,8 @@ async function logToSalesforce(workspaceId: string, recordId: string, recordType
   // trimmed the Task picklists still gets a plain completed task.
   let res = await salesforceRequest(workspaceId, `${base}/Task`, {
     method: "POST",
-    body: JSON.stringify({ ...core, TaskSubtype: "Call", Type: "Call", CallType: "Outbound", ...(call.durationSec ? { CallDurationInSeconds: call.durationSec } : {}) }),
+    // No "Type": smaller editions (Starter) don't have that field at all.
+    body: JSON.stringify({ ...core, TaskSubtype: "Call", CallType: "Outbound", ...(call.durationSec ? { CallDurationInSeconds: call.durationSec } : {}) }),
   });
   if (res.status === 400) res = await salesforceRequest(workspaceId, `${base}/Task`, { method: "POST", body: JSON.stringify(core) });
   if (!res.ok) throw new Error(`Salesforce Task creation failed: ${res.status} ${await res.text()}`);
