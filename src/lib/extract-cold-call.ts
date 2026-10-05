@@ -6,8 +6,8 @@ import { CALL_OUTCOMES, type CallOutcome } from "@/lib/call-outcomes";
 // terms stay on extractDealFromTranscript).
 const MODEL = "claude-haiku-4-5";
 // Per million tokens, for the cost shown after each call.
-const INPUT_USD_PER_MTOK = 1;
-const OUTPUT_USD_PER_MTOK = 5;
+export const INPUT_USD_PER_MTOK = 1;
+export const OUTPUT_USD_PER_MTOK = 5;
 
 export type ColdCallResult = {
   outcome: CallOutcome;

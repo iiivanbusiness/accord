@@ -1,0 +1,168 @@
+"use client";
+
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+
+type LeadOption = { id: string; name: string; detail: string };
+type PendingCall = {
+  id: string;
+  status: string; // pending | processing | failed
+  when: string;
+  duration: string | null;
+  source: string;
+  rep: string | null;
+  transcript: string;
+  leadId: string | null;
+};
+
+const PREVIEW_LINES = 4;
+const MATCHES_SHOWN = 8;
+
+// One call in the Calls inbox: pick who it was with and what kind of call
+// it was, then Process or Discard.
+export default function PendingCallCard({
+  call,
+  leads,
+  processAction,
+  discardAction,
+}: {
+  call: PendingCall;
+  leads: LeadOption[];
+  processAction: (input: { leadId: string; mode: string }) => Promise<void>;
+  discardAction: () => Promise<void>;
+}) {
+  const router = useRouter();
+  const [leadId, setLeadId] = useState(call.leadId ?? "");
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState("cold");
+  const [showAll, setShowAll] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const selected = leads.find((l) => l.id === leadId) ?? null;
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = q ? leads.filter((l) => l.name.toLowerCase().includes(q) || l.detail.toLowerCase().includes(q)) : leads;
+    return list.slice(0, MATCHES_SHOWN);
+  }, [leads, query]);
+
+  const lines = call.transcript.split("\n").filter(Boolean);
+  const shown = showAll ? lines : lines.slice(0, PREVIEW_LINES);
+  const processing = call.status === "processing";
+
+  function run(action: () => Promise<void>) {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await action();
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Something went wrong. Try again");
+      }
+    });
+  }
+
+  return (
+    <div className="card flex flex-col gap-3 px-5 py-4">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
+        <span className="font-medium">{call.when}</span>
+        <span style={{ color: "var(--ink-muted)" }}>{[call.duration, call.source, call.rep].filter(Boolean).join(" · ")}</span>
+        {processing && <span className="chip chip-neutral ml-auto">Processing…</span>}
+        {call.status === "failed" && <span className="chip chip-warn ml-auto">Processing failed. Try again</span>}
+      </div>
+
+      {lines.length > 0 && (
+        <div className="rounded-[12px] px-3.5 py-2.5 text-[12.5px] leading-relaxed" style={{ background: "var(--canvas)", color: "var(--ink-muted)" }}>
+          {shown.map((l, i) => (
+            <div key={i} className="break-words">{l}</div>
+          ))}
+          {lines.length > PREVIEW_LINES && (
+            <button type="button" onClick={() => setShowAll(!showAll)} className="mt-1 font-medium" style={{ color: "var(--accent-blue)" }}>
+              {showAll ? "Show less" : `Show all ${lines.length} lines`}
+            </button>
+          )}
+        </div>
+      )}
+
+      {!processing && (
+        <>
+          <div className="flex flex-wrap items-end gap-2.5">
+            <div className="relative min-w-[220px] flex-1">
+              <label className="mb-1 block text-[12px]" style={{ color: "var(--ink-muted)" }}>Lead</label>
+              {selected && !open ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(true);
+                    setQuery("");
+                  }}
+                  className="input w-full truncate text-left"
+                  aria-label="Lead, change"
+                >
+                  {selected.name}
+                  {selected.detail ? <span style={{ color: "var(--ink-muted)" }}> · {selected.detail}</span> : null}
+                </button>
+              ) : (
+                <input
+                  autoFocus={open}
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setOpen(true);
+                  }}
+                  onFocus={() => setOpen(true)}
+                  onBlur={() => setTimeout(() => setOpen(false), 150)}
+                  placeholder={leads.length ? "Search your leads" : "No leads yet"}
+                  aria-label="Lead"
+                  className="input w-full"
+                />
+              )}
+              {open && matches.length > 0 && (
+                <div className="absolute left-0 right-0 z-10 mt-1 overflow-hidden rounded-[12px] border shadow-lg" style={{ background: "var(--surface-1)", borderColor: "var(--hairline)" }}>
+                  {matches.map((l) => (
+                    <button
+                      key={l.id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setLeadId(l.id);
+                        setOpen(false);
+                      }}
+                      className="block w-full truncate px-3 py-2 text-left text-[13px] hover:bg-[var(--canvas)]"
+                    >
+                      {l.name}
+                      {l.detail ? <span style={{ color: "var(--ink-muted)" }}> · {l.detail}</span> : null}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="mb-1 block text-[12px]" style={{ color: "var(--ink-muted)" }}>Kind</label>
+              <select value={mode} onChange={(e) => setMode(e.target.value)} className="input" aria-label="Kind of call">
+                <option value="cold">Cold call</option>
+                <option value="sales" disabled>Sales call (coming soon)</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={pending || !leadId}
+              onClick={() => run(() => processAction({ leadId, mode }))}
+              className="btn btn-primary btn-sm"
+            >
+              {pending ? "Working…" : call.status === "failed" ? "Process again" : "Process"}
+            </button>
+            <button type="button" disabled={pending} onClick={() => run(discardAction)} className="btn btn-secondary btn-sm">
+              Discard
+            </button>
+            {!leadId && <span className="text-[12px]" style={{ color: "var(--ink-muted)" }}>Pick a lead to process this call.</span>}
+          </div>
+        </>
+      )}
+      {error && <div className="chip chip-warn whitespace-normal px-3 py-2 text-left text-[12.5px]">{error}.</div>}
+    </div>
+  );
+}

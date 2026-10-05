@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { discardStaleCalls } from "@/lib/call-inbox";
 import { prisma } from "@/lib/db";
 import { sendAdminAlertEmail, sendRenewalReminderEmail, sendReviewOverdueEmail } from "@/lib/email";
 import { createNotification } from "@/lib/notifications";
@@ -167,6 +168,15 @@ export async function GET(req: Request) {
       await reportError(err, "Webhook retries");
     }
 
+    // Calls in the Calls inbox nobody processed or discarded within a day.
+    let staleCalls = { discarded: 0 };
+    try {
+      staleCalls = { discarded: await discardStaleCalls(now) };
+    } catch (err) {
+      console.error("Stale call cleanup (piggybacked on renewals cron) crashed", err);
+      await reportError(err, "Stale call cleanup");
+    }
+
     let rateLimitResult = { deleted: 0 };
     try {
       rateLimitResult = await cleanupRateLimitHits();
@@ -196,7 +206,7 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ renewals: { checked: dueContracts.length, sent }, overdueReviews: overdueReviewResult, staleDeals: staleResult, taskDigest: taskDigestResult, crmLeadSync, webhookRetries, rateLimitCleanup: rateLimitResult, monthlyReset });
+    return NextResponse.json({ renewals: { checked: dueContracts.length, sent }, overdueReviews: overdueReviewResult, staleDeals: staleResult, taskDigest: taskDigestResult, crmLeadSync, webhookRetries, staleCalls, rateLimitCleanup: rateLimitResult, monthlyReset });
   } catch (err) {
     console.error("Renewal reminder cron crashed", err);
     try {

@@ -5,7 +5,7 @@ import LocalDateTime from "@/components/LocalDateTime";
 import { CALL_OUTCOME_CHIP, CALL_OUTCOME_LABEL } from "@/lib/call-outcomes";
 import { LEAD_STAGE_LABEL } from "@/lib/lead-stages";
 import { formatTaskDue, TASK_TYPE_LABEL } from "@/lib/tasks";
-import type { ColdCallSummary } from "@/app/(app)/leads/call-actions";
+import type { ColdCallSummary } from "@/lib/cold-call";
 
 export type LeadCall = {
   id: string;
