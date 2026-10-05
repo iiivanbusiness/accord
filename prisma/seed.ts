@@ -65,11 +65,13 @@ async function main() {
     data: { name: "Horizon Media", plan: "Growth", callsUsedThisMonth: 6, callsLimit: 15 },
   });
 
+  // Demo addresses use the reserved .example domain, so the daily emails
+  // can never reach a real company that happens to own the name.
   await prisma.user.create({
     data: {
       workspaceId: workspace.id,
       name: "Horizon Media",
-      email: "hello@horizonmedia.com",
+      email: "hello@horizonmedia.example",
       passwordHash: hashPassword("accord2026"),
     },
   });
@@ -93,16 +95,16 @@ async function main() {
   ]);
 
   const acmeClient = await prisma.client.create({
-    data: { workspaceId: workspace.id, name: "Acme Fitness", company: "Acme Fitness", email: "hello@acmefitness.co" },
+    data: { workspaceId: workspace.id, name: "Acme Fitness", company: "Acme Fitness", email: "hello@acmefitness.example" },
   });
   const lumenClient = await prisma.client.create({
-    data: { workspaceId: workspace.id, name: "Lumen Coffee Co.", company: "Lumen Coffee Co.", email: "team@lumencoffee.com" },
+    data: { workspaceId: workspace.id, name: "Lumen Coffee Co.", company: "Lumen Coffee Co.", email: "team@lumencoffee.example" },
   });
   const northgateClient = await prisma.client.create({
-    data: { workspaceId: workspace.id, name: "Northgate Consulting", company: "Northgate Consulting", email: "ops@northgateconsulting.com" },
+    data: { workspaceId: workspace.id, name: "Northgate Consulting", company: "Northgate Consulting", email: "ops@northgateconsulting.example" },
   });
   const brightPathClient = await prisma.client.create({
-    data: { workspaceId: workspace.id, name: "Bright Path Yoga", company: "Bright Path Yoga", email: "studio@brightpathyoga.com" },
+    data: { workspaceId: workspace.id, name: "Bright Path Yoga", company: "Bright Path Yoga", email: "studio@brightpathyoga.example" },
   });
 
   // Acme Fitness — fully extracted, ready for review
