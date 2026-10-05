@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/db";
 
-const SCOPE = "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.email";
+// Only events on the primary calendar are read, so ask for events-only
+// read access rather than calendar.readonly (Google's review asks for the
+// narrowest scope that does the job).
+const SCOPE = "https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/userinfo.email";
 
 export function isGoogleCalendarConfigured(): boolean {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
