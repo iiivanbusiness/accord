@@ -53,6 +53,7 @@ const CALL_SOURCE_LABEL: Record<string, string> = {
   local: "Recorded locally",
   upload: "Pasted transcript",
   recording: "Uploaded recording",
+  phone: "Phone call",
   api: "Sent through the API",
 };
 

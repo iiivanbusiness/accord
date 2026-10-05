@@ -227,6 +227,21 @@ export async function sendReviewAssignedEmail(options: {
   });
 }
 
+// To the rep, once a sales call has turned into a deal: the contract is
+// ready to review, already sent, or waiting on details the call missed.
+export async function sendContractReadyEmail(options: { to: string; subject: string; message: string; actionLabel: string; url: string }): Promise<void> {
+  await sendSystemEmail({
+    to: [options.to],
+    subject: options.subject,
+    bodyHtml: `
+      <p style="margin:0 0 14px;">${escapeHtml(options.message)}</p>
+      <a href="${options.url}" style="display:inline-block;margin:0 0 20px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
+        ${escapeHtml(options.actionLabel)}
+      </a>
+    `,
+  });
+}
+
 export async function sendReviewOverdueEmail(options: {
   to: string;
   clientName: string;

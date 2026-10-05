@@ -13,7 +13,9 @@ import ProcessAnywayButton from "@/components/ProcessAnywayButton";
 import { addUploadedCall, discardCall, processCall } from "./actions";
 
 // Processing runs in after() on the action's request.
-export const maxDuration = 120;
+// A sales call reads the terms, drafts the contract and runs two more
+// model passes, so it gets the longest window.
+export const maxDuration = 300;
 
 const HISTORY_SHOWN = 100;
 const SOURCE_LABEL: Record<string, string> = { phone: "Phone", upload: "Upload", desktop: "Desktop", paste: "Pasted" };
@@ -34,7 +36,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
   const tab = (await searchParams).tab === "history" ? "history" : "pending";
   const callWhere = { workspaceId: workspace.id, ...(seesAll ? {} : { userId: access.userId }) };
 
-  const [pending, history, leads, pendingCount] = await Promise.all([
+  const [pending, history, leads, pendingCount, templates] = await Promise.all([
     tab === "pending"
       ? prisma.phoneCall.findMany({
           where: { ...callWhere, status: { in: ["pending", "processing", "failed"] } },
@@ -51,6 +53,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
             status: true,
             source: true,
             mode: true,
+            templateId: true,
             transcript: true,
             outcome: true,
             summary: true,
@@ -62,6 +65,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
             hubspotCallId: true,
             salesforceTaskId: true,
             startedAt: true,
+            dealId: true,
             lead: { select: { id: true, name: true, company: true } },
             user: { select: { name: true } },
           },
@@ -78,6 +82,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
         })
       : Promise.resolve([]),
     prisma.phoneCall.count({ where: { ...callWhere, status: { in: ["pending", "processing", "failed"] } } }),
+    tab === "pending" ? prisma.contractTemplate.findMany({ where: { workspaceId: workspace.id }, select: { id: true, name: true }, orderBy: { name: "asc" } }) : Promise.resolve([]),
   ]);
 
   const tabLink = (key: "pending" | "history", label: string) => (
@@ -128,6 +133,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
                   leadId: c.leadId,
                 }}
                 leads={leads.map((l) => ({ id: l.id, name: l.name, detail: l.company ?? l.phone ?? "" }))}
+                templates={templates}
                 processAction={processCall.bind(null, c.id)}
                 discardAction={discardCall.bind(null, c.id)}
               />
@@ -147,7 +153,9 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
             {history.map((c, i) => {
               const skipped = (c.extracted as { skipped?: string } | null)?.skipped;
               const chip =
-                c.status === "processed" && c.outcome
+                c.status === "processed" && c.mode === "sales"
+                  ? { cls: "chip-success", label: "Sales call · deal created" }
+                  : c.status === "processed" && c.outcome
                   ? { cls: CALL_OUTCOME_CHIP[c.outcome] ?? "chip-neutral", label: CALL_OUTCOME_LABEL[c.outcome] ?? c.outcome }
                   : c.status === "skipped"
                     ? { cls: "chip-neutral", label: `Skipped: ${SKIP_LABEL[skipped ?? ""] ?? "not processed"}` }
@@ -171,14 +179,21 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
                     </span>
                   </div>
                   {c.summary && <div className="text-[13px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>{c.summary}</div>}
+                  {c.mode === "sales" && c.dealId && (
+                    <div>
+                      <Link href={`/deals/${c.dealId}`} className="text-[12.5px] font-medium" style={{ color: "var(--accent-blue)" }}>
+                        Open the deal →
+                      </Link>
+                    </div>
+                  )}
                   {(c.hubspotCallId || c.salesforceTaskId) && (
                     <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
                       Logged in {[c.hubspotCallId ? "HubSpot" : null, c.salesforceTaskId ? "Salesforce" : null].filter(Boolean).join(" and ")}
                     </div>
                   )}
-                  {c.status === "skipped" && c.lead && c.transcript && c.mode === "cold" && (
+                  {c.status === "skipped" && c.lead && c.transcript && (c.mode === "cold" || c.mode === "sales") && (
                     <div>
-                      <ProcessAnywayButton action={processCall.bind(null, c.id, { leadId: c.lead.id, mode: c.mode, force: true })} />
+                      <ProcessAnywayButton action={processCall.bind(null, c.id, { leadId: c.lead.id, mode: c.mode, templateId: c.templateId, force: true })} />
                     </div>
                   )}
                 </div>

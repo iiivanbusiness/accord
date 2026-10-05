@@ -4,10 +4,6 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
-import { extractDealFromTranscript, buildDealFieldRows } from "@/lib/extract-deal";
-import { extractActionItems } from "@/lib/extract-action-items";
-import { extractCallHighlights } from "@/lib/extract-call-highlights";
-import { extractPlaceholderKeys } from "@/lib/contract";
 import { requireWorkspace } from "@/lib/workspace";
 import { currentUserWithRole } from "@/lib/permissions";
 import { dispatchDealCreated } from "@/lib/webhooks";
@@ -15,6 +11,7 @@ import { notifySlack } from "@/lib/slack";
 import { syncDealToHubspot } from "@/lib/hubspot";
 import { syncDealToSalesforce } from "@/lib/salesforce";
 import { reportError } from "@/lib/error-report";
+import { createDealFromTranscriptText, finishTranscriptDealInBackground, type TranscriptDeal } from "@/lib/transcript-deal";
 
 export async function createDeal(formData: FormData) {
   const clientName = String(formData.get("clientName") ?? "").trim();
@@ -81,75 +78,31 @@ export async function createDealFromTranscript(formData: FormData) {
   const [workspace, user] = await Promise.all([requireWorkspace(), currentUserWithRole()]);
   const workspaceId = workspace.id;
 
-  const template = await prisma.contractTemplate.findFirst({ where: { id: templateId, workspaceId } });
+  const template = await prisma.contractTemplate.findFirst({ where: { id: templateId, workspaceId }, select: { id: true } });
   if (!template) throw new Error("Template not found");
 
-  const placeholderKeys = extractPlaceholderKeys(template.clauses);
-
-  let extracted;
+  let made: TranscriptDeal;
   try {
-    extracted = await extractDealFromTranscript(transcript, placeholderKeys);
+    made = await createDealFromTranscriptText({
+      workspaceId,
+      ownerId: user.id,
+      teamId: user.teamId,
+      templateId,
+      transcript,
+      callSource: fromRecording ? "recording" : "upload",
+      dealSource: "upload",
+    });
   } catch (err) {
     await reportError(err, "Deal extraction from pasted transcript", { workspaceId });
     redirect(`/deals/new?error=${encodeURIComponent("Couldn't extract deal terms from that transcript. Try again or enter it manually.")}`);
   }
 
-  const { fieldRows, hasMissing, service, fee } = buildDealFieldRows(extracted, placeholderKeys);
+  // Two more model calls plus integrations. Done inline it pushed a long
+  // call past the function timeout before the redirect, so the rep saw
+  // nothing happen. The deal page polls these in as they land.
+  after(() => finishTranscriptDealInBackground(workspaceId, made.dealId, made.callId, transcript));
 
-  const client = await prisma.client.create({
-    data: {
-      workspaceId,
-      name: extracted.clientName,
-      company: extracted.company ?? extracted.clientName,
-      email: extracted.email,
-    },
-  });
-
-  const deal = await prisma.deal.create({
-    data: {
-      workspaceId,
-      clientId: client.id,
-      templateId,
-      ownerId: user.id,
-      teamId: user.teamId,
-      service,
-      feeDisplay: fee,
-      status: hasMissing ? "missing_info" : "ready",
-      summary: extracted.summary,
-      source: "upload",
-      fields: { create: fieldRows },
-      calls: { create: { transcript, source: fromRecording ? "recording" : "upload", endedAt: new Date() } },
-    },
-    include: { calls: true },
-  });
-
-  await prisma.workspace.update({
-    where: { id: workspaceId },
-    data: { callsUsedThisMonth: { increment: 1 } },
-  });
-
-  // Everything below is two more model calls plus integrations. Done inline
-  // it pushed a long call past the function timeout before the redirect, so
-  // the rep saw nothing happen. The deal page polls these in as they land.
-  const callId = deal.calls[0].id;
-  after(async () => {
-    await Promise.all([
-      extractActionItems(callId).catch(async (err) => {
-        console.error(`Failed to extract action items for deal ${deal.id}`, err);
-        await reportError(err, "Action item extraction", { dealId: deal.id });
-      }),
-      extractCallHighlights(deal.id, transcript, callId).catch(async (err) => {
-        console.error(`Failed to extract call highlights for deal ${deal.id}`, err);
-        await reportError(err, "Call highlight extraction", { dealId: deal.id });
-      }),
-    ]);
-    await dispatchDealCreated(workspaceId, deal.id);
-    await notifySlack(workspaceId, { type: "deal.created", dealId: deal.id, clientName: extracted.clientName, service });
-    await syncDealToHubspot(workspaceId, deal.id);
-    await syncDealToSalesforce(workspaceId, deal.id);
-  });
-
-  redirect(`/deals/${deal.id}`);
+  redirect(`/deals/${made.dealId}`);
 }
 
 // Desktop-app-only: starts a deal backed by a locally-recorded call instead

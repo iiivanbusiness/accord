@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/db", () => ({ prisma: {} }));
 vi.mock("@/lib/error-report", () => ({ reportError: async () => {} }));
 vi.mock("@/lib/crm-call-sync", () => ({ pushCallToCrm: async () => {} }));
+vi.mock("@/lib/sales-call", () => ({ applySalesCall: async () => {} }));
 
 import { callCostUsd, skipReason, speakerCount } from "./call-inbox";
 

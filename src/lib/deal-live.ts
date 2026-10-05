@@ -133,4 +133,8 @@ export async function syncCoreDealFields(
   if (clientName) {
     await prisma.client.update({ where: { id: clientId }, data: { name: clientName } });
   }
+  const clientEmail = changed.find((c) => c.fieldKey === "clientEmail")?.value?.trim().toLowerCase();
+  if (clientEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail)) {
+    await prisma.client.update({ where: { id: clientId }, data: { email: clientEmail } });
+  }
 }

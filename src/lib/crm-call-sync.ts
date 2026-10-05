@@ -35,8 +35,9 @@ export function salesforceLeadStatusFor(outcome: string, available: string[]): s
 // Statuses a call shouldn't overwrite: converted or closed leads.
 const SALESFORCE_SETTLED = /converted|closed|qualified/i;
 
-function callTitle(outcome: string | null): string {
-  return `SealMe call: ${CALL_OUTCOME_LABEL[outcome ?? ""] ?? "Call"}`;
+function callTitle(call: { mode: string; outcome: string | null }): string {
+  if (call.mode === "sales") return "SealMe sales call";
+  return `SealMe call: ${CALL_OUTCOME_LABEL[call.outcome ?? ""] ?? "Call"}`;
 }
 
 async function hubspot<T>(token: string, path: string, init?: RequestInit): Promise<T> {
@@ -47,6 +48,7 @@ async function hubspot<T>(token: string, path: string, init?: RequestInit): Prom
 
 type CallForCrm = {
   id: string;
+  mode: string;
   outcome: string | null;
   summary: string | null;
   durationSec: number | null;
@@ -61,7 +63,7 @@ async function logToHubspot(token: string, contactId: string, call: CallForCrm):
     body: JSON.stringify({
       properties: {
         hs_timestamp: call.startedAt.toISOString(),
-        hs_call_title: callTitle(call.outcome),
+        hs_call_title: callTitle(call),
         hs_call_body: call.summary ?? "",
         hs_call_direction: "OUTBOUND",
         hs_call_status: "COMPLETED",
@@ -90,7 +92,7 @@ async function logToSalesforce(workspaceId: string, recordId: string, recordType
   const base = `/services/data/${SALESFORCE_API_VERSION}/sobjects`;
   const core = {
     WhoId: recordId,
-    Subject: callTitle(call.outcome),
+    Subject: callTitle(call),
     Description: call.summary ?? "",
     Status: "Completed",
     ActivityDate: call.startedAt.toISOString().slice(0, 10),
@@ -133,6 +135,7 @@ export async function pushCallToCrm(callId: string): Promise<void> {
     select: {
       id: true,
       status: true,
+      mode: true,
       outcome: true,
       summary: true,
       durationSec: true,

@@ -3,6 +3,7 @@ import { applyColdCall } from "@/lib/cold-call";
 import { INPUT_USD_PER_MTOK, OUTPUT_USD_PER_MTOK } from "@/lib/extract-cold-call";
 import { reportError } from "@/lib/error-report";
 import { pushCallToCrm } from "@/lib/crm-call-sync";
+import { applySalesCall } from "@/lib/sales-call";
 
 // Calls shorter than this aren't worth a model call: nobody picked up, or
 // the line dropped.
@@ -64,15 +65,19 @@ export async function runCallProcessing(callId: string, timeZone: string, option
       return;
     }
     if (!call.lead || !call.userId || !call.transcript) throw new Error("This call has no lead, rep or transcript");
-    if (call.mode !== "cold") throw new Error(`Calls of kind "${call.mode}" can't be processed yet`);
-    await applyColdCall({
+    if (call.mode === "sales") {
+      await applySalesCall(call.id);
+    } else {
+      if (call.mode !== "cold") throw new Error(`Calls of kind "${call.mode}" can't be processed`);
+      await applyColdCall({
       workspaceId: call.workspaceId,
       userId: call.userId,
       lead: call.lead,
       transcript: call.transcript,
-      timeZone,
-      phoneCallId: call.id,
-    });
+        timeZone,
+        phoneCallId: call.id,
+      });
+    }
   } catch (err) {
     await prisma.phoneCall.update({ where: { id: callId }, data: { status: "failed" } }).catch(() => {});
     await reportError(err, "Call processing", { callId, workspaceId: call.workspaceId });

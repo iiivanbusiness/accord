@@ -9,8 +9,7 @@ import { leadAccess } from "@/lib/lead-visibility";
 import { currentUserWithRole } from "@/lib/permissions";
 import { buildDealFieldRows } from "@/lib/extract-deal";
 import { extractPlaceholderKeys } from "@/lib/contract";
-import { CALL_OUTCOME_LABEL } from "@/lib/call-outcomes";
-import { LEAD_INTEREST_LABEL } from "@/lib/lead-stages";
+import { leadHistoryNote } from "@/lib/lead-history";
 import { dispatchDealCreated, dispatchWebhookEvent } from "@/lib/webhooks";
 import { notifySlack } from "@/lib/slack";
 import { syncDealToHubspot } from "@/lib/hubspot";
@@ -18,8 +17,6 @@ import { syncDealToSalesforce } from "@/lib/salesforce";
 import { reportError } from "@/lib/error-report";
 
 export type ConvertInput = { clientName: string; company: string; email: string; service: string; fee: string; templateId: string };
-
-const day = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 
 // "Convert to deal": the lead becomes a client and a deal on the chosen
 // template, ready for the usual contract flow. What prospecting learned
@@ -78,26 +75,7 @@ export async function convertLeadToDeal(leadId: string, input: ConvertInput): Pr
   // Typed in by a person, not read off a call.
   const rows = fieldRows.map((f) => (f.status === "extracted" ? { ...f, status: "confirmed", confidence: null } : f));
 
-  const history = [
-    `Converted from lead ${lead.name}${lead.company ? ` (${lead.company})` : ""} by ${user.name}.`,
-    [
-      lead.interest ? `Interest: ${LEAD_INTEREST_LABEL[lead.interest] ?? lead.interest}` : null,
-      lead.isDecisionMaker === true ? "Decision maker: yes" : lead.isDecisionMaker === false ? "Decision maker: no" : null,
-    ]
-      .filter(Boolean)
-      .join(" · "),
-    lead.painPoints ? `Pain points: ${lead.painPoints}` : null,
-    lead.objections ? `Objections: ${lead.objections}` : null,
-    lead.nextStep ? `Next step: ${[lead.nextStepAt ? day(lead.nextStepAt) : null, lead.nextStep].filter(Boolean).join(" · ")}` : null,
-    lead.notes ? `Notes: ${lead.notes}` : null,
-    lead.phoneCalls.length
-      ? `Calls:\n${lead.phoneCalls
-          .map((c) => `- ${day(c.startedAt)} · ${CALL_OUTCOME_LABEL[c.outcome ?? ""] ?? "Call"}${c.user ? ` (${c.user.name})` : ""}${c.summary ? `: ${c.summary}` : ""}`)
-          .join("\n")}`
-      : null,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+  const history = leadHistoryNote(lead, lead.phoneCalls, `by ${user.name}`);
 
   const deal = await prisma.$transaction(async (tx) => {
     const client =

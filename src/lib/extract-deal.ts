@@ -6,6 +6,9 @@ export function isExtractionConfigured(): boolean {
 
 const FIELD_META: Record<string, { label: string; groupLabel: string }> = {
   clientName: { label: "Client", groupLabel: "Client & engagement" },
+  // Not a contract placeholder: a deal made from a phone call needs it to
+  // send the contract, so it's asked for when the call didn't give one.
+  clientEmail: { label: "Client email", groupLabel: "Client & engagement" },
   service: { label: "Service", groupLabel: "Client & engagement" },
   startDate: { label: "Start date", groupLabel: "Client & engagement" },
   duration: { label: "Duration", groupLabel: "Client & engagement" },

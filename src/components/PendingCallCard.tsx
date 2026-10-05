@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 type LeadOption = { id: string; name: string; detail: string };
+type TemplateOption = { id: string; name: string };
 type PendingCall = {
   id: string;
   status: string; // pending | processing | failed
@@ -23,12 +24,14 @@ const MATCHES_SHOWN = 8;
 export default function PendingCallCard({
   call,
   leads,
+  templates,
   processAction,
   discardAction,
 }: {
   call: PendingCall;
   leads: LeadOption[];
-  processAction: (input: { leadId: string; mode: string }) => Promise<void>;
+  templates: TemplateOption[];
+  processAction: (input: { leadId: string; mode: string; templateId?: string | null }) => Promise<void>;
   discardAction: () => Promise<void>;
 }) {
   const router = useRouter();
@@ -36,6 +39,7 @@ export default function PendingCallCard({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState("cold");
+  const [templateId, setTemplateId] = useState("");
   const [showAll, setShowAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -142,18 +146,29 @@ export default function PendingCallCard({
               <label className="mb-1 block text-[12px]" style={{ color: "var(--ink-muted)" }}>Kind</label>
               <select value={mode} onChange={(e) => setMode(e.target.value)} className="input" aria-label="Kind of call">
                 <option value="cold">Cold call</option>
-                <option value="sales" disabled>Sales call (coming soon)</option>
+                <option value="sales">Sales call</option>
               </select>
             </div>
+            {mode === "sales" && (
+              <div>
+                <label className="mb-1 block text-[12px]" style={{ color: "var(--ink-muted)" }}>Contract template</label>
+                <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} className="input" aria-label="Contract template">
+                  <option value="">Let SealMe pick</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               disabled={pending || !leadId}
-              onClick={() => run(() => processAction({ leadId, mode }))}
+              onClick={() => run(() => processAction({ leadId, mode, templateId: mode === "sales" ? templateId || null : null }))}
               className="btn btn-primary btn-sm"
             >
-              {pending ? "Working…" : call.status === "failed" ? "Process again" : "Process"}
+              {pending ? "Working…" : call.status === "failed" ? "Process again" : mode === "sales" ? "Process and draft the contract" : "Process"}
             </button>
             <button type="button" disabled={pending} onClick={() => run(discardAction)} className="btn btn-secondary btn-sm">
               Discard
