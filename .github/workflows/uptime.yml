@@ -1,0 +1,38 @@
+# Checks app.sealme.net every 5 minutes. A run fails (and GitHub emails
+# whoever last changed this schedule) when the health check doesn't answer
+# 200 three times in a row, half a minute apart. If the repo goes private,
+# scheduled runs count against the free Actions minutes; every 5 minutes is
+# more than the free plan covers, so slow it to every 30 minutes then.
+name: Uptime
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: app.sealme.net/api/health
+        run: |
+          for attempt in 1 2 3; do
+            code=$(curl -s -o body.json -w "%{http_code}" --max-time 20 https://app.sealme.net/api/health || echo 000)
+            if [ "$code" = "200" ] && grep -q '"status":"ok"' body.json; then
+              cat body.json
+              exit 0
+            fi
+            echo "Attempt $attempt: HTTP $code $(cat body.json 2>/dev/null)"
+            [ "$attempt" -lt 3 ] && sleep 30
+          done
+          echo "::error::app.sealme.net is down or can't reach its database"
+          exit 1
+      - name: Sign-in page
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 https://app.sealme.net/login || echo 000)
+          echo "HTTP $code"
+          [ "$code" = "200" ] || { echo "::error::The sign-in page answered $code"; exit 1; }
