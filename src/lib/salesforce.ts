@@ -300,6 +300,12 @@ export async function syncDealToSalesforce(workspaceId: string, dealId: string):
   }
 }
 
+// A write against the org's REST API (call logging, lead status), with the
+// same token refresh as everything else here.
+export async function salesforceRequest(workspaceId: string, path: string, init: RequestInit): Promise<Response> {
+  return sfFetch(workspaceId, path, init);
+}
+
 // Read-only GET against the org's REST API (lead import, picklists).
 export async function salesforceGet<T>(workspaceId: string, path: string): Promise<T> {
   const res = await sfFetch(workspaceId, path);

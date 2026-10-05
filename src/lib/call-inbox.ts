@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { applyColdCall } from "@/lib/cold-call";
 import { INPUT_USD_PER_MTOK, OUTPUT_USD_PER_MTOK } from "@/lib/extract-cold-call";
 import { reportError } from "@/lib/error-report";
+import { pushCallToCrm } from "@/lib/crm-call-sync";
 
 // Calls shorter than this aren't worth a model call: nobody picked up, or
 // the line dropped.
@@ -75,7 +76,10 @@ export async function runCallProcessing(callId: string, timeZone: string, option
   } catch (err) {
     await prisma.phoneCall.update({ where: { id: callId }, data: { status: "failed" } }).catch(() => {});
     await reportError(err, "Call processing", { callId, workspaceId: call.workspaceId });
+    return;
   }
+  // Outside the try: a CRM hiccup must never mark a processed call failed.
+  await pushCallToCrm(callId);
 }
 
 // For the daily cron: calls left unprocessed for a day are dropped, and

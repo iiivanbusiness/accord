@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireProspecting } from "@/lib/prospecting";
@@ -7,6 +8,7 @@ import { leadAccess } from "@/lib/lead-visibility";
 import { isExtractionConfigured } from "@/lib/extract-deal";
 import { applyColdCall, type ColdCallSummary } from "@/lib/cold-call";
 import { cookieTimeZone } from "@/lib/viewer-time";
+import { pushCallToCrm } from "@/lib/crm-call-sync";
 
 const MIN_WORDS = 15;
 const MAX_CHARS = 100_000;
@@ -25,6 +27,7 @@ export async function processColdCallTranscript(leadId: string, transcript: stri
   if (!lead) throw new Error("Lead not found");
 
   const result = await applyColdCall({ workspaceId: workspace.id, userId: access.userId, lead, transcript: text, timeZone: await cookieTimeZone() });
+  after(() => pushCallToCrm(result.callId));
 
   revalidatePath(`/leads/${lead.id}`);
   revalidatePath("/leads");

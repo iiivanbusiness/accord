@@ -21,6 +21,7 @@ export type ColdCallSummary = {
   closedTask: string | null; // the kind of task it marked done
   followUp: { type: string; date: string; time: string | null } | null;
   costUsd: number;
+  callId: string; // the saved call, for logging it to the lead's CRM
 };
 
 type ApplyColdCall = {
@@ -85,7 +86,7 @@ export async function applyColdCall({ workspaceId, userId, lead, transcript, tim
     processedAt: now,
   };
 
-  await prisma.$transaction([
+  const [savedCall] = await prisma.$transaction([
     phoneCallId
       ? prisma.phoneCall.update({ where: { id: phoneCallId }, data: callData })
       : prisma.phoneCall.create({ data: { ...callData, workspaceId, userId, source, startedAt: now } }),
@@ -131,5 +132,5 @@ export async function applyColdCall({ workspaceId, userId, lead, transcript, tim
       : []),
   ]);
 
-  return { outcome: result.outcome, stage, closedTask: closable?.type ?? null, followUp, costUsd: result.usage.costUsd };
+  return { outcome: result.outcome, stage, closedTask: closable?.type ?? null, followUp, costUsd: result.usage.costUsd, callId: savedCall.id };
 }

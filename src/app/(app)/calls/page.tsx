@@ -59,6 +59,8 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
             sttSeconds: true,
             aiInputTokens: true,
             aiOutputTokens: true,
+            hubspotCallId: true,
+            salesforceTaskId: true,
             startedAt: true,
             lead: { select: { id: true, name: true, company: true } },
             user: { select: { name: true } },
@@ -169,6 +171,11 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
                     </span>
                   </div>
                   {c.summary && <div className="text-[13px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>{c.summary}</div>}
+                  {(c.hubspotCallId || c.salesforceTaskId) && (
+                    <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
+                      Logged in {[c.hubspotCallId ? "HubSpot" : null, c.salesforceTaskId ? "Salesforce" : null].filter(Boolean).join(" and ")}
+                    </div>
+                  )}
                   {c.status === "skipped" && c.lead && c.transcript && c.mode === "cold" && (
                     <div>
                       <ProcessAnywayButton action={processCall.bind(null, c.id, { leadId: c.lead.id, mode: c.mode, force: true })} />
