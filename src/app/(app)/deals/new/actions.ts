@@ -12,6 +12,8 @@ import { syncDealToHubspot } from "@/lib/hubspot";
 import { syncDealToSalesforce } from "@/lib/salesforce";
 import { reportError } from "@/lib/error-report";
 import { createDealFromTranscriptText, finishTranscriptDealInBackground, type TranscriptDeal } from "@/lib/transcript-deal";
+import { extractPlaceholderKeys } from "@/lib/contract";
+import { fieldMeta } from "@/lib/extract-deal";
 
 export async function createDeal(formData: FormData) {
   const clientName = String(formData.get("clientName") ?? "").trim();
@@ -28,6 +30,14 @@ export async function createDeal(formData: FormData) {
   const [workspace, user] = await Promise.all([requireWorkspace(), currentUserWithRole()]);
   const workspaceId = workspace.id;
 
+  // Whatever else the template fills in (a start date, say) isn't on this
+  // form, so it's asked for on the deal instead of showing up in the
+  // contract as "{startDate}".
+  const template = templateId ? await prisma.contractTemplate.findFirst({ where: { id: templateId, workspaceId }, select: { clauses: true } }) : null;
+  const given = ["clientName", "service", "fee"];
+  const asked = (template ? extractPlaceholderKeys(template.clauses) : []).filter((key) => !given.includes(key));
+  const extraFields = asked.map((fieldKey, i) => ({ ...fieldMeta(fieldKey), fieldKey, value: null, status: "missing", orderIndex: 3 + i }));
+
   const client = await prisma.client.create({
     data: { workspaceId, name: clientName, company, email },
   });
@@ -41,13 +51,15 @@ export async function createDeal(formData: FormData) {
       teamId: user.teamId,
       service,
       feeDisplay,
-      status: "ready",
+      status: extraFields.length ? "missing_info" : "ready",
       source: "upload",
       fields: {
         create: [
-          { groupLabel: "Client & engagement", label: "Client", fieldKey: "clientName", value: clientName, status: "confirmed", orderIndex: 0 },
+          // The contract is with the company when one was given.
+          { groupLabel: "Client & engagement", label: "Client", fieldKey: "clientName", value: company, status: "confirmed", orderIndex: 0 },
           { groupLabel: "Client & engagement", label: "Service", fieldKey: "service", value: service, status: "confirmed", orderIndex: 1 },
           { groupLabel: "Commercial terms", label: "Fee", fieldKey: "fee", value: feeDisplay, status: "confirmed", orderIndex: 2 },
+          ...extraFields,
         ],
       },
     },

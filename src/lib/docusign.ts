@@ -94,7 +94,21 @@ async function getValidAccessToken(workspaceId: string): Promise<{ accessToken: 
     return { accessToken: workspace.docusignAccessToken, baseUri: workspace.docusignBaseUri, accountId: workspace.docusignAccountId };
   }
 
-  const refreshed = await requestToken(new URLSearchParams({ grant_type: "refresh_token", refresh_token: workspace.docusignRefreshToken }));
+  let refreshed: DocusignTokenResponse;
+  try {
+    refreshed = await requestToken(new URLSearchParams({ grant_type: "refresh_token", refresh_token: workspace.docusignRefreshToken }));
+  } catch (err) {
+    // DocuSign drops a connection nobody used for 30 days (invalid_grant).
+    // Clear it so Settings offers Connect again, and say what to do.
+    if (err instanceof Error && err.message.includes("invalid_grant")) {
+      await prisma.workspace.update({
+        where: { id: workspaceId },
+        data: { docusignEnabled: false, docusignAccessToken: null, docusignRefreshToken: null, docusignTokenExpiresAt: null },
+      });
+      throw new Error(DOCUSIGN_EXPIRED);
+    }
+    throw err;
+  }
   await prisma.workspace.update({
     where: { id: workspaceId },
     // DocuSign hands back a new refresh token too; the old one only lasts
@@ -106,6 +120,32 @@ async function getValidAccessToken(workspaceId: string): Promise<{ accessToken: 
     },
   });
   return { accessToken: refreshed.access_token, baseUri: workspace.docusignBaseUri, accountId: workspace.docusignAccountId };
+}
+
+export const DOCUSIGN_EXPIRED = "Your DocuSign connection expired. Reconnect DocuSign in Settings, then send again";
+
+// DocuSign refresh tokens last 30 days, and each refresh hands out a new
+// one. The daily cron refreshes connections that haven't been used in 20
+// days, so a workspace that rarely sends through DocuSign stays connected.
+export async function keepDocusignConnectionsAlive(): Promise<number> {
+  // The access token lasts 8 hours from each refresh, so its expiry says
+  // when the connection was last refreshed.
+  const stale = await prisma.workspace.findMany({
+    where: { docusignRefreshToken: { not: null }, OR: [{ docusignTokenExpiresAt: null }, { docusignTokenExpiresAt: { lt: new Date(Date.now() - 20 * 86_400_000) } }] },
+    select: { id: true },
+    take: 200,
+  });
+  let refreshed = 0;
+  for (const w of stale) {
+    await prisma.workspace.update({ where: { id: w.id }, data: { docusignTokenExpiresAt: null } });
+    try {
+      await getValidAccessToken(w.id);
+      refreshed++;
+    } catch {
+      // Expired already: getValidAccessToken cleared it for reconnecting.
+    }
+  }
+  return refreshed;
 }
 
 export type EnvelopeSigner = { name: string; email: string; routingOrder: number; anchor: string };

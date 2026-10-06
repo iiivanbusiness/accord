@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { discardStaleCalls, fillTelnyxCosts } from "@/lib/call-inbox";
 import { syncPendingDocusignContracts } from "@/lib/docusign-sync";
+import { keepDocusignConnectionsAlive } from "@/lib/docusign";
 import { prisma } from "@/lib/db";
 import { sendAdminAlertEmail, sendRenewalReminderEmail, sendReviewOverdueEmail } from "@/lib/email";
 import { createNotification } from "@/lib/notifications";
@@ -188,9 +189,9 @@ export async function GET(req: Request) {
     }
 
     // DocuSign contracts whose "completed" event never arrived.
-    let docusign = { signed: 0 };
+    let docusign = { signed: 0, refreshed: 0 };
     try {
-      docusign = { signed: await syncPendingDocusignContracts() };
+      docusign = { signed: await syncPendingDocusignContracts(), refreshed: await keepDocusignConnectionsAlive() };
     } catch (err) {
       console.error("DocuSign status check (piggybacked on renewals cron) crashed", err);
       await reportError(err, "DocuSign status check");
