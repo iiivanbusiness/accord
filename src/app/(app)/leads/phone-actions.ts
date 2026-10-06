@@ -20,10 +20,11 @@ export type CallPlan =
 // lead, it notes that the rep is about to call them, so the call that
 // reaches the SealMe number from the rep's phone in the next few minutes
 // is tied to this lead; otherwise the rep just calls the client.
-export async function startLeadCall(leadId: string, input: { mode: string; templateId?: string | null }): Promise<CallPlan> {
+export async function startLeadCall(leadId: string, input: { mode?: string; templateId?: string | null } = {}): Promise<CallPlan> {
   const workspace = await requireProspecting();
   const access = await leadAccess();
-  if (input.mode !== "cold" && input.mode !== "sales") return { kind: "error", error: "Pick what kind of call it is" };
+  // Nobody has to say what kind of call it is: SealMe tells from the call.
+  const mode = input.mode === "cold" || input.mode === "sales" ? input.mode : "auto";
 
   const lead = await prisma.lead.findFirst({ where: { id: leadId, workspaceId: workspace.id, AND: [access.where] }, select: { id: true, phone: true } });
   if (!lead) return { kind: "error", error: "Lead not found" };
@@ -39,7 +40,7 @@ export async function startLeadCall(leadId: string, input: { mode: string; templ
   if (!me?.phone) return { kind: "error", error: "Add your phone number in Settings first, so SealMe knows the call is yours" };
 
   let templateId: string | null = null;
-  if (input.mode === "sales" && input.templateId) {
+  if (mode === "sales" && input.templateId) {
     const template = await prisma.contractTemplate.findFirst({ where: { id: input.templateId, workspaceId: workspace.id }, select: { id: true } });
     if (!template) return { kind: "error", error: "That template isn't in this workspace" };
     templateId = template.id;
@@ -48,7 +49,7 @@ export async function startLeadCall(leadId: string, input: { mode: string; templ
   // Only the latest tap counts.
   await prisma.callIntent.updateMany({ where: { userId: access.userId, usedAt: null, expiresAt: { gt: new Date() } }, data: { expiresAt: new Date() } });
   await prisma.callIntent.create({
-    data: { workspaceId: workspace.id, userId: access.userId, leadId: lead.id, mode: input.mode, templateId, expiresAt: new Date(Date.now() + INTENT_MINUTES * 60 * 1000) },
+    data: { workspaceId: workspace.id, userId: access.userId, leadId: lead.id, mode, templateId, expiresAt: new Date(Date.now() + INTENT_MINUTES * 60 * 1000) },
   });
   return { kind: "sealme", dial: number, leadPhone: lead.phone, announce, state: consent.state };
 }

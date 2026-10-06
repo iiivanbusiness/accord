@@ -6,6 +6,9 @@ import { pushCallToCrm } from "@/lib/crm-call-sync";
 import { applySalesCall } from "@/lib/sales-call";
 import { deleteRecording, recordingDownload } from "@/lib/telnyx";
 import { RECORDING_LISTEN_PARAMS, transcriptFromListenResponse } from "@/lib/recording-transcript";
+import { classifyCallKind } from "@/lib/call-kind";
+import { createNotification } from "@/lib/notifications";
+import { isValidTimeZone } from "@/lib/tasks";
 
 // Calls shorter than this aren't worth a model call: nobody picked up, or
 // the line dropped.
@@ -55,13 +58,14 @@ export function callCostUsd(call: { sttSeconds: number | null; aiInputTokens: nu
   return stt + ai;
 }
 
-// Runs in the background after someone clicks Process: the call is already
-// marked processing with its lead and kind. Short calls and one-voice calls
-// are set aside without a model call; anything that throws is marked failed
-// so it can be retried from the inbox. force runs the model even on a call
-// that would be set aside ("Process anyway", when the speaker split was
-// wrong).
-export async function runCallProcessing(callId: string, timeZone: string, options: { force?: boolean } = {}): Promise<void> {
+// Runs in the background after someone clicks Process, or by itself once a
+// phone call's recording is in (auto): the call is already marked
+// processing with its lead. Short calls and one-voice calls are set aside
+// without a model call; anything that throws is marked failed so it can be
+// retried from the inbox. force runs the model even on a call that would be
+// set aside ("Process anyway", when the speaker split was wrong). A call
+// whose kind nobody picked is sorted into cold or sales from what was said.
+export async function runCallProcessing(callId: string, timeZone: string, options: { force?: boolean; auto?: boolean } = {}): Promise<void> {
   let call = await prisma.phoneCall.findUnique({ where: { id: callId }, include: { lead: true } });
   if (!call || call.status !== "processing") return;
   try {
@@ -80,18 +84,37 @@ export async function runCallProcessing(callId: string, timeZone: string, option
       });
       return;
     }
-    if (!call.lead || !call.userId || !call.transcript) throw new Error("This call has no lead, rep or transcript");
-    if (call.mode === "sales") {
-      await applySalesCall(call.id);
+    const { lead, userId, transcript } = call;
+    if (!lead || !userId || !transcript) throw new Error("This call has no lead, rep or transcript");
+    let mode = call.mode;
+    let sorted: { inputTokens: number; outputTokens: number } | null = null;
+    if (mode !== "cold" && mode !== "sales") {
+      const { kind, ...usage } = await classifyCallKind(transcript);
+      await prisma.phoneCall.update({ where: { id: callId }, data: { mode: kind } });
+      mode = kind;
+      sorted = usage;
+    }
+    if (mode === "sales") {
+      // SealMe decided this was a sales call: the contract waits for the rep.
+      await applySalesCall(call.id, { draftOnly: Boolean(sorted) });
     } else {
-      if (call.mode !== "cold") throw new Error(`Calls of kind "${call.mode}" can't be processed`);
-      await applyColdCall({
-        workspaceId: call.workspaceId,
-        userId: call.userId,
-        lead: call.lead,
-        transcript: call.transcript,
-        timeZone,
-        phoneCallId: call.id,
+      await applyColdCall({ workspaceId: call.workspaceId, userId, lead, transcript, timeZone, phoneCallId: call.id });
+      if (options.auto) {
+        await createNotification({
+          workspaceId: call.workspaceId,
+          userId,
+          type: "call.saved",
+          title: `Notes from your call with ${lead.name} are saved`,
+          body: "Check them, and fix anything SealMe heard wrong.",
+          linkUrl: `/leads/${lead.id}`,
+        }).catch((err) => reportError(err, "Call saved notification", { callId }));
+      }
+    }
+    if (sorted) {
+      const used = await prisma.phoneCall.findUnique({ where: { id: callId }, select: { aiInputTokens: true, aiOutputTokens: true } });
+      await prisma.phoneCall.update({
+        where: { id: callId },
+        data: { aiInputTokens: (used?.aiInputTokens ?? 0) + sorted.inputTokens, aiOutputTokens: (used?.aiOutputTokens ?? 0) + sorted.outputTokens },
       });
     }
   } catch (err) {
@@ -103,7 +126,18 @@ export async function runCallProcessing(callId: string, timeZone: string, option
   await pushCallToCrm(callId);
 }
 
-// A phone call's recording is transcribed only once someone asks for it
+// A phone call's notes are written as soon as its recording is in: no
+// Process click. Runs after the Telnyx webhook has answered.
+export async function processPhoneCallAutomatically(callId: string): Promise<void> {
+  const call = await prisma.phoneCall.findUnique({ where: { id: callId }, select: { leadId: true, user: { select: { timezone: true } } } });
+  if (!call?.leadId) return;
+  const { count } = await prisma.phoneCall.updateMany({ where: { id: callId, status: "pending" }, data: { status: "processing" } });
+  if (count === 0) return;
+  const tz = call.user?.timezone && isValidTimeZone(call.user.timezone) ? call.user.timezone : "America/New_York";
+  await runCallProcessing(callId, tz, { auto: true });
+}
+
+// A phone call's recording is transcribed only once it's processed
 // (Process), and then dropped at Telnyx: SealMe keeps the transcript, not
 // the audio.
 async function transcribePhoneRecording(callId: string, recordingId: string, durationSec: number | null): Promise<{ transcript: string; sttSeconds: number; durationSec: number | null; telnyxRecordingId: string | null }> {

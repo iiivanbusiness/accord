@@ -1239,7 +1239,7 @@ model PhoneCall {
   dealId String?
   deal   Deal?   @relation(fields: [dealId], references: [id], onDelete: SetNull)
 
-  mode   String @default("unknown") // cold | sales | unknown
+  mode   String @default("unknown") // cold | sales | unknown | auto (sorted from the transcript when processed)
   status String @default("recording") // recording | pending | processing | processed | discarded | failed | skipped
   source String @default("phone") // phone | paste (a transcript pasted on the lead page) | desktop
   // What happened, from the transcript: meeting_booked | interested | follow_up
@@ -1295,7 +1295,7 @@ model CallIntent {
   leadId      String?
   lead        Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
-  mode       String // cold | sales
+  mode       String // auto (SealMe decides from the call) | cold | sales
   templateId String?
   expiresAt  DateTime
   usedAt     DateTime?

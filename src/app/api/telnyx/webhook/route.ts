@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { verifyTelnyxSignature, type TelnyxEvent } from "@/lib/telnyx";
 import { handleTelnyxEvent } from "@/lib/telnyx-calls";
+import { processPhoneCallAutomatically } from "@/lib/call-inbox";
 import { reportError } from "@/lib/error-report";
 
 // Telnyx calls this for every event on the SealMe number's Voice API app
@@ -8,6 +9,10 @@ import { reportError } from "@/lib/error-report";
 // see telnyx-calls.ts for what each one does.
 // Fails closed: without the account's public key there's no telling a real
 // event from anyone who found this URL.
+
+// A finished call is transcribed and written up after the response.
+export const maxDuration = 300;
+
 export async function POST(req: Request) {
   const body = await req.text();
 
@@ -35,7 +40,8 @@ export async function POST(req: Request) {
   // A failure is reported, not retried; a resent event could repeat a
   // command that already went through.
   try {
-    await handleTelnyxEvent(event);
+    const { processCallId } = await handleTelnyxEvent(event);
+    if (processCallId) after(() => processPhoneCallAutomatically(processCallId));
   } catch (err) {
     await reportError(err, "Telnyx event", { event: event.data?.event_type ?? "unknown", callControlId: event.data?.payload?.call_control_id ?? null });
   }

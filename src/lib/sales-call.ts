@@ -43,8 +43,10 @@ export async function suggestTemplateId(transcript: string, templates: TemplateO
 // A processed sales call from the Calls inbox: the lead becomes a client and
 // a deal on the call's template, with the contract drafted (or sent, when
 // the workspace doesn't require approval and nothing is missing), and the
-// rep hears about it in the app and by email.
-export async function applySalesCall(callId: string): Promise<void> {
+// rep hears about it in the app and by email. draftOnly: SealMe itself
+// decided this was a sales call, so the contract waits for the rep
+// whatever the workspace allows.
+export async function applySalesCall(callId: string, options: { draftOnly?: boolean } = {}): Promise<void> {
   const call = await prisma.phoneCall.findUniqueOrThrow({
     where: { id: callId },
     include: {
@@ -92,7 +94,7 @@ export async function applySalesCall(callId: string): Promise<void> {
   // the workspace lets complete deals send on their own.
   let sent = false;
   if (!made.hasMissing) {
-    if (!workspace.requireApproval) sent = await autoGenerateAndSendContract(made.dealId);
+    if (!workspace.requireApproval && !options.draftOnly) sent = await autoGenerateAndSendContract(made.dealId);
     if (!sent) await prisma.contract.upsert({ where: { dealId: made.dealId }, create: { dealId: made.dealId, templateId, status: "draft" }, update: {} });
   }
   await tellRep({ workspaceId: workspace.id, user, dealId: made.dealId, clientName: made.clientName, hasMissing: made.hasMissing, sent });

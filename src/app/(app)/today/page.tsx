@@ -7,6 +7,8 @@ import { formatPhone } from "@/lib/phone";
 import { STATUS_CHIP, STATUS_LABEL } from "@/lib/deal-status";
 import { formatTaskDue, TASK_TYPE_LABEL } from "@/lib/tasks";
 import TodayTaskRow, { type TodayTask } from "@/components/TodayTaskRow";
+import LeadCallButton from "@/components/LeadCallButton";
+import { CALL_OUTCOME_CHIP, CALL_OUTCOME_LABEL } from "@/lib/call-outcomes";
 import TaskDigestToggle from "@/components/TaskDigestToggle";
 import { setTaskStatus } from "../leads/task-actions";
 import { startLeadCall } from "../leads/phone-actions";
@@ -24,7 +26,16 @@ type TaskRow = {
   dueTime: string | null;
   priority: string;
   note: string | null;
-  lead: { id: string; name: string; company: string | null; title: string | null; phone: string | null } | null;
+  lead: {
+    id: string;
+    name: string;
+    company: string | null;
+    title: string | null;
+    phone: string | null;
+    summary: string | null;
+    objections: string | null;
+    isDecisionMaker: boolean | null;
+  } | null;
 };
 
 const byPriority = (a: TaskRow, b: TaskRow) => (PRIORITY_RANK[a.priority] ?? 2) - (PRIORITY_RANK[b.priority] ?? 2);
@@ -73,7 +84,7 @@ export default async function TodayPage() {
     dueTime: true,
     priority: true,
     note: true,
-    lead: { select: { id: true, name: true, company: true, title: true, phone: true } },
+    lead: { select: { id: true, name: true, company: true, title: true, phone: true, summary: true, objections: true, isDecisionMaker: true } },
   } as const;
 
   const delegations = await prisma.approvalDelegate.findMany({
@@ -82,7 +93,8 @@ export default async function TodayPage() {
   });
   const reviewerIds = [user.id, ...delegations.map((d) => d.fromUserId)];
 
-  const [open, finished, myDeals, pendingSteps] = await Promise.all([
+  const dayStart = startOfDayInZone(now, tz);
+  const [open, finished, myDeals, pendingSteps, justSaved, callsToCheck, meetings] = await Promise.all([
     prisma.task.findMany({
       where: { workspaceId: workspace.id, assigneeId: user.id, status: "open", dueDate: { lt: horizon } },
       select: taskSelect,
@@ -116,6 +128,19 @@ export default async function TodayPage() {
       },
       take: 40,
     }),
+    // The call SealMe just wrote up, so the rep sees what went on the lead.
+    prisma.phoneCall.findFirst({
+      where: { workspaceId: workspace.id, userId: user.id, status: "processed", processedAt: { gte: new Date(now.getTime() - 2 * 60 * 60 * 1000) } },
+      orderBy: { processedAt: "desc" },
+      select: { id: true, mode: true, outcome: true, summary: true, dealId: true, lead: { select: { id: true, name: true } } },
+    }),
+    prisma.phoneCall.count({ where: { workspaceId: workspace.id, userId: user.id, status: { in: ["pending", "failed"] } } }),
+    prisma.calendarEvent.findMany({
+      where: { workspaceId: workspace.id, startTime: { gte: new Date(Math.max(now.getTime() - 60 * 60 * 1000, dayStart.getTime())), lt: new Date(dayStart.getTime() + DAY) } },
+      orderBy: { startTime: "asc" },
+      select: { id: true, title: true, startTime: true },
+      take: 3,
+    }),
   ]);
 
   const overdue = open.filter((t) => t.dueDate < todayDate).sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime() || byPriority(a, b));
@@ -124,6 +149,19 @@ export default async function TodayPage() {
   const salesCalls = dueToday.filter((t) => t.type === "sales_call").sort(byTime);
   const followUps = dueToday.filter((t) => t.type !== "cold_call" && t.type !== "sales_call").sort((a, b) => byTime(a, b) || byPriority(a, b));
   const upcoming = open.filter((t) => t.dueDate >= tomorrowDate);
+
+  // Next up: anything overdue, then what's due within half an hour, then
+  // today's untimed tasks by priority, then the rest of today in time order.
+  const clock = (d: Date) => new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: tz }).format(d);
+  const soon = clock(new Date(now.getTime() + 30 * 60 * 1000));
+  const next =
+    [
+      ...overdue,
+      ...dueToday.filter((t) => t.dueTime && t.dueTime <= soon).sort(byTime),
+      ...dueToday.filter((t) => !t.dueTime).sort(byPriority),
+      ...dueToday.filter((t) => t.dueTime && t.dueTime > soon).sort(byTime),
+    ][0] ?? null;
+  const notNext = (t: TaskRow) => t.id !== next?.id;
 
   // Only the step that's actually up: later steps in a chain wait their turn.
   const approvals = pendingSteps.filter((s) => s.contract.reviewSteps[0]?.id === s.id).map((s) => s.contract.deal);
@@ -169,59 +207,77 @@ export default async function TodayPage() {
         </Link>
       </div>
 
-      {/* Phones are for cold calling, so those come right after anything
-          overdue; on a computer, sales calls and contracts lead. */}
       <div className="flex flex-col gap-4">
-        {overdue.length > 0 && (
-          <Section title="Overdue" count={overdue.length} tone="warn" className="order-1">
-            {rows(overdue, (t) => formatTaskDue(t.dueDate, t.dueTime), { overdue: true, showType: true })}
-          </Section>
+        {next && <NextUp task={next} overdue={next.dueDate < todayDate} />}
+
+        {justSaved?.lead && (
+          <div className="card flex flex-col gap-2 px-4 py-3.5 sm:px-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[12px] font-medium" style={{ color: "var(--ink-muted)", letterSpacing: "0.4px" }}>JUST SAVED</span>
+              {justSaved.mode === "sales" ? (
+                <span className="chip chip-success">Deal created</span>
+              ) : (
+                justSaved.outcome && <span className={`chip ${CALL_OUTCOME_CHIP[justSaved.outcome] ?? "chip-neutral"}`}>{CALL_OUTCOME_LABEL[justSaved.outcome] ?? justSaved.outcome}</span>
+              )}
+            </div>
+            <div className="text-[14px] font-medium">Your call with {justSaved.lead.name}</div>
+            {justSaved.summary && <div className="line-clamp-3 break-words text-[13px]" style={{ color: "var(--ink-muted)" }}>{justSaved.summary}</div>}
+            <Link href={justSaved.mode === "sales" && justSaved.dealId ? `/deals/${justSaved.dealId}` : `/leads/${justSaved.lead.id}`} className="w-fit text-[13px] font-medium" style={{ color: "var(--accent-blue)" }}>
+              {justSaved.mode === "sales" ? "Check the deal →" : "Check or fix the notes →"}
+            </Link>
+          </div>
         )}
 
-        {coldCalls.length > 0 && (
-          <Section title="Cold calls" count={coldCalls.length} className="order-2 md:order-4">
-            {rows(coldCalls, (t) => t.dueTime ?? "")}
-          </Section>
-        )}
-
-        {salesCalls.length > 0 && (
-          <Section title="Sales calls" count={salesCalls.length} className="order-3 md:order-2">
-            {rows(salesCalls, (t) => t.dueTime ?? "Any time")}
-          </Section>
-        )}
-
-        {contractCount > 0 && (
-          <Section title="Contracts" count={contractCount} className="order-5 md:order-3">
+        {(callsToCheck > 0 || meetings.length > 0 || contractCount > 0) && (
+          <Section title="Waiting on you" count={callsToCheck + meetings.length + contractCount}>
+            {callsToCheck > 0 && (
+              <WaitingRow href="/calls" title={callsToCheck === 1 ? "1 call needs a look" : `${callsToCheck} calls need a look`} detail="Pick who it was with, or try again" />
+            )}
+            {meetings.map((m) => (
+              <WaitingRow
+                key={m.id}
+                href="/calendar"
+                title={`Meeting at ${new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: tz }).format(m.startTime)}`}
+                detail={m.title}
+              />
+            ))}
             {contractItems.slice(0, CONTRACTS_SHOWN).map((d, i) => (
-              <Link
-                key={`${d.id}-${i}`}
-                href={`/deals/${d.id}`}
-                className="row-hover flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5"
-                style={i ? { borderTop: "1px solid var(--hairline-soft)" } : undefined}
-              >
-                <div className="min-w-0">
-                  <div className="truncate text-[14px] font-medium" style={{ color: "var(--ink)" }}>{d.client.name}</div>
-                  <div className="truncate text-[12.5px]" style={{ color: "var(--ink-muted)" }}>{d.service}</div>
-                </div>
-                <span className={`chip flex-none whitespace-nowrap ${d.chip}`}>{d.label}</span>
-              </Link>
+              <WaitingRow key={`${d.id}-${i}`} href={`/deals/${d.id}`} title={d.client.name} detail={d.service} chip={{ label: d.label, cls: d.chip }} />
             ))}
             {contractCount > CONTRACTS_SHOWN && (
               <Link href="/deals" className="block px-4 py-3 text-[13px] font-medium sm:px-5" style={{ borderTop: "1px solid var(--hairline-soft)", color: "var(--accent-blue)" }}>
-                {plural(contractCount - CONTRACTS_SHOWN, "more", "more")} in Deals
+                {plural(contractCount - CONTRACTS_SHOWN, "more contract", "more contracts")} in Deals
               </Link>
             )}
           </Section>
         )}
 
-        {followUps.length > 0 && (
-          <Section title="Follow-ups and other" count={followUps.length} className="order-4 md:order-5">
-            {rows(followUps, (t) => t.dueTime ?? "", { showType: true })}
+        {overdue.filter(notNext).length > 0 && (
+          <Section title="Overdue" count={overdue.filter(notNext).length} tone="warn">
+            {rows(overdue.filter(notNext), (t) => formatTaskDue(t.dueDate, t.dueTime), { overdue: true, showType: true })}
           </Section>
         )}
 
-        {left === 0 && contractCount === 0 && (
-          <div className="card order-1 flex flex-col items-start gap-2 p-6">
+        {coldCalls.filter(notNext).length > 0 && (
+          <Section title="Cold calls" count={coldCalls.filter(notNext).length}>
+            {rows(coldCalls.filter(notNext), (t) => t.dueTime ?? "")}
+          </Section>
+        )}
+
+        {salesCalls.filter(notNext).length > 0 && (
+          <Section title="Sales calls" count={salesCalls.filter(notNext).length}>
+            {rows(salesCalls.filter(notNext), (t) => t.dueTime ?? "Any time")}
+          </Section>
+        )}
+
+        {followUps.filter(notNext).length > 0 && (
+          <Section title="Follow-ups and other" count={followUps.filter(notNext).length}>
+            {rows(followUps.filter(notNext), (t) => t.dueTime ?? "", { showType: true })}
+          </Section>
+        )}
+
+        {!next && contractCount === 0 && callsToCheck === 0 && (
+          <div className="card flex flex-col items-start gap-2 p-6">
             <div className="text-[14.5px] font-medium">{done > 0 ? "All done for today" : "Nothing due today"}</div>
             <div className="text-[13px]" style={{ color: "var(--ink-muted)" }}>
               {upcoming.length > 0 ? "Your next tasks are below." : "Calls and follow-ups assigned to you will show up here on the day they're due."}
@@ -230,7 +286,7 @@ export default async function TodayPage() {
         )}
 
         {upcomingDays.size > 0 && (
-          <Section title="Coming up" count={upcoming.length} className="order-6">
+          <Section title="Coming up" count={upcoming.length}>
             {[...upcomingDays.entries()].map(([day, tasks], i) => {
               const kinds = new Map<string, number>();
               for (const t of tasks) kinds.set(t.type, (kinds.get(t.type) ?? 0) + 1);
@@ -248,7 +304,7 @@ export default async function TodayPage() {
         )}
 
         {finished.length > 0 && (
-          <details className="card order-7 overflow-hidden">
+          <details className="card overflow-hidden">
             <summary className="flex cursor-pointer select-none items-baseline justify-between gap-3 px-4 py-3 sm:px-5">
               <span className="text-[14px] font-medium">Finished today</span>
               <span className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>{finished.length}</span>
@@ -257,7 +313,7 @@ export default async function TodayPage() {
           </details>
         )}
 
-        <div className="order-8 px-1 pt-1">
+        <div className="px-1 pt-1">
           <TaskDigestToggle enabled={user.taskDigestEmail} action={setTaskDigestEmail} />
         </div>
       </div>
@@ -274,5 +330,67 @@ function Section({ title, count, tone, className, children }: { title: string; c
       </div>
       <div>{children}</div>
     </section>
+  );
+}
+
+// The one thing to do now: who to call, what you know about them, and the
+// button that starts the call. Done and Skip move on to the next.
+function NextUp({ task, overdue }: { task: TaskRow; overdue: boolean }) {
+  const lead = task.lead;
+  const isCall = task.type === "cold_call" || task.type === "sales_call";
+  const title = lead ? (isCall ? `Call ${lead.name}` : task.type === "follow_up" ? `Follow up with ${lead.name}` : `${TASK_TYPE_LABEL[task.type] ?? "Task"}: ${lead.name}`) : (TASK_TYPE_LABEL[task.type] ?? "Task");
+  const detail = [lead?.company, TASK_TYPE_LABEL[task.type] ?? task.type, overdue ? `was due ${formatTaskDue(task.dueDate, task.dueTime)}` : task.dueTime ? `due ${task.dueTime}` : "today"]
+    .filter(Boolean)
+    .join(" · ");
+  const facts = [
+    lead?.isDecisionMaker === true ? "Decision maker" : lead?.isDecisionMaker === false ? "Not the decision maker" : null,
+    lead?.objections ? `Worried about: ${lead.objections}` : null,
+  ].filter(Boolean);
+
+  return (
+    <section className="flex flex-col gap-3.5 rounded-[20px] p-5" style={{ background: "var(--surface-inverted)", color: "var(--on-surface-inverted)" }}>
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] font-semibold" style={{ letterSpacing: "1px", color: "var(--on-surface-inverted-muted)" }}>NEXT UP</span>
+        {overdue && <span className="chip chip-warn">Overdue</span>}
+      </div>
+      <div className="flex flex-col gap-1">
+        <h2 className="break-words text-[21px] font-semibold" style={{ letterSpacing: "-0.4px" }}>{title}</h2>
+        <div className="text-[13.5px]" style={{ color: "var(--on-surface-inverted-muted)" }}>{detail}</div>
+      </div>
+      {(task.note || lead?.summary || facts.length > 0) && (
+        <div className="flex flex-col gap-1 rounded-[12px] px-3 py-2.5 text-[13px] leading-relaxed" style={{ background: "var(--surface-inverted-2)" }}>
+          {task.note && <div className="break-words">{task.note}</div>}
+          {lead?.summary && <div className="line-clamp-3 break-words">Last call: {lead.summary}</div>}
+          {facts.length > 0 && <div style={{ color: "var(--on-surface-inverted-muted)" }}>{facts.join(" · ")}</div>}
+        </div>
+      )}
+      {lead?.phone && isCall ? (
+        <LeadCallButton variant="hero" leadName={lead.name} startAction={startLeadCall.bind(null, lead.id)} />
+      ) : lead ? (
+        <Link href={`/leads/${lead.id}`} className="btn w-full justify-center" style={{ height: 50, fontSize: 16, background: "var(--on-surface-inverted)", color: "var(--surface-inverted)" }}>
+          Open {lead.name}
+        </Link>
+      ) : null}
+      <div className="flex justify-center gap-7 text-[13px]">
+        <form action={setTaskStatus.bind(null, task.id, "done")}>
+          <button type="submit" className="px-1 py-1 font-medium" style={{ color: "var(--on-surface-inverted)" }}>Done</button>
+        </form>
+        <form action={setTaskStatus.bind(null, task.id, "skipped")}>
+          <button type="submit" className="px-1 py-1" style={{ color: "var(--on-surface-inverted-muted)" }}>Skip</button>
+        </form>
+      </div>
+    </section>
+  );
+}
+
+function WaitingRow({ href, title, detail, chip }: { href: string; title: string; detail?: string | null; chip?: { label: string; cls: string } }) {
+  return (
+    <Link href={href} className="row-hover flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5" style={{ borderTop: "1px solid var(--hairline-soft)", marginTop: -1 }}>
+      <div className="min-w-0">
+        <div className="truncate text-[14px] font-medium" style={{ color: "var(--ink)" }}>{title}</div>
+        {detail && <div className="truncate text-[12.5px]" style={{ color: "var(--ink-muted)" }}>{detail}</div>}
+      </div>
+      {chip ? <span className={`chip flex-none whitespace-nowrap ${chip.cls}`}>{chip.label}</span> : <span aria-hidden style={{ color: "var(--ink-muted)" }}>›</span>}
+    </Link>
   );
 }

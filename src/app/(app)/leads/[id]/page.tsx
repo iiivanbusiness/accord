@@ -117,7 +117,7 @@ export default async function LeadPage({
         </div>
 
         <div className="order-1 flex min-w-0 flex-col gap-4 lg:order-2">
-          {lead.phone && !convertedDeal && <LeadCallButton leadName={lead.name} templates={templates} startAction={startLeadCall.bind(null, lead.id)} />}
+          {lead.phone && !convertedDeal && <LeadCallButton leadName={lead.name} startAction={startLeadCall.bind(null, lead.id)} />}
 
           <div className="card flex flex-col gap-3 p-5">
             <div className="text-[14px] font-medium">Stage</div>

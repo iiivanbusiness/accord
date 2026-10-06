@@ -122,8 +122,8 @@ describe("Calls to the SealMe number", () => {
   });
 
   it("puts a finished recording in the inbox, untranscribed", async () => {
-    db.phoneCall.findUnique.mockResolvedValue({ id: "call1", status: "recording", recorded: true, telnyxRecordingId: null, endedAt: null });
-    await handleTelnyxEvent(
+    db.phoneCall.findUnique.mockResolvedValue({ id: "call1", status: "recording", recorded: true, telnyxRecordingId: null, endedAt: null, leadId: null });
+    const result = await handleTelnyxEvent(
       event("call.recording.saved", {
         client_state: encodeClientState({ k: "rec", c: "call1" }),
         recording_id: "rec1",
@@ -133,17 +133,32 @@ describe("Calls to the SealMe number", () => {
     );
     expect(db.phoneCall.update.mock.calls[0][0].data).toMatchObject({ status: "pending", durationSec: 192, telnyxRecordingId: "rec1" });
     expect(telnyx.deleteRecording).not.toHaveBeenCalled();
+    // No lead to write it up for: it waits in the inbox.
+    expect(result).toEqual({});
+  });
+
+  it("hands a call tied to a lead straight to processing", async () => {
+    db.phoneCall.findUnique.mockResolvedValue({ id: "call1", status: "recording", recorded: true, telnyxRecordingId: "rec1", endedAt: null, leadId: "l1" });
+    const result = await handleTelnyxEvent(
+      event("call.recording.saved", {
+        client_state: encodeClientState({ k: "rec", c: "call1" }),
+        recording_started_at: "2026-10-06T10:00:00Z",
+        recording_ended_at: "2026-10-06T10:01:43Z",
+      }),
+    );
+    expect(result).toEqual({ processCallId: "call1" });
   });
 
   it("sets aside a call under 30 seconds and drops its recording", async () => {
-    db.phoneCall.findUnique.mockResolvedValue({ id: "call1", status: "recording", recorded: true, telnyxRecordingId: "rec1", endedAt: null });
-    await handleTelnyxEvent(
+    db.phoneCall.findUnique.mockResolvedValue({ id: "call1", status: "recording", recorded: true, telnyxRecordingId: "rec1", endedAt: null, leadId: "l1" });
+    const result = await handleTelnyxEvent(
       event("call.recording.saved", {
         client_state: encodeClientState({ k: "rec", c: "call1" }),
         recording_started_at: "2026-10-06T10:00:00Z",
         recording_ended_at: "2026-10-06T10:00:12Z",
       }),
     );
+    expect(result).toEqual({});
     expect(db.phoneCall.update.mock.calls[0][0].data).toMatchObject({ status: "skipped", durationSec: 12, telnyxRecordingId: null, extracted: { skipped: "too_short" } });
     expect(telnyx.deleteRecording).toHaveBeenCalledWith("rec1");
   });

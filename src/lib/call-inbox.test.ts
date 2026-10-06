@@ -1,15 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 
-const { phoneCall, cold, telnyx } = vi.hoisted(() => ({
+const { phoneCall, cold, sales, classify, notify, telnyx } = vi.hoisted(() => ({
   phoneCall: { findUnique: vi.fn(), update: vi.fn() },
   cold: vi.fn(),
+  sales: vi.fn(),
+  classify: vi.fn(),
+  notify: vi.fn(),
   telnyx: { recordingDownload: vi.fn(), deleteRecording: vi.fn() },
 }));
 vi.mock("@/lib/db", () => ({ prisma: { phoneCall } }));
 vi.mock("@/lib/error-report", () => ({ reportError: async () => {} }));
 vi.mock("@/lib/crm-call-sync", () => ({ pushCallToCrm: async () => {} }));
-vi.mock("@/lib/sales-call", () => ({ applySalesCall: async () => {} }));
+vi.mock("@/lib/sales-call", () => ({ applySalesCall: sales }));
 vi.mock("@/lib/cold-call", () => ({ applyColdCall: cold }));
+vi.mock("@/lib/call-kind", () => ({ classifyCallKind: classify }));
+vi.mock("@/lib/notifications", () => ({ createNotification: notify }));
 vi.mock("@/lib/telnyx", () => telnyx);
 
 import { callCostUsd, runCallProcessing, skipReason, speakerCount } from "./call-inbox";
@@ -74,5 +79,30 @@ describe("Calls inbox", () => {
     expect(phoneCall.update.mock.calls[1][0].data).toMatchObject({ status: "skipped", extracted: { skipped: "no_speech" } });
     expect(telnyx.deleteRecording).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
+  });
+
+  it("works out cold or sales when nobody picked, and never auto-sends a contract it guessed", async () => {
+    const call = { id: "call3", status: "processing", mode: "auto", workspaceId: "w1", userId: "u1", lead: { id: "l1", name: "Dana" }, transcript: "Speaker 1: Hi Dana.\nSpeaker 2: Hi.", telnyxRecordingId: null, durationSec: 120 };
+    phoneCall.update.mockClear();
+    notify.mockResolvedValue(undefined);
+
+    phoneCall.findUnique.mockResolvedValue(call);
+    classify.mockResolvedValue({ kind: "cold", inputTokens: 900, outputTokens: 1 });
+    await runCallProcessing("call3", "America/Chicago", { auto: true });
+    expect(phoneCall.update).toHaveBeenCalledWith({ where: { id: "call3" }, data: { mode: "cold" } });
+    expect(cold).toHaveBeenLastCalledWith(expect.objectContaining({ phoneCallId: "call3" }));
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ userId: "u1", linkUrl: "/leads/l1" }));
+
+    phoneCall.findUnique.mockResolvedValue(call);
+    classify.mockResolvedValue({ kind: "sales", inputTokens: 900, outputTokens: 1 });
+    await runCallProcessing("call3", "America/Chicago", { auto: true });
+    expect(sales).toHaveBeenCalledWith("call3", { draftOnly: true });
+
+    // A rep who picked "Sales call" in the inbox keeps the workspace's auto-send.
+    phoneCall.findUnique.mockResolvedValue({ ...call, mode: "sales" });
+    classify.mockClear();
+    await runCallProcessing("call3", "America/Chicago");
+    expect(classify).not.toHaveBeenCalled();
+    expect(sales).toHaveBeenLastCalledWith("call3", { draftOnly: false });
   });
 });

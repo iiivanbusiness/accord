@@ -30,7 +30,7 @@ export default function TodayTaskRow({
   overdue?: boolean;
   showType?: boolean;
   statusAction: (taskId: string, status: "open" | "done" | "skipped") => Promise<void>;
-  callAction: (leadId: string, input: { mode: string; templateId?: string | null }) => Promise<CallPlan>;
+  callAction: (leadId: string, input?: { mode?: string }) => Promise<CallPlan>;
 }) {
   const [pending, startTransition] = useTransition();
   const set = (status: "open" | "done" | "skipped") => startTransition(() => statusAction(task.id, status));
@@ -71,13 +71,7 @@ export default function TodayTaskRow({
         ) : (
           <>
             {task.lead?.phone && (
-              <LeadCallButton
-                compact
-                primary={callFirst}
-                leadName={task.lead.name}
-                defaultMode={task.type === "sales_call" ? "sales" : "cold"}
-                startAction={(input) => callAction(task.lead!.id, input)}
-              />
+              <LeadCallButton variant="compact" primary={callFirst} leadName={task.lead.name} startAction={(input) => callAction(task.lead!.id, input)} />
             )}
             <button type="button" disabled={pending} onClick={() => set("done")} className={`btn btn-sm ${task.lead?.phone && callFirst ? "btn-secondary" : "btn-primary"}`}>
               Done

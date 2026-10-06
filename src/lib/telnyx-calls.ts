@@ -28,38 +28,39 @@ const recordOptions = (callId: string) => ({ record_format: "mp3", record_channe
 
 // One verified event from the SealMe number. Throws only on our own
 // errors; the route reports them and still answers Telnyx, so a retry
-// doesn't send the same command twice.
-export async function handleTelnyxEvent(event: TelnyxEvent): Promise<void> {
+// doesn't send the same command twice. Returns the call to process once
+// its recording is in, which the route does after answering.
+export async function handleTelnyxEvent(event: TelnyxEvent): Promise<{ processCallId?: string }> {
   const type = event.data?.event_type;
   const p = event.data?.payload;
   const id = p?.call_control_id;
-  if (!type || !p || !id) return;
+  if (!type || !p || !id) return {};
   const state = decodeClientState<CallState>(p.client_state);
 
   switch (type) {
     case "call.initiated":
       if (p.direction === "incoming") await answerIncoming(id, p.from ?? null);
-      return;
+      return {};
     case "call.answered":
       if (state?.k === "bye" && state.m) await callAction(id, "speak", { ...VOICE, payload: SAY[state.m], command_id: `bye-${id}` });
       if (state?.k === "notice") await callAction(id, "speak", { ...VOICE, payload: SAY.notice_prompt, command_id: `prompt-${id}` });
-      return;
+      return {};
     case "call.dtmf.received":
       if (state?.k === "notice" && p.digit === "1" && state.c) {
         await callAction(id, "speak", { ...VOICE, payload: SAY.notice, client_state: encodeClientState({ k: "noticing", c: state.c }), command_id: `notice-${id}` });
       }
-      return;
+      return {};
     case "call.speak.ended":
       if (state?.k === "bye") await callAction(id, "hangup", { command_id: `hangup-${id}` });
       if (state?.k === "noticing" && state.c) await startRecordingAfterNotice(id, state.c);
-      return;
+      return {};
     case "call.hangup":
       await callEnded(id, state);
-      return;
+      return {};
     case "call.recording.saved":
-      await recordingSaved(id, state, p);
-      return;
+      return recordingSaved(id, state, p);
   }
+  return {};
 }
 
 // Someone dialed the SealMe number. A rep is known by the number they call
@@ -160,12 +161,12 @@ async function callEnded(callControlId: string, state: CallState | null): Promis
   if (!call.endedAt) await prisma.phoneCall.update({ where: { id: call.id }, data: { endedAt: now } });
 }
 
-// The recording is ready: the call lands in the inbox, still untranscribed
-// (transcription is paid for only when someone clicks Process). A call too
-// short to be worth anything is set aside and its recording dropped.
-async function recordingSaved(callControlId: string, state: CallState | null, p: NonNullable<NonNullable<TelnyxEvent["data"]>["payload"]>): Promise<void> {
+// The recording is ready. A call tied to a lead is processed right away;
+// one without stays in the inbox. A call too short to be worth anything is
+// set aside and its recording dropped.
+async function recordingSaved(callControlId: string, state: CallState | null, p: NonNullable<NonNullable<TelnyxEvent["data"]>["payload"]>): Promise<{ processCallId?: string }> {
   const call = await findCall(callControlId, state);
-  if (!call || call.status !== "recording") return;
+  if (!call || call.status !== "recording") return {};
   const recordingId = p.recording_id ?? call.telnyxRecordingId ?? (await findRecordingId(callControlId));
   const started = p.recording_started_at ? Date.parse(p.recording_started_at) : NaN;
   const ended = p.recording_ended_at ? Date.parse(p.recording_ended_at) : NaN;
@@ -183,4 +184,6 @@ async function recordingSaved(callControlId: string, state: CallState | null, p:
     },
   });
   if (tooShort && recordingId) await deleteRecording(recordingId).catch((err) => reportError(err, "Deleting a short call's recording", { callId: call.id }));
+  // Tied to a lead (the rep tapped Call): the notes write themselves.
+  return !tooShort && call.leadId ? { processCallId: call.id } : {};
 }
