@@ -1,7 +1,7 @@
 import { renderToBuffer } from "@react-pdf/renderer";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { fillClauses } from "@/lib/contract";
+import { contractParty, fillClauses } from "@/lib/contract";
 import { ContractPdfDocument } from "@/lib/contract-pdf";
 import { embedTamperEvidentSignature, isPdfSigningConfigured } from "@/lib/pdf-sign";
 
@@ -21,7 +21,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       templateName={contract.template.name}
       agencyName={contract.deal.workspace.name}
       agencyLogo={contract.deal.workspace.logoImage}
-      clientName={contract.deal.client.name}
+      clientName={contractParty(contract.deal.fields, contract.deal.client)}
       clauses={clauses}
       signedBy={contract.signerName}
       signedAt={contract.signedAt}

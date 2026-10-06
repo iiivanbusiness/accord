@@ -9,6 +9,12 @@ export function fillClauses(clausesJson: string, fields: { fieldKey: string; val
   }));
 }
 
+// Who a contract is with: the party its Parties clause names (the client's
+// company when one was heard, else the person), or the client on file.
+export function contractParty(fields: { fieldKey: string; value: string | null }[], client: { name: string; company?: string | null }): string {
+  return fields.find((f) => f.fieldKey === "clientName")?.value?.trim() || client.company?.trim() || client.name;
+}
+
 export function extractPlaceholderKeys(clausesJson: string): string[] {
   const clauses = JSON.parse(clausesJson) as Clause[];
   const keys = new Set<string>();

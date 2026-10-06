@@ -80,7 +80,11 @@ export async function extractDealFromTranscript(
     system:
       "You extract structured sales-deal terms from a raw call transcript between an agency and a prospective client. " +
       "Only report a field if the transcript actually states it. Never invent numbers, dates, or names. " +
-      "For every extracted field, quote the exact transcript sentence it came from.",
+      "For every extracted field, quote the exact transcript sentence it came from. " +
+      "The fields fill a contract, so: the clientName field is the party the contract is with, the client's company or organization when one is named, " +
+      "otherwise the person's full name (the top-level clientName stays the person you spoke with). " +
+      "The service field finishes the sentence \"Agency will provide ...\", so write it as a phrase that starts lowercase unless it begins with a name or acronym, " +
+      "for example \"a twelve-week sales enablement program for 8 SDRs\".",
     messages: [
       {
         role: "user",

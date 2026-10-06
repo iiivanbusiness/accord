@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { dispatchWebhookEvent } from "@/lib/webhooks";
-import { fillClauses } from "@/lib/contract";
+import { contractParty, fillClauses } from "@/lib/contract";
 import { signContract, requestClauseChange } from "./actions";
 import BrandLogo from "@/components/BrandLogo";
 import SignForm from "@/components/SignForm";
@@ -90,7 +90,7 @@ export default async function SignPage({ params, searchParams }: { params: Promi
         <div className="card px-5 py-7 md:px-[46px] md:py-[42px]">
           <div className="mb-1.5 text-[22px] font-medium" style={{ letterSpacing: "-0.6px" }}>{contract.template.name}</div>
           <div className="mb-7 border-b pb-[22px] text-[13.5px]" style={{ color: "var(--ink-muted)", borderColor: "var(--hairline-soft)" }}>
-            Between {contract.deal.workspace.name} and {contract.deal.client.name}
+            Between {contract.deal.workspace.name} and {contractParty(contract.deal.fields, contract.deal.client)}
           </div>
           {clauses.map((clause, i) => (
             <div key={clause.title} className="mb-5 max-w-[64ch]">

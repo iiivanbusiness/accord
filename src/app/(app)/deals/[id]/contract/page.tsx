@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { fillClauses } from "@/lib/contract";
+import { contractParty, fillClauses } from "@/lib/contract";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { currentUserWithRole } from "@/lib/permissions";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
@@ -128,7 +128,7 @@ export default async function ContractPage({
       <div className="card px-5 py-7 md:px-[46px] md:py-[42px]">
         <div className="mb-1.5 text-[21px] font-medium" style={{ letterSpacing: "-0.6px" }}>{deal.template.name}</div>
         <div className="mb-7 border-b pb-[22px] text-[13.5px]" style={{ color: "var(--ink-muted)", borderColor: "var(--hairline-soft)" }}>
-          Between {deal.workspace.name} and {deal.client.name}
+          Between {deal.workspace.name} and {contractParty(deal.fields, deal.client)}
         </div>
         {clauses.map((clause, i) => (
           <div key={clause.title} className="mb-5 max-w-[64ch]">

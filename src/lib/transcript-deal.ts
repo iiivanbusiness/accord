@@ -49,7 +49,8 @@ export async function createDealFromTranscriptText(options: {
   const heardEmail = extracted.email?.trim().toLowerCase() || null;
   const email = knownClient?.email?.toLowerCase() || (heardEmail && EMAIL.test(heardEmail) ? heardEmail : null);
 
-  let fieldRows = knownClient ? built.fieldRows.map((f) => (f.fieldKey === "clientName" ? { ...f, value: clientName, status: "confirmed", confidence: null } : f)) : built.fieldRows;
+  // A known client's contract is with their company, when there is one.
+  let fieldRows = knownClient ? built.fieldRows.map((f) => (f.fieldKey === "clientName" ? { ...f, value: company, status: "confirmed", confidence: null } : f)) : built.fieldRows;
   if (options.requireEmail && !email) {
     const meta = fieldMeta("clientEmail");
     fieldRows = [...fieldRows, { groupLabel: meta.groupLabel, label: meta.label, fieldKey: "clientEmail", value: null, status: "missing", confidence: null, sourceQuote: null, orderIndex: fieldRows.length }];

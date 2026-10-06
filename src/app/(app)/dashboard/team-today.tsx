@@ -72,7 +72,7 @@ export async function teamLines({ workspaceId, tz, managerId, need }: { workspac
             <Link href="/team" className="font-medium" style={{ color: "var(--accent-blue)" }}>Details</Link>
           </div>
           {rows.length === 0 ? (
-            <div className="px-4 py-4 text-[13px] sm:px-5" style={{ color: "var(--ink-muted)" }}>Nobody has work for today yet. Hand some out with the Hand out work line.</div>
+            <div className="px-4 py-4 text-[13px] sm:px-5" style={{ color: "var(--ink-muted)" }}>Nobody has work for today yet. Hand some out in the Hand out work folder.</div>
           ) : (
             rows.map((r) => {
               const status =
