@@ -31,7 +31,8 @@ export async function reportError(err: unknown, where: string, context: Record<s
       .map(([key, value]) => `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`);
 
     await sendAdminAlertEmail({
-      subject: `${where}: ${error.message.slice(0, 90)}`,
+      // Mail headers can't hold line breaks; browser errors often have them.
+      subject: `${where}: ${error.message.replace(/\s+/g, " ").slice(0, 90)}`,
       details: [
         `Where: ${where}`,
         ...contextLines,

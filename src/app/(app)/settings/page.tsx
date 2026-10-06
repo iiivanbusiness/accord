@@ -7,6 +7,8 @@ import TwoFactorSettings from "@/components/TwoFactorSettings";
 import PhoneNumberSettings from "@/components/PhoneNumberSettings";
 import { sealmeNumber } from "@/lib/telnyx";
 import { formatPhone } from "@/lib/phone";
+import { countryFromLocale } from "@/lib/phone-input";
+import { headers } from "next/headers";
 import DeleteAccountSettings from "@/components/DeleteAccountSettings";
 import RolesManager from "@/components/RolesManager";
 import RoleSelect from "@/components/RoleSelect";
@@ -501,7 +503,11 @@ export default async function SettingsPage({
           <h2 className="text-[15px] font-medium">Your phone number</h2>
         </div>
         <div className="px-[22px] py-4">
-          <PhoneNumberSettings phone={currentUser.phone} sealmeNumber={sealmeNumber() ? formatPhone(sealmeNumber()) : null} />
+          <PhoneNumberSettings
+            phone={currentUser.phone}
+            sealmeNumber={sealmeNumber() ? formatPhone(sealmeNumber()) : null}
+            country={countryFromLocale((await headers()).get("accept-language")?.split(",")[0])?.code ?? "US"}
+          />
         </div>
       </div>
     )}
