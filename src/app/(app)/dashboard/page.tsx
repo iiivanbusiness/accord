@@ -69,10 +69,12 @@ export default async function DashboardPage() {
   const firstName = session?.user?.name?.trim().split(/\s+/)[0] ?? null;
   const hello = firstName ? `Hello, ${firstName}` : "Dashboard";
 
-  // With prospecting on, the Dashboard is a few lines, one per thing, each
-  // colored by how urgent it is: whoever hands out the work gets the
+  // With prospecting on, a few lines sit above the widgets, one per thing,
+  // each colored by how urgent it is: whoever hands out the work gets the
   // team's day first, a rep their own next call.
   const prospecting = (await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { prospectingEnabled: true } }))?.prospectingEnabled ?? false;
+  let subtitle = "Everything happening across your workspace";
+  let linesBlock: React.ReactNode = null;
   if (prospecting) {
     const role = (await leadAccess(user)).canAssign ? "manager" : "rep";
     const prefs = resolveLines(user.dashboardLines, role);
@@ -81,24 +83,24 @@ export default async function DashboardPage() {
     const [day, team, dealsLines, calendar, notifications] = await Promise.all([
       myDayLines({ workspaceId, userId: user.id, tz, need }),
       role === "manager" ? teamLines({ workspaceId, tz, managerId: user.id, need }) : [],
-      dealLines({ workspaceId, tz, need }),
+      dealLines({ workspaceId, need }),
       calendarLine({ workspaceId, tz, need }),
       notificationsLine({ userId: user.id, need }),
     ]);
     const lines = [...day.lines, ...team, ...dealsLines, ...calendar, ...notifications];
-    const dateLabel = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: tz }).format(now);
-    return (
-      <DashboardLines
-        title={hello}
-        subtitle={`${dateLabel} · ${day.progress}`}
-        role={role}
-        lines={lines}
-        prefs={prefs}
-        initialOpen={openAtStart(prefs, Object.fromEntries(lines.map((l) => [l.id, l.tone])))}
-        notice={day.notice}
-        customizeExtra={<TaskDigestToggle enabled={user.taskDigestEmail} action={setTaskDigestEmail} />}
-        saveAction={saveDashboardLines}
-      />
+    subtitle = `${new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: tz }).format(now)} · ${day.progress}`;
+    linesBlock = (
+      <div className="mb-8">
+        <DashboardLines
+          role={role}
+          lines={lines}
+          prefs={prefs}
+          initialOpen={openAtStart(prefs, Object.fromEntries(lines.map((l) => [l.id, l.tone])))}
+          notice={day.notice}
+          customizeExtra={<TaskDigestToggle enabled={user.taskDigestEmail} action={setTaskDigestEmail} />}
+          saveAction={saveDashboardLines}
+        />
+      </div>
     );
   }
   const { where: visibility } = await dealVisibilityFilter();
@@ -361,7 +363,7 @@ export default async function DashboardPage() {
           {hello}
         </h1>
         <div className="mt-1 text-[14px]" style={{ color: "var(--ink-muted)" }}>
-          Everything happening across your workspace
+          {subtitle}
         </div>
       </div>
       <div className="flex gap-2.5">
@@ -376,6 +378,8 @@ export default async function DashboardPage() {
         </Link>
       </div>
     </div>
+
+    {linesBlock}
 
     <DashboardGrid widgets={widgets} saved={normalizeDashboard(user.dashboardLayout)} saveAction={saveDashboardLayout} />
     </>

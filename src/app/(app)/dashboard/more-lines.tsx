@@ -4,7 +4,6 @@ import { parseFee } from "@/lib/money";
 import { dealVisibilityFilter } from "@/lib/deal-visibility";
 import { STATUS_CHIP, STATUS_LABEL } from "@/lib/deal-status";
 import { dayInZone } from "@/lib/viewer-time";
-import DealValueHeroCard from "@/components/dashboard/DealValueHeroCard";
 import DashboardNotifications from "@/components/DashboardNotifications";
 import type { DashboardLine } from "@/components/DashboardLines";
 import type { LineId } from "@/lib/dashboard-lines";
@@ -27,29 +26,22 @@ function ago(date: Date): string {
   return days === 1 ? "1 day ago" : `${days} days ago`;
 }
 
-// Deals, renewals and the month-by-month chart, each as a line.
-export async function dealLines({ workspaceId, tz, need }: { workspaceId: string; tz: string; need: Set<LineId> }): Promise<DashboardLine[]> {
-  if (!need.has("deals") && !need.has("renewals") && !need.has("deal-value")) return [];
+// Deals in one line: what's open, what got signed, what's stuck.
+export async function dealLines({ workspaceId, need }: { workspaceId: string; need: Set<LineId> }): Promise<DashboardLine[]> {
+  if (!need.has("deals")) return [];
   const now = new Date();
   const { where: visibility } = await dealVisibilityFilter();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const staleCutoff = new Date(now.getTime() - 7 * DAY);
 
-  const [deals, signedThisMonth, renewals] = await Promise.all([
+  const [deals, signedThisMonth] = await Promise.all([
     // Only the columns shown: a full Deal row carries the whole transcript.
     prisma.deal.findMany({
       where: { workspaceId, trashedAt: null, ...visibility },
-      select: { id: true, status: true, service: true, feeDisplay: true, createdAt: true, updatedAt: true, client: { select: { name: true } } },
+      select: { id: true, status: true, service: true, feeDisplay: true, updatedAt: true, client: { select: { name: true } } },
       orderBy: { updatedAt: "desc" },
     }),
     prisma.contract.count({ where: { signedAt: { gte: monthStart }, deal: { workspaceId, trashedAt: null, ...visibility } } }),
-    need.has("renewals")
-      ? prisma.contract.findMany({
-          where: { status: "signed", renewalDate: { gte: now, lte: new Date(now.getTime() + 90 * DAY) }, deal: { workspaceId, trashedAt: null, ...visibility } },
-          select: { id: true, dealId: true, autoRenews: true, renewalDate: true, deal: { select: { feeDisplay: true, client: { select: { name: true } } } } },
-          orderBy: { renewalDate: "asc" },
-        })
-      : [],
   ]);
 
   const lines: DashboardLine[] = [];
@@ -57,7 +49,7 @@ export async function dealLines({ workspaceId, tz, need }: { workspaceId: string
   const openValue = openDeals.reduce((s, d) => s + parseFee(d.feeDisplay), 0);
   const stuck = deals.filter((d) => (d.status === "ready" || d.status === "missing_info") && d.updatedAt <= staleCutoff).sort((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime());
 
-  if (need.has("deals")) {
+  {
     const dealRow = (d: (typeof deals)[number], i: number, right: React.ReactNode) => (
       <Link key={d.id} href={`/deals/${d.id}`} className="row-hover flex items-center justify-between gap-3 px-4 py-3 sm:px-5" style={rowStyle(i)}>
         <div className="min-w-0">
@@ -99,67 +91,6 @@ export async function dealLines({ workspaceId, tz, need }: { workspaceId: string
             {footerLink("/deals", "All deals")}
           </div>
         ),
-    });
-  }
-
-  if (need.has("renewals")) {
-    const atRisk = renewals.reduce((s, c) => s + parseFee(c.deal.feeDisplay), 0);
-    const soon = renewals.filter((c) => (c.renewalDate as Date).getTime() - now.getTime() <= 30 * DAY);
-    lines.push({
-      id: "renewals",
-      tone: soon.length ? "due" : "quiet",
-      summary: renewals.length
-        ? `${renewals.length.toLocaleString("en-US")} in the next 90 days · ${money(atRisk)}${soon.length ? ` · ${soon.length.toLocaleString("en-US")} within 30 days` : ""}`
-        : "Nothing renewing in the next 90 days",
-      body:
-        renewals.length === 0
-          ? muted("Signed contracts with a renewal date show up here 90 days ahead.")
-          : renewals.slice(0, 10).map((c, i) => {
-              const days = Math.ceil(((c.renewalDate as Date).getTime() - now.getTime()) / DAY);
-              return (
-                <Link key={c.id} href={`/deals/${c.dealId}/contract`} className="row-hover flex items-center justify-between gap-3 px-4 py-3 sm:px-5" style={rowStyle(i)}>
-                  <div className="min-w-0">
-                    <div className="truncate text-[14px] font-medium" style={{ color: "var(--ink)" }}>{c.deal.client.name}</div>
-                    <div className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-                      {c.autoRenews ? "Auto-renews" : "Term ends"} {(c.renewalDate as Date).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: tz })}
-                    </div>
-                  </div>
-                  <span className={`chip flex-none ${days <= 30 ? "chip-warn" : "chip-neutral"}`}>in {days}d</span>
-                </Link>
-              );
-            }),
-    });
-  }
-
-  if (need.has("deal-value")) {
-    const months: { key: string; label: string; value: number }[] = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      months.push({ key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleDateString("en-US", { month: "short" }), value: 0 });
-    }
-    for (const deal of deals) {
-      const bucket = months.find((m) => m.key === `${deal.createdAt.getFullYear()}-${deal.createdAt.getMonth()}`);
-      if (bucket) bucket.value += parseFee(deal.feeDisplay);
-    }
-    const signedCount = deals.filter((d) => d.status === "signed").length;
-    const signedRate = deals.length ? Math.round((signedCount / deals.length) * 100) : 0;
-    const current = months[months.length - 1];
-    lines.push({
-      id: "deal-value",
-      tone: "quiet",
-      summary: `${money(current.value)} this month · ${signedRate}% of deals signed`,
-      body: (
-        <div className="h-[300px] p-3 sm:p-4">
-          <DealValueHeroCard
-            months={months}
-            maxMonthValue={Math.max(...months.map((m) => m.value), 1)}
-            currentMonthKey={current.key}
-            signedRate={signedRate}
-            signedCount={signedCount}
-            dealCount={deals.length}
-          />
-        </div>
-      ),
     });
   }
 

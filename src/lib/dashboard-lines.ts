@@ -1,8 +1,9 @@
-// The Dashboard is a short list of lines: one line per thing (the team's
-// day, your next call, deals...), each with a colored dot for how urgent
-// it is and a one-line summary. A tap opens the line. Each person picks
-// which lines show, their order and which start open; that's saved on
-// User.dashboardLines in the SavedLines shape below.
+// The top of the Dashboard, above the widgets, is a short list of lines:
+// one line per thing (the team's day, your next call, deals...), each with
+// a colored dot for how urgent it is and a one-line summary. A tap opens
+// the line. Each person picks which lines show, their order and which
+// start open; that's saved on User.dashboardLines in the SavedLines shape
+// below.
 
 export type LineTone = "urgent" | "due" | "new" | "good" | "quiet";
 export type LineRole = "manager" | "rep";
@@ -17,8 +18,6 @@ export const LINE_TITLES = {
   deals: "Deals",
   assign: "Hand out work",
   calendar: "Calendar",
-  renewals: "Renewals",
-  "deal-value": "Deal value by month",
 } as const;
 
 export type LineId = keyof typeof LINE_TITLES;
@@ -37,13 +36,13 @@ type LinePrefs = { order: LineId[]; hidden: LineId[]; open: LineId[] };
 // the hidden ones can be turned on in Customize.
 export const DEFAULT_LINES: Record<LineRole, LinePrefs> = {
   manager: {
-    order: ["team", "next", "today", "waiting", "notifications", "deals", "assign", "calendar", "saved", "renewals", "deal-value"],
-    hidden: ["saved", "renewals", "deal-value"],
+    order: ["team", "next", "today", "waiting", "notifications", "deals", "assign", "calendar", "saved"],
+    hidden: ["saved"],
     open: ["team"],
   },
   rep: {
-    order: ["next", "today", "notifications", "saved", "waiting", "calendar", "deals", "renewals", "deal-value"],
-    hidden: ["deals", "renewals", "deal-value"],
+    order: ["next", "today", "notifications", "saved", "waiting", "calendar", "deals"],
+    hidden: ["deals"],
     open: ["next"],
   },
 };

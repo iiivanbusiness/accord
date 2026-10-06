@@ -22,7 +22,7 @@ describe("resolveLines", () => {
     const manager = resolveLines(saved, "manager");
     expect(manager.order.slice(0, 2)).toEqual(["next", "today"]);
     expect(manager.order).toHaveLength(DEFAULT_LINES.manager.order.length);
-    expect(manager.hidden).toEqual(expect.arrayContaining(["saved", "renewals", "deal-value"]));
+    expect(manager.hidden).toEqual(["saved"]);
     expect(manager.hidden).not.toContain("team");
     expect(manager.open).toEqual(["team"]);
   });

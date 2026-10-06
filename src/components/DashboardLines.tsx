@@ -26,12 +26,10 @@ function Chevron({ open }: { open: boolean }) {
   );
 }
 
-// The Dashboard: a few lines, each a colored dot (how urgent), a title and
-// one line of what's going on. A tap opens the line; Customize picks which
-// lines show, their order and which start open.
+// The lines above the Dashboard widgets: each a colored dot (how urgent),
+// a title and one line of what's going on. A tap opens the line;
+// "Customize lines" picks which show, their order and which start open.
 export default function DashboardLines({
-  title,
-  subtitle,
   role,
   lines,
   prefs: savedPrefs,
@@ -40,8 +38,6 @@ export default function DashboardLines({
   customizeExtra,
   saveAction,
 }: {
-  title: string;
-  subtitle: string;
   role: LineRole;
   lines: DashboardLine[];
   prefs: Prefs;
@@ -80,16 +76,13 @@ export default function DashboardLines({
   }
 
   const header = (
-    <div className="flex flex-wrap items-end justify-between gap-3">
-      <div className="min-w-0">
-        <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>{draft ? "Customize your dashboard" : title}</h1>
-        <div className="mt-1 text-[14px]" style={{ color: "var(--ink-muted)" }}>
-          {draft ? "Turn lines on or off and move them up or down. Only you see your layout." : subtitle}
-        </div>
-      </div>
+    <div className="flex min-h-[34px] flex-wrap items-center justify-between gap-x-3 gap-y-1">
+      <span className="text-[13px]" style={{ color: "var(--ink-muted)" }}>
+        {draft ? "Turn lines on or off and move them up or down. Only you see your layout." : "Today at a glance. Tap a line to open it."}
+      </span>
       {!draft && (
         <button type="button" onClick={() => setDraft({ ...prefs })} className="btn btn-secondary btn-sm">
-          Customize
+          Customize lines
         </button>
       )}
     </div>
@@ -105,7 +98,7 @@ export default function DashboardLines({
       setDraft({ ...draft, [key]: draft[key].includes(id) ? draft[key].filter((x) => x !== id) : [...draft[key], id] });
 
     return (
-      <div className="mx-auto flex w-full max-w-[780px] flex-col gap-4">
+      <div className="flex w-full flex-col gap-3">
         {header}
         <div className="card overflow-hidden">
           {draft.order.map((id, i) => {
@@ -164,7 +157,7 @@ export default function DashboardLines({
   const tones = [...new Set(visible.map((id) => byId.get(id)?.tone).filter((t): t is LineTone => Boolean(t && t !== "quiet")))];
 
   return (
-    <div className="mx-auto flex w-full max-w-[780px] flex-col gap-4">
+    <div className="flex w-full flex-col gap-3">
       {header}
       {notice}
       <div className="flex flex-col gap-2">
