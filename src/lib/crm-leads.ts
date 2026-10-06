@@ -194,7 +194,7 @@ export async function notifyCrmAssignments(workspaceId: string, source: CrmSourc
         type: "lead.assigned",
         title: names.length === 1 ? `New lead from ${crm}: ${names[0]}` : `${names.length} new leads from ${crm}`,
         body: names.length === 1 ? `Assigned to you in ${crm}. It's on your list for today.` : `Assigned to you in ${crm}. They're on your list for today.`,
-        linkUrl: "/today",
+        linkUrl: "/dashboard",
       });
     } catch (err) {
       console.error("Failed to notify about CRM leads", err);

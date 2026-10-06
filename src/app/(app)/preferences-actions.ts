@@ -18,5 +18,5 @@ export async function saveTimeZone(tz: string): Promise<void> {
 export async function setTaskDigestEmail(enabled: boolean): Promise<void> {
   const user = await currentUserWithRole();
   await prisma.user.update({ where: { id: user.id }, data: { taskDigestEmail: Boolean(enabled) } });
-  revalidatePath("/today");
+  revalidatePath("/dashboard");
 }

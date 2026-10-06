@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { requireProspecting } from "@/lib/prospecting";
 import { leadAccess } from "@/lib/lead-visibility";
 import { isValidDay, isValidTime, isValidTimeZone, TASK_PRIORITIES, TASK_TYPES } from "@/lib/tasks";
+import { dayInZone } from "@/lib/viewer-time";
 import { currentUserWithRole } from "@/lib/permissions";
 import { notifyTasksAssigned } from "@/lib/task-notify";
 
@@ -106,7 +107,7 @@ export async function setTaskStatus(taskId: string, status: "open" | "done" | "s
 
   await prisma.task.update({ where: { id: task.id }, data: { status, completedAt: status === "open" ? null : new Date() } });
   if (task.leadId) revalidatePath(`/leads/${task.leadId}`);
-  revalidatePath("/today");
+  revalidatePath("/dashboard");
 }
 
 // Managers only: take a task off entirely.
@@ -118,4 +119,29 @@ export async function deleteTask(taskId: string): Promise<void> {
   if (!task) throw new Error("Task not found");
   await prisma.task.delete({ where: { id: task.id } });
   if (task.leadId) revalidatePath(`/leads/${task.leadId}`);
+}
+
+// "Hand out work" on the Dashboard: the next leads nobody is working on
+// (no owner, no open task, not converted or lost), oldest first, become
+// cold calls for one rep on one day, and the rep becomes their owner.
+export async function quickAssignLeads(input: { assigneeId: string; count: number; day: "today" | "tomorrow"; timezone: string }): Promise<{ created: number }> {
+  const workspace = await requireProspecting();
+  const access = await leadAccess();
+  if (!access.canAssign) throw new Error("Only managers can hand out work");
+  const count = Math.min(Math.max(Math.round(Number(input.count) || 0), 1), 200);
+  const tz = isValidTimeZone(input.timezone) ? input.timezone : "UTC";
+  const today = dayInZone(new Date(), tz);
+  const dueDate = input.day === "tomorrow" ? new Date(new Date(`${today}T00:00:00Z`).getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10) : today;
+
+  const free = await prisma.lead.findMany({
+    where: { workspaceId: workspace.id, ownerId: null, stage: { notIn: ["converted", "lost"] }, tasks: { none: { status: "open" } } },
+    orderBy: { createdAt: "asc" },
+    take: count,
+    select: { id: true },
+  });
+  if (free.length === 0) throw new Error("No free leads left. Import more, or add some by hand");
+
+  const result = await assignLeadTasks({ assigneeId: input.assigneeId, type: "cold_call", dueDate, dueTime: "", timezone: tz, priority: "normal", note: "", leadIds: free.map((l) => l.id), makeOwner: true });
+  revalidatePath("/dashboard");
+  return result;
 }

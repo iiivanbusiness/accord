@@ -31,6 +31,6 @@ export async function processColdCallTranscript(leadId: string, transcript: stri
 
   revalidatePath(`/leads/${lead.id}`);
   revalidatePath("/leads");
-  revalidatePath("/today");
+  revalidatePath("/dashboard");
   return result;
 }

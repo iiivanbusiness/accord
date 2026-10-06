@@ -29,7 +29,7 @@ export async function notifyTasksAssigned(o: {
       type: "task.assigned",
       title: o.count === 1 && o.lead ? `New task: ${o.lead.name}` : `${o.count.toLocaleString("en-US")} new tasks`,
       body: `${o.actorName} gave you ${what} for ${formatTaskDue(o.dueDate, o.dueTime)}.`,
-      linkUrl: o.count === 1 && o.lead ? `/leads/${o.lead.id}` : "/today",
+      linkUrl: o.count === 1 && o.lead ? `/leads/${o.lead.id}` : "/dashboard",
     });
   } catch (err) {
     console.error("Failed to notify task assignee", err);
@@ -46,7 +46,7 @@ export async function notifyTasksMoved(o: { workspaceId: string; recipientId: st
       type: "task.moved",
       title: `${n} ${tasks} moved to you`,
       body: o.fromName ? `${o.actorName} moved ${n} of ${o.fromName}'s ${tasks} to you.` : `${o.actorName} gave you ${n} unassigned ${tasks}.`,
-      linkUrl: "/today",
+      linkUrl: "/dashboard",
     });
   } catch (err) {
     console.error("Failed to notify task recipient", err);

@@ -79,7 +79,7 @@ export async function runTaskDigest(options: { workspaceId?: string } = {}): Pro
           overdueCount: overdue.length,
           items,
           moreCount: Math.max(0, tasks.length - MAX_ROWS),
-          todayUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/today`,
+          todayUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/dashboard`,
         }),
       );
       await prisma.user.update({ where: { id: user.id }, data: { taskDigestSentOn: day } });

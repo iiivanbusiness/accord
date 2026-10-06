@@ -4,11 +4,11 @@ export type NavItem = { href: string; label: string };
 export type NavGroup = { label: string; items: NavItem[]; collapsible?: boolean };
 
 // The sidebar: the few pages someone uses every day, then "More" for the
-// rest. Reps live in Today, Leads, Calls and Deals; without prospecting
-// (leads, tasks, calls) the everyday pages are the deal ones. Admin only
+// rest. Reps live in the Dashboard (their day), Leads, Calls and Deals;
+// without prospecting (leads, tasks, calls) the everyday pages are the
+// deal ones. Admin only
 // for platform admins, Team for people who assign the work.
 const ITEM = {
-  today: { href: "/today", label: "Today" },
   leads: { href: "/leads", label: "Leads" },
   calls: { href: "/calls", label: "Calls" },
   deals: { href: "/deals", label: "Deals" },
@@ -24,9 +24,11 @@ const ITEM = {
 export const ADMIN_ITEM: NavItem = { href: "/admin", label: "Admin" };
 
 export function navGroupsFor({ prospecting, admin, manager = false }: { prospecting: boolean; admin: boolean; manager?: boolean }): NavGroup[] {
-  const everyday = prospecting ? [ITEM.today, ITEM.leads, ITEM.calls, ITEM.deals] : [ITEM.dashboard, ITEM.deals, ITEM.calendar, ITEM.clients];
+  // The Dashboard is the day (a rep's tasks, or the team's for managers),
+  // so there's no separate Today.
+  const everyday = prospecting ? [ITEM.dashboard, ITEM.leads, ITEM.calls, ITEM.deals] : [ITEM.dashboard, ITEM.deals, ITEM.calendar, ITEM.clients];
   const more = prospecting
-    ? [ITEM.dashboard, ITEM.calendar, ITEM.clients, ITEM.templates, ITEM.analytics, ...(manager ? [ITEM.team] : []), ITEM.feedback, ITEM.settings]
+    ? [ITEM.calendar, ITEM.clients, ITEM.templates, ITEM.analytics, ...(manager ? [ITEM.team] : []), ITEM.feedback, ITEM.settings]
     : [ITEM.templates, ITEM.analytics, ITEM.feedback, ITEM.settings];
   return [
     { label: "", items: everyday },
@@ -41,7 +43,7 @@ export const NAV_ITEMS: NavItem[] = navGroupsFor({ prospecting: false, admin: fa
 // The phone's bottom bar has room for four buttons plus "More". Reps live
 // in prospecting on the phone, so those come first when it's on; anything
 // not built yet is skipped and the next item fills its spot.
-const MOBILE_PRIORITY_PROSPECTING = ["/today", "/leads", "/calls", "/deals", "/dashboard"];
+const MOBILE_PRIORITY_PROSPECTING = ["/dashboard", "/leads", "/calls", "/deals"];
 const MOBILE_PRIORITY_DEFAULT = ["/dashboard", "/deals", "/calendar", "/clients"];
 
 export function mobilePrimaryItems(groups: NavGroup[], prospecting: boolean, count = 4): NavItem[] {

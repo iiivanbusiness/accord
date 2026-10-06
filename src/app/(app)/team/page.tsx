@@ -24,7 +24,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   const workspace = await requireProspecting();
   const access = await leadAccess();
   // Only people who hand out the work see how it's going.
-  if (!access.canAssign) redirect("/today");
+  if (!access.canAssign) redirect("/dashboard");
 
   const { period: rawPeriod } = await searchParams;
   const period = rawPeriod === "7d" || rawPeriod === "30d" ? rawPeriod : "";

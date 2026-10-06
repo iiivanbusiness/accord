@@ -131,7 +131,7 @@ export async function deleteLeads(leadIds: string[]): Promise<{ deleted: number 
   await logAudit({ workspaceId: workspace.id, actorEmail: user.email, action: "lead.deleted", targetType: "lead", targetId: ids.length === 1 ? ids[0] : undefined, metadata: { count: ids.length } });
 
   revalidatePath("/leads");
-  revalidatePath("/today");
+  revalidatePath("/dashboard");
   revalidatePath("/team");
   return { deleted: ids.length };
 }
