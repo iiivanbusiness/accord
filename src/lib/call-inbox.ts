@@ -36,10 +36,15 @@ export function speakerCount(transcript: string): number {
   return speakers.size;
 }
 
+// A voicemail is a greeting and maybe a short message. Past this, one
+// voice in the transcript more likely means the speaker split failed (it
+// does on merged phone lines) than that nobody picked up.
+const VOICEMAIL_MAX_SECONDS = 75;
+
 // Why a call shouldn't go to the model, if it shouldn't.
 export function skipReason(call: { durationSec: number | null; transcript: string | null }): "too_short" | "one_speaker" | null {
   if (call.durationSec !== null && call.durationSec < MIN_PROCESS_SECONDS) return "too_short";
-  if (call.transcript && speakerCount(call.transcript) === 1) return "one_speaker";
+  if (call.transcript && speakerCount(call.transcript) === 1 && (call.durationSec === null || call.durationSec < VOICEMAIL_MAX_SECONDS)) return "one_speaker";
   return null;
 }
 

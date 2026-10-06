@@ -26,7 +26,9 @@ describe("Calls inbox", () => {
 
   it("sets aside short calls and one-voice calls before any model call", () => {
     expect(skipReason({ durationSec: 12, transcript: twoVoices })).toBe("too_short");
-    expect(skipReason({ durationSec: 95, transcript: "Speaker 1: Hi, you've reached Dana. Leave a message after the tone." })).toBe("one_speaker");
+    expect(skipReason({ durationSec: 45, transcript: "Speaker 1: Hi, you've reached Dana. Leave a message after the tone." })).toBe("one_speaker");
+    // A long call heard as one voice is a failed speaker split, not voicemail.
+    expect(skipReason({ durationSec: 103, transcript: "Speaker 1: Hi, is this Gordan? Mhmm. Great, do you have a minute?" })).toBeNull();
     expect(skipReason({ durationSec: 95, transcript: twoVoices })).toBeNull();
     // Unknown length and unlabeled text: nothing to go on, so it's processed.
     expect(skipReason({ durationSec: null, transcript: "no labels here" })).toBeNull();
