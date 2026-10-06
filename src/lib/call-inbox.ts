@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/db";
 import { applyColdCall } from "@/lib/cold-call";
 import { INPUT_USD_PER_MTOK, OUTPUT_USD_PER_MTOK } from "@/lib/extract-cold-call";
+import { meterAiUsage } from "@/lib/ai-usage";
 import { reportError } from "@/lib/error-report";
 import { pushCallToCrm } from "@/lib/crm-call-sync";
 import { applySalesCall } from "@/lib/sales-call";
-import { deleteRecording, recordingDownload } from "@/lib/telnyx";
+import { deleteRecording, isTelnyxConfigured, recordingDownload, telnyxCallCost } from "@/lib/telnyx";
 import { DUAL_CHANNEL_LISTEN_PARAMS, RECORDING_LISTEN_PARAMS, transcriptFromChannels, transcriptFromListenResponse } from "@/lib/recording-transcript";
 import { classifyCallKind } from "@/lib/call-kind";
 import { createNotification } from "@/lib/notifications";
@@ -59,11 +60,19 @@ export function skipReason(call: { durationSec: number | null; transcript: strin
   return null;
 }
 
-// What a call cost us: transcription by the minute plus the model's tokens.
-export function callCostUsd(call: { sttSeconds: number | null; aiInputTokens: number | null; aiOutputTokens: number | null }): number {
+// What a call cost us: transcription by the billed minute, the models it
+// took, and Telnyx once its records are in. Calls from before the models
+// were metered were Haiku only, so their tokens are priced as Haiku.
+export function callCostUsd(call: {
+  sttSeconds: number | null;
+  aiInputTokens: number | null;
+  aiOutputTokens: number | null;
+  aiCostUsd?: number | null;
+  telnyxCostUsd?: number | null;
+}): number {
   const stt = ((call.sttSeconds ?? 0) / 60) * STT_USD_PER_MINUTE;
-  const ai = ((call.aiInputTokens ?? 0) * INPUT_USD_PER_MTOK + (call.aiOutputTokens ?? 0) * OUTPUT_USD_PER_MTOK) / 1_000_000;
-  return stt + ai;
+  const ai = call.aiCostUsd ?? ((call.aiInputTokens ?? 0) * INPUT_USD_PER_MTOK + (call.aiOutputTokens ?? 0) * OUTPUT_USD_PER_MTOK) / 1_000_000;
+  return stt + ai + (call.telnyxCostUsd ?? 0);
 }
 
 // Runs in the background after someone clicks Process, or by itself once a
@@ -94,37 +103,39 @@ export async function runCallProcessing(callId: string, timeZone: string, option
     }
     const { lead, userId, transcript } = call;
     if (!lead || !userId || !transcript) throw new Error("This call has no lead, rep or transcript");
-    let mode = call.mode;
-    let sorted: { inputTokens: number; outputTokens: number } | null = null;
-    if (mode !== "cold" && mode !== "sales") {
-      const { kind, ...usage } = await classifyCallKind(transcript);
-      await prisma.phoneCall.update({ where: { id: callId }, data: { mode: kind } });
-      mode = kind;
-      sorted = usage;
-    }
-    if (mode === "sales") {
-      // SealMe decided this was a sales call: the contract waits for the rep.
-      await applySalesCall(call.id, { draftOnly: Boolean(sorted) });
-    } else {
-      await applyColdCall({ workspaceId: call.workspaceId, userId, lead, transcript, timeZone, phoneCallId: call.id });
-      if (options.auto) {
-        await createNotification({
-          workspaceId: call.workspaceId,
-          userId,
-          type: "call.saved",
-          title: `Notes from your call with ${lead.name} are saved`,
-          body: "Check them, and fix anything SealMe heard wrong.",
-          linkUrl: `/leads/${lead.id}`,
-        }).catch((err) => reportError(err, "Call saved notification", { callId }));
+    const { workspaceId, mode: picked } = call;
+    // Every model call below counts toward this call's cost: sorting it,
+    // the notes, and for a sales call the template pick, the deal and the
+    // highlights.
+    const { usage } = await meterAiUsage(async () => {
+      let mode = picked;
+      const sorted = mode !== "cold" && mode !== "sales";
+      if (sorted) {
+        const { kind } = await classifyCallKind(transcript);
+        await prisma.phoneCall.update({ where: { id: callId }, data: { mode: kind } });
+        mode = kind;
       }
-    }
-    if (sorted) {
-      const used = await prisma.phoneCall.findUnique({ where: { id: callId }, select: { aiInputTokens: true, aiOutputTokens: true } });
-      await prisma.phoneCall.update({
-        where: { id: callId },
-        data: { aiInputTokens: (used?.aiInputTokens ?? 0) + sorted.inputTokens, aiOutputTokens: (used?.aiOutputTokens ?? 0) + sorted.outputTokens },
-      });
-    }
+      if (mode === "sales") {
+        // SealMe decided this was a sales call: the contract waits for the rep.
+        await applySalesCall(callId, { draftOnly: sorted });
+      } else {
+        await applyColdCall({ workspaceId, userId, lead, transcript, timeZone, phoneCallId: callId });
+        if (options.auto) {
+          await createNotification({
+            workspaceId,
+            userId,
+            type: "call.saved",
+            title: `Notes from your call with ${lead.name} are saved`,
+            body: "Check them, and fix anything SealMe heard wrong.",
+            linkUrl: `/leads/${lead.id}`,
+          }).catch((err) => reportError(err, "Call saved notification", { callId }));
+        }
+      }
+    });
+    await prisma.phoneCall.update({
+      where: { id: callId },
+      data: { aiInputTokens: usage.inputTokens, aiOutputTokens: usage.outputTokens, aiCostUsd: usage.costUsd },
+    });
   } catch (err) {
     await prisma.phoneCall.update({ where: { id: callId }, data: { status: "failed" } }).catch(() => {});
     await reportError(err, "Call processing", { callId, workspaceId: call.workspaceId });
@@ -164,11 +175,13 @@ async function transcribePhoneRecording(
   if (!res.ok) throw new Error(`Deepgram ${res.status}: ${await res.text()}`);
   const json = await res.json();
   const heard = dualChannel ? transcriptFromChannels(json, DUAL_CHANNEL_LABELS) : transcriptFromListenResponse(json);
+  // Deepgram bills every channel of a multichannel request.
+  const billedSeconds = heard.seconds * (dualChannel ? Math.max(1, json.results?.channels?.length ?? 2) : 1);
   // Nothing heard: the recording stays at Telnyx for the day, so a silent
   // line can be told apart from speech the model missed. The daily cron
   // drops it then.
   const keep = !heard.transcript;
-  const saved = { transcript: heard.transcript, sttSeconds: heard.seconds, durationSec: durationSec ?? seconds ?? heard.seconds, telnyxRecordingId: keep ? recordingId : null };
+  const saved = { transcript: heard.transcript, sttSeconds: billedSeconds, durationSec: durationSec ?? seconds ?? heard.seconds, telnyxRecordingId: keep ? recordingId : null };
   await prisma.phoneCall.update({ where: { id: callId }, data: saved });
   if (!keep) await dropRecording(recordingId, callId);
   return saved;
@@ -201,4 +214,35 @@ export async function discardStaleCalls(now = new Date()): Promise<number> {
     await prisma.phoneCall.update({ where: { id: c.id }, data: { telnyxRecordingId: null } });
   }
   return count;
+}
+
+// What Telnyx billed, once its records have settled (daily cron): Telnyx
+// keeps re-rating a call's records for hours after it ends, so only calls
+// over a day old, up to 30 days back. A call Telnyx has nothing for yet is
+// tried again the next day.
+export async function fillTelnyxCosts(now = new Date(), budgetMs = 20_000): Promise<number> {
+  if (!isTelnyxConfigured()) return 0;
+  const calls = await prisma.phoneCall.findMany({
+    where: { telnyxCallControlId: { not: null }, telnyxCostUsd: null, startedAt: { gte: new Date(now.getTime() - 30 * PENDING_TTL_MS), lt: new Date(now.getTime() - PENDING_TTL_MS) } },
+    select: { id: true, telnyxCallControlId: true },
+    orderBy: { startedAt: "asc" },
+    take: 200,
+  });
+  const stop = Date.now() + budgetMs;
+  let filled = 0;
+  let failed: unknown = null;
+  for (const c of calls) {
+    if (Date.now() > stop) break;
+    try {
+      const cost = await telnyxCallCost(c.telnyxCallControlId!);
+      if (cost === null) continue;
+      await prisma.phoneCall.update({ where: { id: c.id }, data: { telnyxCostUsd: cost } });
+      filled++;
+    } catch (err) {
+      // That call waits for tomorrow; the rest still get their cost.
+      failed = err;
+    }
+  }
+  if (failed) await reportError(failed, "Telnyx call cost lookup", { filled });
+  return filled;
 }

@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/db";
+import { recordAiUsage } from "@/lib/ai-usage";
 
 // Runs once, right when a call finishes — pulls out commitments made on the
 // call that AREN'T deal terms: "I'll send the proposal by Friday", "you
@@ -56,6 +57,7 @@ export async function extractActionItems(callId: string): Promise<void> {
     ],
     tool_choice: { type: "tool", name: "record_action_items" },
   });
+  recordAiUsage(response);
 
   const toolUse = response.content.find((b) => b.type === "tool_use");
   if (!toolUse || toolUse.type !== "tool_use") return;

@@ -43,6 +43,34 @@ describe("Calls inbox", () => {
     // 3 minutes at $0.0043 plus 2,000 in / 400 out at $1 / $5 per million.
     expect(callCostUsd({ sttSeconds: 180, aiInputTokens: 2000, aiOutputTokens: 400 })).toBeCloseTo(0.0129 + 0.002 + 0.002, 6);
     expect(callCostUsd({ sttSeconds: null, aiInputTokens: null, aiOutputTokens: null })).toBe(0);
+    // Metered model cost and Telnyx's bill replace the Haiku guess and add on.
+    expect(callCostUsd({ sttSeconds: 60, aiInputTokens: 5000, aiOutputTokens: 900, aiCostUsd: 0.02, telnyxCostUsd: 0.0144 })).toBeCloseTo(0.0043 + 0.02 + 0.0144, 6);
+  });
+
+  it("counts every channel of a two-channel recording, and every model call", async () => {
+    phoneCall.findUnique.mockResolvedValue({ id: "call3", status: "processing", mode: null, workspaceId: "w1", userId: "u1", lead: { id: "l1", name: "Dana" }, transcript: null, telnyxRecordingId: "rec3", telnyxClientLegId: "leg2", durationSec: 44 });
+    telnyx.recordingDownload.mockResolvedValue({ url: "https://telnyx.example/rec3.mp3", seconds: 44 });
+    telnyx.deleteRecording.mockResolvedValue(undefined);
+    const utterances = [{ channel: 0, start: 0, transcript: "Hello?" }, { channel: 1, start: 1, transcript: "Hi Dana, it's Sam." }];
+    const channels = [{ alternatives: [{ transcript: "Hello?" }] }, { alternatives: [{ transcript: "Hi Dana, it's Sam." }] }];
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ metadata: { duration: 44 }, results: { utterances, channels } }))));
+    const { recordAiUsage } = await import("@/lib/ai-usage");
+    classify.mockImplementation(async () => {
+      recordAiUsage({ model: "claude-haiku-4-5", usage: { input_tokens: 1000, output_tokens: 2 } });
+      return { kind: "sales" };
+    });
+    sales.mockImplementation(async () => {
+      recordAiUsage({ model: "claude-sonnet-5", usage: { input_tokens: 4000, output_tokens: 1000 } });
+    });
+    phoneCall.update.mockClear();
+
+    await runCallProcessing("call3", "America/Chicago", { force: true });
+
+    expect(phoneCall.update.mock.calls.find((c) => "sttSeconds" in c[0].data)?.[0].data.sttSeconds).toBe(88);
+    const last = phoneCall.update.mock.calls.at(-1)?.[0].data;
+    expect(last).toMatchObject({ aiInputTokens: 5000, aiOutputTokens: 1002 });
+    expect(last.aiCostUsd).toBeCloseTo((1000 * 1 + 2 * 5) / 1e6 + (4000 * 2 + 1000 * 10) / 1e6, 9);
+    vi.unstubAllGlobals();
   });
 
   it("writes out a phone recording only when it's processed, then drops the audio", async () => {

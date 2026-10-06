@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { recordAiUsage } from "@/lib/ai-usage";
 
 export function isExtractionConfigured(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY);
@@ -118,6 +119,7 @@ export async function extractDealFromTranscript(
     ],
     tool_choice: { type: "tool", name: "record_deal_terms" },
   });
+  recordAiUsage(response);
 
   const toolUse = response.content.find((b) => b.type === "tool_use");
   if (!toolUse || toolUse.type !== "tool_use") {

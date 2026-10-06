@@ -8,6 +8,7 @@ import { createNotification } from "@/lib/notifications";
 import { sendContractReadyEmail } from "@/lib/email";
 import { dispatchWebhookEvent } from "@/lib/webhooks";
 import { reportError } from "@/lib/error-report";
+import { recordAiUsage } from "@/lib/ai-usage";
 
 type TemplateOption = { id: string; name: string; description: string };
 
@@ -31,6 +32,7 @@ export async function suggestTemplateId(transcript: string, templates: TemplateO
         },
       ],
     });
+    recordAiUsage(message);
     const text = message.content.find((c) => c.type === "text")?.text ?? "";
     const n = Number(text.match(/\d+/)?.[0]);
     if (Number.isInteger(n) && n >= 1 && n <= templates.length) return templates[n - 1].id;

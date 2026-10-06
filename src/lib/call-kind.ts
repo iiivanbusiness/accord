@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { recordAiUsage } from "@/lib/ai-usage";
 
 export type CallKind = "cold" | "sales";
 
@@ -17,6 +18,7 @@ export async function classifyCallKind(transcript: string): Promise<{ kind: Call
       "\"cold\" for everything else: first contact, qualifying, booking a meeting or demo, follow-ups, voicemail, no agreement.",
     messages: [{ role: "user", content: transcript.slice(0, 30_000) }],
   });
+  recordAiUsage(message);
   const text = message.content.find((c) => c.type === "text")?.text.trim().toLowerCase() ?? "";
   return { kind: text.startsWith("sales") ? "sales" : "cold", inputTokens: message.usage.input_tokens, outputTokens: message.usage.output_tokens };
 }

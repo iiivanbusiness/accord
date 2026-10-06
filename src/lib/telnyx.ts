@@ -168,3 +168,28 @@ export async function isNumberVerified(phone: string): Promise<boolean> {
   const { data } = (await res.json()) as { data?: { verified_at?: string | null } };
   return Boolean(data?.verified_at);
 }
+
+type DetailRecord = { cost?: string | null; telnyx_session_id?: string | null };
+
+async function detailRecords(recordType: string, filter: Record<string, string>): Promise<DetailRecord[]> {
+  const params = new URLSearchParams({ "filter[record_type]": recordType, "filter[date_range]": "last_30_days", "page[size]": "50" });
+  for (const [key, value] of Object.entries(filter)) params.set(`filter[${key}]`, value);
+  const { data } = await telnyx<{ data?: DetailRecord[] }>(`/detail_records?${params}`);
+  return data ?? [];
+}
+
+// What Telnyx billed for a call: every leg in its session (SealMe's line,
+// the rep's phone, the client's), Call Control and the recording. Null
+// until Telnyx has the records, which can take a while after hangup.
+export async function telnyxCallCost(callControlId: string): Promise<number | null> {
+  const [leg] = await detailRecords("sip-trunking", { call_control_id: callControlId });
+  const session = leg?.telnyx_session_id;
+  if (!session) return null;
+  // One at a time: Telnyx answers parallel record queries with a 500 now
+  // and then.
+  let cost = 0;
+  for (const type of ["call-control", "sip-trunking", "recording"]) {
+    for (const r of await detailRecords(type, { telnyx_session_id: session })) cost += Number(r.cost) || 0;
+  }
+  return cost;
+}

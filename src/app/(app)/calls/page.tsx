@@ -62,6 +62,8 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
             sttSeconds: true,
             aiInputTokens: true,
             aiOutputTokens: true,
+            aiCostUsd: true,
+            telnyxCostUsd: true,
             hubspotCallId: true,
             salesforceTaskId: true,
             startedAt: true,

@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "PhoneCall" ADD COLUMN "aiCostUsd" DOUBLE PRECISION,
+ADD COLUMN "telnyxCostUsd" DOUBLE PRECISION;

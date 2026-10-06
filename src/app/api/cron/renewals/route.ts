@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { discardStaleCalls } from "@/lib/call-inbox";
+import { discardStaleCalls, fillTelnyxCosts } from "@/lib/call-inbox";
 import { prisma } from "@/lib/db";
 import { sendAdminAlertEmail, sendRenewalReminderEmail, sendReviewOverdueEmail } from "@/lib/email";
 import { createNotification } from "@/lib/notifications";
@@ -177,6 +177,15 @@ export async function GET(req: Request) {
       await reportError(err, "Stale call cleanup");
     }
 
+    // What Telnyx billed for recent calls, so a call's cost is the real one.
+    let callCosts = { filled: 0 };
+    try {
+      callCosts = { filled: await fillTelnyxCosts(now) };
+    } catch (err) {
+      console.error("Telnyx call costs (piggybacked on renewals cron) crashed", err);
+      await reportError(err, "Telnyx call costs");
+    }
+
     let rateLimitResult = { deleted: 0 };
     try {
       rateLimitResult = await cleanupRateLimitHits();
@@ -206,7 +215,7 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ renewals: { checked: dueContracts.length, sent }, overdueReviews: overdueReviewResult, staleDeals: staleResult, taskDigest: taskDigestResult, crmLeadSync, webhookRetries, staleCalls, rateLimitCleanup: rateLimitResult, monthlyReset });
+    return NextResponse.json({ renewals: { checked: dueContracts.length, sent }, overdueReviews: overdueReviewResult, staleDeals: staleResult, taskDigest: taskDigestResult, crmLeadSync, webhookRetries, staleCalls, callCosts, rateLimitCleanup: rateLimitResult, monthlyReset });
   } catch (err) {
     console.error("Renewal reminder cron crashed", err);
     try {

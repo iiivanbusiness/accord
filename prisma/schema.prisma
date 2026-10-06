@@ -1276,10 +1276,17 @@ model PhoneCall {
   summary     String?
   extracted   Json?
 
-  // Usage, so the real cost per call can be checked against the estimate.
+  // Usage, so the real cost per call can be checked against the bills.
+  // sttSeconds is what Deepgram bills: every channel of a two-channel
+  // recording counts. aiCostUsd is every model call the call took at each
+  // model's price (null on older calls, which were Haiku only).
+  // telnyxCostUsd is what Telnyx billed for all legs and the recording,
+  // filled in by the daily cron once Telnyx has the records.
   sttSeconds     Int?
   aiInputTokens  Int?
   aiOutputTokens Int?
+  aiCostUsd      Float?
+  telnyxCostUsd  Float?
 
   startedAt   DateTime  @default(now())
   endedAt     DateTime?

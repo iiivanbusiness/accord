@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { CALL_OUTCOMES, type CallOutcome } from "@/lib/call-outcomes";
+import { recordAiUsage } from "@/lib/ai-usage";
 
 // Cold calls go to Haiku: they're short and only fill a handful of CRM
 // fields, so the cheapest model does the job (sales calls with contract
@@ -106,6 +107,7 @@ export async function extractColdCall(transcript: string, lead: LeadContext, tod
     ],
     tool_choice: { type: "tool", name: "record_cold_call" },
   });
+  recordAiUsage(response);
 
   const toolUse = response.content.find((b) => b.type === "tool_use");
   if (!toolUse || toolUse.type !== "tool_use") throw new Error("Claude didn't return the call details");

@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/db";
+import { recordAiUsage } from "@/lib/ai-usage";
 
 const VALID_TYPES = new Set(["discussion_point", "objection", "competitor_mention", "next_step"]);
 
@@ -66,6 +67,7 @@ export async function extractCallHighlights(dealId: string, transcript: string, 
     ],
     tool_choice: { type: "tool", name: "record_call_highlights" },
   });
+  recordAiUsage(response);
 
   const toolUse = response.content.find((b) => b.type === "tool_use");
   if (!toolUse || toolUse.type !== "tool_use") return;
