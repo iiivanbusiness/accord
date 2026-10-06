@@ -29,10 +29,23 @@ export function consentFor(phone: string | null | undefined): { state: string | 
   return { state, rule: ALL_PARTY_STATES.has(state) ? "all_party" : "one_party" };
 }
 
+// Workspaces listed in CALL_TEST_WORKSPACES (comma-separated ids) may
+// record calls to numbers outside the US, always after the recording
+// notice: for testing SealMe from outside the US with people who know
+// it's a test. Off for everyone else.
+export function isCallTestWorkspace(workspaceId: string): boolean {
+  return (process.env.CALL_TEST_WORKSPACES ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean)
+    .includes(workspaceId);
+}
+
 // Whether SealMe records, and whether it plays the recording notice first.
 // No number, toll-free and non-US numbers are never recorded; strict and
 // unplaceable states follow the workspace's choice.
-export function recordingDecision(rule: ConsentRule, allPartyStatePolicy: string): { record: boolean; announce: boolean } {
+export function recordingDecision(rule: ConsentRule, allPartyStatePolicy: string, options: { testMode?: boolean } = {}): { record: boolean; announce: boolean } {
+  if (rule === "non_us" && options.testMode) return { record: true, announce: true };
   if (rule === "one_party") return { record: true, announce: false };
   if ((rule === "all_party" || rule === "unknown") && allPartyStatePolicy === "announce") return { record: true, announce: true };
   return { record: false, announce: false };

@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/db";
 import { requireProspecting } from "@/lib/prospecting";
 import { leadAccess } from "@/lib/lead-visibility";
-import { consentFor, recordingDecision, type ConsentRule } from "@/lib/call-consent";
+import { consentFor, isCallTestWorkspace, recordingDecision, type ConsentRule } from "@/lib/call-consent";
 import { callAction, isTelnyxConfigured, sealmeNumber } from "@/lib/telnyx";
 import { callRep } from "@/lib/telnyx-calls";
 import { reportError } from "@/lib/error-report";
@@ -40,7 +40,7 @@ export async function startLeadCall(leadId: string, input: { mode?: string; temp
   const consent = consentFor(lead.phone);
   const number = sealmeNumber();
   if (!number) return { kind: "direct", dial: lead.phone, reason: "no_sealme_number", state: consent.state };
-  const { record, announce } = recordingDecision(consent.rule, workspace.allPartyStatePolicy);
+  const { record, announce } = recordingDecision(consent.rule, workspace.allPartyStatePolicy, { testMode: isCallTestWorkspace(workspace.id) });
   if (!record) return { kind: "direct", dial: lead.phone, reason: consent.rule, state: consent.state };
 
   const me = await prisma.user.findUnique({ where: { id: access.userId }, select: { phone: true, phoneVerifiedAt: true } });

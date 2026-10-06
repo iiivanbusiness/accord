@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { consentFor, recordingDecision } from "./call-consent";
+import { consentFor, isCallTestWorkspace, recordingDecision } from "./call-consent";
 
 describe("Recording rules by the lead's number", () => {
   it("places US numbers by area code", () => {
@@ -24,5 +24,15 @@ describe("Recording rules by the lead's number", () => {
     expect(recordingDecision("all_party", "announce")).toEqual({ record: true, announce: true });
     expect(recordingDecision("unknown", "announce")).toEqual({ record: true, announce: true });
     for (const rule of ["non_us", "toll_free", "no_number"] as const) expect(recordingDecision(rule, "announce")).toEqual({ record: false, announce: false });
+  });
+
+  it("records outside the US only in a test workspace, and only after the notice", () => {
+    expect(recordingDecision("non_us", "announce")).toEqual({ record: false, announce: false });
+    expect(recordingDecision("non_us", "skip", { testMode: true })).toEqual({ record: true, announce: true });
+    expect(recordingDecision("toll_free", "skip", { testMode: true })).toEqual({ record: false, announce: false });
+    process.env.CALL_TEST_WORKSPACES = "ws_a, ws_b";
+    expect(isCallTestWorkspace("ws_b")).toBe(true);
+    expect(isCallTestWorkspace("ws_c")).toBe(false);
+    delete process.env.CALL_TEST_WORKSPACES;
   });
 });

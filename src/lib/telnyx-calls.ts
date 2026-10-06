@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { normalizePhone } from "@/lib/phone";
-import { consentFor, recordingDecision } from "@/lib/call-consent";
+import { consentFor, isCallTestWorkspace, recordingDecision } from "@/lib/call-consent";
 import { MIN_PROCESS_SECONDS } from "@/lib/call-inbox";
 import { callAction, decodeClientState, deleteRecording, dial, encodeClientState, findRecordingId, type TelnyxEvent } from "@/lib/telnyx";
 import { reportError } from "@/lib/error-report";
@@ -108,7 +108,7 @@ async function answerIncoming(callControlId: string, rawFrom: string | null): Pr
   if (intent) await prisma.callIntent.update({ where: { id: intent.id }, data: { usedAt: now } });
 
   const consent = consentFor(intent?.lead?.phone ?? null);
-  const { record, announce } = recordingDecision(consent.rule, rep.workspace.allPartyStatePolicy);
+  const { record, announce } = recordingDecision(consent.rule, rep.workspace.allPartyStatePolicy, { testMode: isCallTestWorkspace(rep.workspaceId) });
 
   let callId: string;
   try {
