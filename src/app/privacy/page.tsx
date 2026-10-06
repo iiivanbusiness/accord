@@ -4,7 +4,7 @@ export const metadata = {
   title: "Privacy Policy - SealMe",
 };
 
-const LAST_UPDATED = "September 30, 2026";
+const LAST_UPDATED = "October 6, 2026";
 
 export default function PrivacyPage() {
   return (
@@ -37,6 +37,12 @@ export default function PrivacyPage() {
               <li><strong style={{ color: "var(--ink)" }}>Account data</strong>. Name, work email, password hash, and workspace details.</li>
               <li><strong style={{ color: "var(--ink)" }}>Call data</strong>. Audio captured during calls you connect to SealMe, and the transcripts and deal
                 terms extracted from it.</li>
+              <li><strong style={{ color: "var(--ink)" }}>Lead data</strong>. Names, job titles, companies, phone numbers, email addresses, and notes about
+                sales leads that you add by hand, import from a file, or bring in from HubSpot or Salesforce.</li>
+              <li><strong style={{ color: "var(--ink)" }}>Phone call data</strong>. If you place calls through SealMe: the phone numbers involved, when the call
+                happened and how long it lasted, the US state we infer from the area code and the recording rule we applied, and, where recording is
+                allowed, the call audio, its transcript, and the notes we extract from it. We also keep your own phone number and the fact that you
+                verified it with a text message code.</li>
               <li><strong style={{ color: "var(--ink)" }}>Deal and contract data</strong>. Client names, pricing, contract templates, clauses, and signature
                 records you create in the Service.</li>
               <li><strong style={{ color: "var(--ink)" }}>Calendar data</strong>. If you connect Google Calendar, we read your upcoming events and the email
@@ -48,6 +54,8 @@ export default function PrivacyPage() {
           <Section title="3. How We Use Information">
             <ul className="ml-5 flex list-disc flex-col gap-1.5">
               <li>To operate the Service: capturing deal terms, drafting contracts, and routing them for signature;</li>
+              <li>To connect the phone calls you start, apply the recording rule for the called party&apos;s state, and write up calls as lead notes,
+                summaries, and draft contracts;</li>
               <li>To maintain and secure workspace accounts;</li>
               <li>To provide customer support and respond to requests;</li>
               <li>To improve accuracy of AI-driven field extraction and contract drafting;</li>
@@ -59,7 +67,10 @@ export default function PrivacyPage() {
             <p>
               Call audio and transcripts are processed by Anthropic (Claude) under contract with SealMe in order to extract deal terms, generate contract
               language, and summarize call notes. Audio you record locally is first transcribed by Deepgram before reaching Anthropic. If you connect Google Calendar, Google processes your calendar data under its own terms to
-              sync events. These providers are bound by confidentiality and data-processing terms and are not permitted to use your data to train their own
+              sync events. Phone calls you place through SealMe are carried, and where allowed recorded, by Telnyx, our telephony provider, which also
+              sends the text message code used to verify your phone number; those recordings are transcribed by Deepgram and summarized by Anthropic.
+              If you connect HubSpot or Salesforce, we read the contacts or leads you choose to import and write call summaries and lead status back to
+              your account. These providers are bound by confidentiality and data-processing terms and are not permitted to use your data to train their own
               general-purpose models unless you explicitly opt in.
             </p>
           </Section>
@@ -88,25 +99,36 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          <Section title="6. Sharing of Information">
+          <Section title="6. Phone Call Recording">
+            <p>
+              SealMe decides whether a call may be recorded from the called party&apos;s US area code. Where one party&apos;s consent is enough, the call is
+              recorded. In states that require the consent of everyone on the call, and when the state cannot be determined, calls are not recorded.
+              Calls to numbers outside the United States, to toll-free numbers, and to leads without a phone number are not recorded. Every call keeps a
+              record of the area code, the state, the rule applied, whether it was recorded, and when.
+            </p>
+          </Section>
+
+          <Section title="7. Sharing of Information">
             <p>We do not sell your personal information. We share information only with:</p>
             <ul className="ml-5 mt-2 flex list-disc flex-col gap-1.5">
-              <li>Sub-processors who host, transcribe, or process data on our behalf (e.g., cloud hosting, AI model providers, e-signature delivery);</li>
+              <li>Sub-processors who host, transcribe, or process data on our behalf (e.g., cloud hosting, AI model providers, telephony, e-signature delivery);</li>
               <li>Integrated platforms you connect, such as Slack, DocuSign, HubSpot, or Salesforce, to the extent needed for the integration to function;</li>
               <li>Law enforcement or regulators where required by law;</li>
               <li>A successor entity in the event of a merger, acquisition, or asset sale, subject to the same privacy commitments.</li>
             </ul>
           </Section>
 
-          <Section title="7. Data Retention">
+          <Section title="8. Data Retention">
             <p>
               We retain account, deal, and contract data for as long as your workspace is active, and for a reasonable period afterward to comply with legal,
               accounting, or dispute-resolution requirements. Raw call audio is retained only as long as needed to complete transcription and field extraction,
-              after which it is deleted or reduced to a text transcript, unless you configure a longer retention period.
+              after which it is deleted or reduced to a text transcript, unless you configure a longer retention period. Phone call recordings are deleted
+              from our telephony provider once the call is written up or discarded, and calls nobody processes are deleted after 24 hours. Transcripts
+              and call notes stay with the lead or deal for as long as the workspace keeps them.
             </p>
           </Section>
 
-          <Section title="8. Data Security">
+          <Section title="9. Data Security">
             <p>
               We use industry-standard technical and organizational measures (including encryption in transit and access controls) to protect information
               against unauthorized access, alteration, or loss. No method of transmission or storage is completely secure, and we cannot guarantee absolute
@@ -114,7 +136,7 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          <Section title="9. Your Rights">
+          <Section title="10. Your Rights">
             <p>
               Depending on your location, you may have the right to access, correct, export, or delete your personal information, and to object to or restrict
               certain processing. Workspace administrators can manage most of this directly in account settings; you can also contact us using the details
@@ -122,31 +144,31 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          <Section title="10. Cookies">
+          <Section title="11. Cookies">
             <p>
               We use essential cookies to keep you signed in and remember basic preferences. We do not use third-party advertising cookies on the Service.
             </p>
           </Section>
 
-          <Section title="11. International Data Transfers">
+          <Section title="12. International Data Transfers">
             <p>
               Information may be processed in countries other than your own. Where required, we rely on appropriate safeguards (such as standard contractual
               clauses) for cross-border transfers of personal data.
             </p>
           </Section>
 
-          <Section title="12. Children&apos;s Privacy">
+          <Section title="13. Children&apos;s Privacy">
             <p>The Service is intended for business use and is not directed at individuals under 16. We do not knowingly collect data from children.</p>
           </Section>
 
-          <Section title="13. Changes to This Policy">
+          <Section title="14. Changes to This Policy">
             <p>
               We may update this Privacy Policy from time to time. Material changes will be communicated to workspace administrators by email or in-app
               notice before they take effect.
             </p>
           </Section>
 
-          <Section title="14. Contact">
+          <Section title="15. Contact">
             <p>
               For privacy questions or data requests, contact <span style={{ color: "var(--ink)" }}>hello@sealme.net</span>.
             </p>
