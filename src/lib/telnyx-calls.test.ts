@@ -102,6 +102,7 @@ describe("Calls to the SealMe number", () => {
     await handleTelnyxEvent(event("call.speak.ended", { client_state: spoken.client_state }));
     const [, start, recordBody] = lastAction();
     expect(start).toBe("record_start");
+    expect(recordBody).toMatchObject({ format: "mp3", channels: "single" });
     expect(stateOf(recordBody)).toEqual({ k: "rec", c: "call1" });
     expect(db.phoneCall.update).toHaveBeenCalledWith({ where: { id: "call1" }, data: { recorded: true } });
   });
@@ -181,7 +182,10 @@ describe("Calls to the SealMe number", () => {
       await handleTelnyxEvent(event("call.answered", { call_control_id: "client-leg", client_state: encodeClientState({ k: "client", c: "call9" }) }));
       const [leg, action, body] = lastAction();
       expect([leg, action]).toEqual(["client-leg", "record_start"]);
-      expect(body).toMatchObject({ record_channels: "dual" });
+      // record_start takes format/channels; Telnyx rejects the answer-style names.
+      expect(body).toMatchObject({ format: "mp3", channels: "dual", max_length: 14400 });
+      expect(body).not.toHaveProperty("record_channels");
+      expect(body).not.toHaveProperty("record_format");
       expect(stateOf(body)).toEqual({ k: "live", c: "call9" });
       expect(db.phoneCall.update).toHaveBeenCalledWith({ where: { id: "call9" }, data: { status: "recording", recorded: true } });
     });

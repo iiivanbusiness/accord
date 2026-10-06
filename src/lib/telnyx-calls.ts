@@ -32,13 +32,24 @@ const SAY: Record<ByeReason | "notice_prompt" | "notice" | "holding", string> = 
 // A safety cap; a sales call longer than this is unheard of.
 const MAX_RECORDING_SECONDS = 4 * 60 * 60;
 
-// A merged line comes in as one mixed track. A call SealMe places itself is
-// recorded on the client's leg in two channels (client, rep), so who said
-// what never has to be guessed.
-const recordOptions = (callId: string, channels: "single" | "dual" = "single") => ({
+// Recording from the moment SealMe answers a merged line: one mixed track.
+// These names only work on "answer"; record_start takes its own (below).
+const answerRecordOptions = (callId: string) => ({
+  record: "record-from-answer",
   record_format: "mp3",
-  record_channels: channels,
+  record_channels: "single",
   record_max_length: MAX_RECORDING_SECONDS,
+  command_id: `answer-record-${callId}`,
+});
+
+// record_start, once the notice has played: Telnyx requires format and
+// channels here and rejects the answer-style names. A call SealMe places
+// itself is recorded on the client's leg in two channels (client, rep), so
+// who said what never has to be guessed.
+export const recordStartOptions = (callId: string, channels: "single" | "dual") => ({
+  format: "mp3",
+  channels,
+  max_length: MAX_RECORDING_SECONDS,
   command_id: `record-${callId}`,
 });
 
@@ -149,8 +160,7 @@ async function answerIncoming(callControlId: string, rawFrom: string | null): Pr
   }
   const answered = await callAction(callControlId, "answer", {
     client_state: encodeClientState({ k: "rec", c: callId }),
-    record: "record-from-answer",
-    ...recordOptions(callId),
+    ...answerRecordOptions(callId),
     command_id: `answer-${callControlId}`,
   });
   if (answered.data?.recording_id) await prisma.phoneCall.update({ where: { id: callId }, data: { telnyxRecordingId: answered.data.recording_id } });
@@ -159,7 +169,7 @@ async function answerIncoming(callControlId: string, rawFrom: string | null): Pr
 // The notice has played to everyone on the merged call; only now does
 // SealMe start recording.
 async function startRecordingAfterNotice(callControlId: string, callId: string): Promise<void> {
-  await callAction(callControlId, "record_start", { ...recordOptions(callId), client_state: encodeClientState({ k: "rec", c: callId }) });
+  await callAction(callControlId, "record_start", { ...recordStartOptions(callId, "single"), client_state: encodeClientState({ k: "rec", c: callId }) });
   await prisma.phoneCall.update({ where: { id: callId }, data: { recorded: true } });
 }
 
@@ -205,7 +215,15 @@ async function joinAndRecord(clientLeg: string, callId: string): Promise<void> {
 }
 
 async function startRecordingClientLeg(clientLeg: string, callId: string): Promise<void> {
-  await callAction(clientLeg, "record_start", { ...recordOptions(callId, "dual"), client_state: encodeClientState({ k: "live", c: callId }) });
+  try {
+    await callAction(clientLeg, "record_start", { ...recordStartOptions(callId, "dual"), client_state: encodeClientState({ k: "live", c: callId }) });
+  } catch (err) {
+    // They're talking, but nothing is recorded: say so on the call instead
+    // of it ending up "cancelled", and tell us.
+    await prisma.phoneCall.update({ where: { id: callId }, data: { status: "skipped", extracted: { skipped: "record_failed" }, processedAt: new Date() } });
+    await reportError(err, "Starting a call recording", { callId });
+    return;
+  }
   await prisma.phoneCall.update({ where: { id: callId }, data: { status: "recording", recorded: true } });
 }
 

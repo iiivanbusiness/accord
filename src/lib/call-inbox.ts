@@ -30,6 +30,7 @@ export const SKIP_LABEL: Record<string, string> = {
   rep_missed: "You didn't answer SealMe's call",
   cancelled: "Cancelled before they picked up",
   dial_failed: "SealMe couldn't place the call",
+  record_failed: "SealMe couldn't start recording",
 };
 
 // Channels of SealMe's own two-channel recordings, recorded on the client's
