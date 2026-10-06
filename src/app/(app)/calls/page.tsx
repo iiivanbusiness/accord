@@ -36,7 +36,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
   const tab = (await searchParams).tab === "history" ? "history" : "pending";
   const callWhere = { workspaceId: workspace.id, ...(seesAll ? {} : { userId: access.userId }) };
 
-  const [pending, history, leads, pendingCount, templates] = await Promise.all([
+  const [pending, history, leads, pendingCount] = await Promise.all([
     tab === "pending"
       ? prisma.phoneCall.findMany({
           where: { ...callWhere, status: { in: ["pending", "processing", "failed"] } },
@@ -82,7 +82,6 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
         })
       : Promise.resolve([]),
     prisma.phoneCall.count({ where: { ...callWhere, status: { in: ["pending", "processing", "failed"] } } }),
-    tab === "pending" ? prisma.contractTemplate.findMany({ where: { workspaceId: workspace.id }, select: { id: true, name: true }, orderBy: { name: "asc" } }) : Promise.resolve([]),
   ]);
 
   const tabLink = (key: "pending" | "history", label: string) => (
@@ -133,10 +132,8 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
                   awaitingTranscript: !c.transcript && Boolean(c.telnyxRecordingId),
                   leadId: c.leadId,
                   mode: c.mode,
-                  templateId: c.templateId,
                 }}
                 leads={leads.map((l) => ({ id: l.id, name: l.name, detail: l.company ?? l.phone ?? "" }))}
-                templates={templates}
                 processAction={processCall.bind(null, c.id)}
                 discardAction={discardCall.bind(null, c.id)}
               />

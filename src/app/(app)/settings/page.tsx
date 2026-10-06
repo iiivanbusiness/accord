@@ -497,7 +497,7 @@ export default async function SettingsPage({
     {canManageWorkspacePerm && <DeveloperSettingsLink />}
 
     {currentUser && workspace.prospectingEnabled && (
-      <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
+      <div id="phone" className="glass-card glass-card-solid card-hover mb-4 max-w-[600px] scroll-mt-24">
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">Your phone number</h2>
         </div>

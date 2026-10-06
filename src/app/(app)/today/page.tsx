@@ -9,6 +9,7 @@ import { formatTaskDue, TASK_TYPE_LABEL } from "@/lib/tasks";
 import TodayTaskRow, { type TodayTask } from "@/components/TodayTaskRow";
 import LeadCallButton from "@/components/LeadCallButton";
 import { CALL_OUTCOME_CHIP, CALL_OUTCOME_LABEL } from "@/lib/call-outcomes";
+import { isTelnyxConfigured } from "@/lib/telnyx";
 import TaskDigestToggle from "@/components/TaskDigestToggle";
 import { setTaskStatus } from "../leads/task-actions";
 import { startLeadCall } from "../leads/phone-actions";
@@ -94,6 +95,7 @@ export default async function TodayPage() {
   const reviewerIds = [user.id, ...delegations.map((d) => d.fromUserId)];
 
   const dayStart = startOfDayInZone(now, tz);
+  const me = await prisma.user.findUnique({ where: { id: user.id }, select: { phone: true, phoneVerifiedAt: true } });
   const [open, finished, myDeals, pendingSteps, justSaved, callsToCheck, meetings] = await Promise.all([
     prisma.task.findMany({
       where: { workspaceId: workspace.id, assigneeId: user.id, status: "open", dueDate: { lt: horizon } },
@@ -208,6 +210,16 @@ export default async function TodayPage() {
       </div>
 
       <div className="flex flex-col gap-4">
+        {isTelnyxConfigured() && !me?.phoneVerifiedAt && (
+          <Link href="/settings#phone" className="card row-hover flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
+            <div className="min-w-0">
+              <div className="text-[14px] font-medium" style={{ color: "var(--ink)" }}>{me?.phone ? "Verify your phone number" : "Add your phone number"}</div>
+              <div className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>One time, takes a minute. Then a tap on Call rings you and connects your client.</div>
+            </div>
+            <span className="chip chip-warn flex-none">Setup</span>
+          </Link>
+        )}
+
         {next && <NextUp task={next} overdue={next.dueDate < todayDate} />}
 
         {justSaved?.lead && (
