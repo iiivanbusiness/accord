@@ -27,7 +27,7 @@ import CrmLeadImportPanel from "@/components/CrmLeadImportPanel";
 import { readHubspotFilter, readSalesforceFilter } from "@/lib/crm-leads";
 import { loadCrmLeadOptions, saveCrmLeadFilter, saveHubspotWebhookSecret, setCrmLeadImport, setSalesforceWebhookKey, syncCrmLeadsNow } from "./crm-lead-actions";
 import { isDocusignConfigured } from "@/lib/docusign";
-import { isSalesforceConfigured } from "@/lib/salesforce";
+import { canConnectSalesforce, isSalesforceConfigured } from "@/lib/salesforce";
 import { listSlackChannels, isSlackConfigured } from "@/lib/slack";
 import {
   checkSenderDomainVerification,
@@ -457,6 +457,7 @@ export default async function SettingsPage({
         </div>
         <SalesforceSettingsPanel
           configured={isSalesforceConfigured()}
+          available={canConnectSalesforce(workspace.id)}
           connected={Boolean(workspace.salesforceRefreshToken)}
           accountEmail={workspace.salesforceAccountEmail}
           enabled={workspace.salesforceEnabled}

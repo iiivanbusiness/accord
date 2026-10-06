@@ -5,6 +5,7 @@ import ExternalConnectLink from "./ExternalConnectLink";
 
 export default function SalesforceSettingsPanel({
   configured,
+  available,
   connected,
   accountEmail,
   enabled,
@@ -12,6 +13,9 @@ export default function SalesforceSettingsPanel({
   disconnectAction,
 }: {
   configured: boolean;
+  // Salesforce still has to approve SealMe for any company's org (see
+  // canConnectSalesforce); until then most workspaces can't connect.
+  available: boolean;
   connected: boolean;
   accountEmail: string | null;
   enabled: boolean;
@@ -36,6 +40,17 @@ export default function SalesforceSettingsPanel({
     return (
       <div className="px-[22px] py-[18px] text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
         Salesforce isn&apos;t set up for this deployment yet. A SALESFORCE_CLIENT_ID/SECRET needs to be configured first.
+      </div>
+    );
+  }
+
+  if (!connected && !available) {
+    return (
+      <div className="flex flex-col gap-1 px-[22px] py-[18px]">
+        <span className="chip chip-neutral w-fit">Coming soon</span>
+        <div className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
+          Salesforce is still approving SealMe&apos;s app for other companies&apos; orgs. We&apos;ll turn this on as soon as they do. HubSpot works today.
+        </div>
       </div>
     );
   }

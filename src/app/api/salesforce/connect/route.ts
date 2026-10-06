@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { requirePermission } from "@/lib/permissions";
 import { requireWorkspaceId } from "@/lib/workspace";
-import { buildSalesforceAuthorizeUrl, isSalesforceConfigured } from "@/lib/salesforce";
+import { buildSalesforceAuthorizeUrl, canConnectSalesforce, isSalesforceConfigured } from "@/lib/salesforce";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -16,5 +16,6 @@ export async function GET(req: Request) {
 
   if (!isSalesforceConfigured()) return NextResponse.redirect(new URL("/settings?error=salesforce_not_configured", req.url));
   const workspaceId = await requireWorkspaceId();
+  if (!canConnectSalesforce(workspaceId)) return NextResponse.redirect(new URL("/settings?error=salesforce_coming_soon", req.url));
   return NextResponse.redirect(await buildSalesforceAuthorizeUrl(workspaceId));
 }

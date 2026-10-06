@@ -21,6 +21,16 @@ export function isSalesforceConfigured(): boolean {
   return Boolean(process.env.SALESFORCE_CLIENT_ID && process.env.SALESFORCE_CLIENT_SECRET);
 }
 
+// Until SealMe's Salesforce app ships in a managed package, Salesforce lets
+// only the org it was made in connect; any other org gets "Cross-org OAuth
+// flows are not supported". So Connect is offered only to the workspaces in
+// SALESFORCE_CONNECT_WORKSPACES (comma-separated ids), or to everyone once
+// it's "*".
+export function canConnectSalesforce(workspaceId: string): boolean {
+  const allowed = (process.env.SALESFORCE_CONNECT_WORKSPACES ?? "").split(",").map((id) => id.trim());
+  return allowed.includes("*") || allowed.includes(workspaceId);
+}
+
 function redirectUri(): string {
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   return `${base}/api/salesforce/callback`;
