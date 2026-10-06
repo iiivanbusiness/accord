@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import type { CallPlan } from "@/app/(app)/leads/phone-actions";
+import { cancelLeadCall, type CallPlan } from "@/app/(app)/leads/phone-actions";
 import { US_STATE_NAME } from "@/lib/us-states";
 
 const stateName = (state: string | null) => (state ? (US_STATE_NAME[state] ?? state) : "This state");
@@ -26,10 +26,11 @@ const PHONE_ICON = (
   </svg>
 );
 
-// Call a lead with SealMe on the line: one tap gets it ready, then a tel:
-// link the rep taps (phones never block those) calls the SealMe number,
-// and they add the client and merge. Nobody picks cold or sales: SealMe
-// tells from the call. When SealMe may not record this lead, the client is
+// Call a lead with SealMe on the line. With a verified number, one tap and
+// SealMe rings the rep, then the client. Without one, the tap gets a tel:
+// link ready (phones never block those) to call the SealMe number, and the
+// rep adds the client and merges. Nobody picks cold or sales: SealMe tells
+// from the call. When SealMe may not record this lead, the client is
 // dialed directly and the rep is told why.
 //   card     the Call box on a lead
 //   compact  one button, for a Today row
@@ -74,7 +75,29 @@ export default function LeadCallButton({
   );
 
   const steps =
-    plan?.kind === "sealme" ? (
+    plan?.kind === "ringing" ? (
+      <div className="flex flex-col gap-2 rounded-[14px] px-3.5 py-3" style={{ background: hero ? "var(--surface-inverted-2)" : "var(--canvas)" }}>
+        <div className="flex items-center gap-2 text-[15px] font-semibold">
+          {PHONE_ICON}
+          Answer your phone
+        </div>
+        <div className="text-[12.5px] leading-relaxed" style={{ color: muted }}>
+          SealMe is ringing you now. Pick up and it calls {firstName} from your number and joins you. When you hang up, the notes write themselves.
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            const callId = plan.callId;
+            setPlan(null);
+            void cancelLeadCall(callId);
+          }}
+          className="w-fit text-[12.5px] font-medium"
+          style={{ color: muted }}
+        >
+          Cancel
+        </button>
+      </div>
+    ) : plan?.kind === "sealme" ? (
       <div className="flex flex-col gap-2">
         {dialButton(plan.dial, "Call SealMe")}
         <div className="text-[12.5px] leading-relaxed" style={{ color: muted }}>
@@ -82,6 +105,9 @@ export default function LeadCallButton({
           {plan.announce && <> Once {firstName} is on, press <b>1</b> for the recording notice: {stateName(plan.state)} needs everyone&apos;s consent.</>}
           {" "}SealMe writes up the call when you hang up.
         </div>
+        <Link href="/settings" className="w-fit text-[12px] font-medium underline" style={{ color: muted }}>
+          Verify your number and SealMe rings you instead, no merging
+        </Link>
       </div>
     ) : plan?.kind === "direct" ? (
       <div className="flex flex-col gap-2">
@@ -122,7 +148,7 @@ export default function LeadCallButton({
       {!hero && <div className="text-[14px] font-medium">Call</div>}
       {ready ? steps : callButton}
       {!ready && steps}
-      {ready && (
+      {ready && plan.kind !== "ringing" && (
         <button type="button" onClick={() => setPlan(null)} className="w-fit text-[12px] font-medium" style={{ color: muted }}>
           Start over
         </button>

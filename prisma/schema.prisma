@@ -329,6 +329,8 @@ model User {
   // The rep's own mobile number, E.164. Calls into the SealMe number are
   // matched to the rep by caller ID, so two users can't share one.
   phone String? @unique
+  // Confirmed with a text code, so SealMe may call clients from this number.
+  phoneVerifiedAt DateTime?
 
   ownedLeads    Lead[]       @relation("LeadOwner")
   assignedTasks Task[]       @relation("TaskAssignee")
@@ -1240,7 +1242,7 @@ model PhoneCall {
   deal   Deal?   @relation(fields: [dealId], references: [id], onDelete: SetNull)
 
   mode   String @default("unknown") // cold | sales | unknown | auto (sorted from the transcript when processed)
-  status String @default("recording") // recording | pending | processing | processed | discarded | failed | skipped
+  status String @default("recording") // dialing (SealMe ringing the rep or client) | recording | pending | processing | processed | discarded | failed | skipped
   source String @default("phone") // phone | paste (a transcript pasted on the lead page) | desktop
   // What happened, from the transcript: meeting_booked | interested | follow_up
   // | not_interested | voicemail | no_answer | wrong_person. connected is
@@ -1257,6 +1259,8 @@ model PhoneCall {
   recorded     Boolean @default(false)
 
   telnyxCallControlId String? @unique
+  // When SealMe calls the rep and then the client, the client's leg.
+  telnyxClientLegId   String?
   telnyxRecordingId   String?
 
   // The call as logged in the lead's CRM, so it's written there only once.

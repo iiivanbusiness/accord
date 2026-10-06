@@ -5,7 +5,11 @@
 // numbers them from 0.
 export const RECORDING_LISTEN_PARAMS = "model=nova-3&smart_format=true&punctuate=true&diarize=true&utterances=true";
 
-type Utterance = { speaker?: number; transcript?: string };
+// A two-channel phone recording (SealMe's own calls): each person is on
+// their own channel, so turns are labeled by channel instead of guessed.
+export const DUAL_CHANNEL_LISTEN_PARAMS = "model=nova-3&smart_format=true&punctuate=true&multichannel=true&utterances=true";
+
+type Utterance = { speaker?: number; channel?: number; start?: number; transcript?: string };
 type ListenResponse = {
   metadata?: { duration?: number };
   results?: { utterances?: Utterance[]; channels?: { alternatives?: { transcript?: string }[] }[] };
@@ -27,6 +31,25 @@ export function transcriptFromListenResponse(data: ListenResponse): { transcript
     ? lines.map((l) => `Speaker ${l.speaker + 1}: ${l.text}`).join("\n")
     : (data.results?.channels?.[0]?.alternatives?.[0]?.transcript ?? "").trim();
   return { transcript, seconds: Math.round(data.metadata?.duration ?? 0), turns: lines.length };
+}
+
+// One line per turn, "Client: ..." / "Rep: ...", in the order they spoke.
+export function transcriptFromChannels(data: ListenResponse, labels: string[]): { transcript: string; seconds: number; turns: number } {
+  const utterances = [...(data.results?.utterances ?? [])].sort((a, b) => (a.start ?? 0) - (b.start ?? 0));
+  const lines: { channel: number; text: string }[] = [];
+  for (const u of utterances) {
+    const text = u.transcript?.trim();
+    if (!text) continue;
+    const channel = u.channel ?? 0;
+    const last = lines[lines.length - 1];
+    if (last && last.channel === channel) last.text += ` ${text}`;
+    else lines.push({ channel, text });
+  }
+  return {
+    transcript: lines.map((l) => `${labels[l.channel] ?? `Speaker ${l.channel + 1}`}: ${l.text}`).join("\n"),
+    seconds: Math.round(data.metadata?.duration ?? 0),
+    turns: lines.length,
+  };
 }
 
 // Zoom, Meet and Teams export captions as .vtt or .srt: drop the cue

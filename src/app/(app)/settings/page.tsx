@@ -5,8 +5,7 @@ import { requireWorkspaceId } from "@/lib/workspace";
 import { getSenderDomainStatus, type SenderDomainRecord } from "@/lib/sender-domain";
 import TwoFactorSettings from "@/components/TwoFactorSettings";
 import PhoneNumberSettings from "@/components/PhoneNumberSettings";
-import { sealmeNumber } from "@/lib/telnyx";
-import { formatPhone } from "@/lib/phone";
+import { isTelnyxConfigured } from "@/lib/telnyx";
 import { countryFromLocale } from "@/lib/phone-input";
 import { headers } from "next/headers";
 import DeleteAccountSettings from "@/components/DeleteAccountSettings";
@@ -505,7 +504,8 @@ export default async function SettingsPage({
         <div className="px-[22px] py-4">
           <PhoneNumberSettings
             phone={currentUser.phone}
-            sealmeNumber={sealmeNumber() ? formatPhone(sealmeNumber()) : null}
+            verified={Boolean(currentUser.phoneVerifiedAt)}
+            canVerify={isTelnyxConfigured()}
             country={countryFromLocale((await headers()).get("accept-language")?.split(",")[0])?.code ?? "US"}
           />
         </div>

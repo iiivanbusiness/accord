@@ -111,3 +111,60 @@ export type TelnyxEvent = {
     };
   };
 };
+
+// The Voice API app the SealMe number is attached to: outbound calls go
+// out through it. Read off the number once per server instance.
+let connectionId: string | null = null;
+export async function telnyxConnectionId(): Promise<string> {
+  if (connectionId) return connectionId;
+  const number = sealmeNumber();
+  if (!number) throw new Error("TELNYX_PHONE_NUMBER isn't set");
+  const { data } = await telnyx<{ data: { connection_id?: string }[] }>(`/phone_numbers?filter[phone_number]=${encodeURIComponent(number)}`);
+  const id = data[0]?.connection_id;
+  if (!id) throw new Error("The SealMe number isn't attached to a Voice API app");
+  connectionId = id;
+  return id;
+}
+
+// Places an outbound call through the SealMe app; returns its leg.
+export async function dial(options: { to: string; from: string; clientState: object; timeoutSecs?: number; linkTo?: string; commandId?: string }): Promise<string> {
+  const { data } = await telnyx<{ data: { call_control_id: string } }>("/calls", {
+    method: "POST",
+    body: JSON.stringify({
+      connection_id: await telnyxConnectionId(),
+      to: options.to,
+      from: options.from,
+      client_state: encodeClientState(options.clientState),
+      timeout_secs: options.timeoutSecs ?? 30,
+      ...(options.linkTo ? { link_to: options.linkTo } : {}),
+      ...(options.commandId ? { command_id: options.commandId } : {}),
+    }),
+  });
+  return data.call_control_id;
+}
+
+// A rep's own number becomes caller ID once they prove they hold it: Telnyx
+// texts a code, the rep types it into SealMe.
+export async function sendVerificationCode(phone: string): Promise<void> {
+  await telnyx("/verified_numbers", { method: "POST", body: JSON.stringify({ phone_number: phone, verification_method: "sms" }) });
+}
+
+export async function confirmVerificationCode(phone: string, code: string): Promise<boolean> {
+  const res = await fetch(`${API}/verified_numbers/${encodeURIComponent(phone)}/actions/verify`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${process.env.TELNYX_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ verification_code: code }),
+  });
+  if (res.ok) return true;
+  if (res.status === 400 || res.status === 404 || res.status === 422) return false;
+  throw new Error(`Telnyx verify failed: ${res.status} ${await res.text()}`);
+}
+
+// Already confirmed at Telnyx (say, before this SealMe account existed).
+export async function isNumberVerified(phone: string): Promise<boolean> {
+  const res = await fetch(`${API}/verified_numbers/${encodeURIComponent(phone)}`, { headers: { Authorization: `Bearer ${process.env.TELNYX_API_KEY}` } });
+  if (res.status === 404) return false;
+  if (!res.ok) throw new Error(`Telnyx verified number lookup failed: ${res.status} ${await res.text()}`);
+  const { data } = (await res.json()) as { data?: { verified_at?: string | null } };
+  return Boolean(data?.verified_at);
+}

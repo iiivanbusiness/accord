@@ -5,7 +5,7 @@ import { reportError } from "@/lib/error-report";
 import { pushCallToCrm } from "@/lib/crm-call-sync";
 import { applySalesCall } from "@/lib/sales-call";
 import { deleteRecording, recordingDownload } from "@/lib/telnyx";
-import { RECORDING_LISTEN_PARAMS, transcriptFromListenResponse } from "@/lib/recording-transcript";
+import { DUAL_CHANNEL_LISTEN_PARAMS, RECORDING_LISTEN_PARAMS, transcriptFromChannels, transcriptFromListenResponse } from "@/lib/recording-transcript";
 import { classifyCallKind } from "@/lib/call-kind";
 import { createNotification } from "@/lib/notifications";
 import { isValidTimeZone } from "@/lib/tasks";
@@ -25,7 +25,15 @@ export const SKIP_LABEL: Record<string, string> = {
   one_speaker: "Only one voice (likely voicemail)",
   no_speech: "Nothing was said",
   not_recorded: "Not recorded (recording rules for the lead's state)",
+  no_pickup: "They didn't pick up",
+  rep_missed: "You didn't answer SealMe's call",
+  cancelled: "Cancelled before they picked up",
+  dial_failed: "SealMe couldn't place the call",
 };
+
+// Channels of SealMe's own two-channel recordings, recorded on the client's
+// leg: what came from the client, then what went to them (the rep).
+const DUAL_CHANNEL_LABELS = ["Client", "Rep"];
 
 // How many different people talk in a transcript. Diarized recordings
 // label turns "Speaker 1:", the desktop recorder "Client:" / "You:".
@@ -70,7 +78,7 @@ export async function runCallProcessing(callId: string, timeZone: string, option
   if (!call || call.status !== "processing") return;
   try {
     if (!call.transcript && call.telnyxRecordingId) {
-      call = { ...call, ...(await transcribePhoneRecording(call.id, call.telnyxRecordingId, call.durationSec)) };
+      call = { ...call, ...(await transcribePhoneRecording(call.id, call.telnyxRecordingId, call.durationSec, Boolean(call.telnyxClientLegId))) };
       if (!call.transcript) {
         await prisma.phoneCall.update({ where: { id: callId }, data: { status: "skipped", connected: false, extracted: { skipped: "no_speech" }, processedAt: new Date() } });
         return;
@@ -140,16 +148,22 @@ export async function processPhoneCallAutomatically(callId: string): Promise<voi
 // A phone call's recording is transcribed only once it's processed
 // (Process), and then dropped at Telnyx: SealMe keeps the transcript, not
 // the audio.
-async function transcribePhoneRecording(callId: string, recordingId: string, durationSec: number | null): Promise<{ transcript: string; sttSeconds: number; durationSec: number | null; telnyxRecordingId: string | null }> {
+async function transcribePhoneRecording(
+  callId: string,
+  recordingId: string,
+  durationSec: number | null,
+  dualChannel: boolean,
+): Promise<{ transcript: string; sttSeconds: number; durationSec: number | null; telnyxRecordingId: string | null }> {
   const { url, seconds } = await recordingDownload(recordingId);
   const language = process.env.DEEPGRAM_LANGUAGE || "en";
-  const res = await fetch(`https://api.deepgram.com/v1/listen?${RECORDING_LISTEN_PARAMS}&language=${language}`, {
+  const res = await fetch(`https://api.deepgram.com/v1/listen?${dualChannel ? DUAL_CHANNEL_LISTEN_PARAMS : RECORDING_LISTEN_PARAMS}&language=${language}`, {
     method: "POST",
     headers: { Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({ url }),
   });
   if (!res.ok) throw new Error(`Deepgram ${res.status}: ${await res.text()}`);
-  const heard = transcriptFromListenResponse(await res.json());
+  const json = await res.json();
+  const heard = dualChannel ? transcriptFromChannels(json, DUAL_CHANNEL_LABELS) : transcriptFromListenResponse(json);
   // Nothing heard: the recording stays at Telnyx for the day, so a silent
   // line can be told apart from speech the model missed. The daily cron
   // drops it then.
@@ -170,7 +184,7 @@ export async function dropRecording(recordingId: string | null, callId: string):
 // recording never arrived.
 export async function discardStaleCalls(now = new Date()): Promise<number> {
   const before = new Date(now.getTime() - PENDING_TTL_MS);
-  const where = { status: { in: ["pending", "failed", "recording"] }, startedAt: { lt: before } };
+  const where = { status: { in: ["pending", "failed", "recording", "dialing"] }, startedAt: { lt: before } };
   const stale = await prisma.phoneCall.findMany({ where, select: { id: true, telnyxRecordingId: true } });
   let count = 0;
   if (stale.length) {
@@ -181,7 +195,7 @@ export async function discardStaleCalls(now = new Date()): Promise<number> {
     for (const c of stale) await dropRecording(c.telnyxRecordingId, c.id);
   }
   // Recordings kept past processing (nothing was heard) go after a day too.
-  const kept = await prisma.phoneCall.findMany({ where: { telnyxRecordingId: { not: null }, status: { notIn: ["pending", "failed", "recording", "processing"] }, startedAt: { lt: before } }, select: { id: true, telnyxRecordingId: true } });
+  const kept = await prisma.phoneCall.findMany({ where: { telnyxRecordingId: { not: null }, status: { notIn: ["pending", "failed", "recording", "dialing", "processing"] }, startedAt: { lt: before } }, select: { id: true, telnyxRecordingId: true } });
   for (const c of kept) {
     await dropRecording(c.telnyxRecordingId, c.id);
     await prisma.phoneCall.update({ where: { id: c.id }, data: { telnyxRecordingId: null } });

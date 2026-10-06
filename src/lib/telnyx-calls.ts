@@ -2,29 +2,45 @@ import { prisma } from "@/lib/db";
 import { normalizePhone } from "@/lib/phone";
 import { consentFor, recordingDecision } from "@/lib/call-consent";
 import { MIN_PROCESS_SECONDS } from "@/lib/call-inbox";
-import { callAction, decodeClientState, deleteRecording, encodeClientState, findRecordingId, type TelnyxEvent } from "@/lib/telnyx";
+import { callAction, decodeClientState, deleteRecording, dial, encodeClientState, findRecordingId, type TelnyxEvent } from "@/lib/telnyx";
 import { reportError } from "@/lib/error-report";
 
-// What a call is doing, carried on the call itself (client_state):
+// What a call is doing, carried on the call itself (client_state).
+// The rep calling the SealMe number and merging:
 //   rec     recording since SealMe answered
 //   notice  waiting for the rep to press 1 for the recording notice
 //   noticing  playing the notice; recording starts when it ends
 //   bye     saying why SealMe isn't on this call, then hanging up
-type CallState = { k: "rec" | "notice" | "noticing" | "bye"; c?: string; m?: ByeReason };
-type ByeReason = "unknown" | "nolead" | "off";
+// SealMe calling the rep, then the client (a = play the recording notice):
+//   rep     the rep's leg
+//   client  the client's leg, ringing
+//   cnotice the client's leg, hearing the recording notice
+//   live    the client's leg, joined to the rep and recording
+type CallState = { k: "rec" | "notice" | "noticing" | "bye" | "rep" | "client" | "cnotice" | "live"; c?: string; m?: ByeReason; a?: 1 };
+type ByeReason = "unknown" | "nolead" | "off" | "nopickup";
 
 const VOICE = { voice: "AWS.Polly.Joanna-Neural", language: "en-US" };
-const SAY: Record<ByeReason | "notice_prompt" | "notice", string> = {
+const SAY: Record<ByeReason | "notice_prompt" | "notice" | "holding", string> = {
   unknown: "This is SealMe. This phone number isn't set up in SealMe yet. Add it in SealMe under Settings, then call again. Goodbye.",
   nolead: "This is SealMe. No lead is waiting for this call. Tap Call on a lead in SealMe, then call again. Goodbye.",
   off: "This is SealMe. Recording is off for this call. Hang up and call your client directly.",
   notice_prompt: "SealMe is on the line. Once your client is on the call too, press 1 to play the recording notice. Nothing is recorded before that.",
   notice: "This call is being recorded.",
+  nopickup: "Your client didn't pick up. Try again later. Goodbye.",
+  holding: "Calling your client now. They'll hear that the call is recorded, then you're connected.",
 };
 // A safety cap; a sales call longer than this is unheard of.
 const MAX_RECORDING_SECONDS = 4 * 60 * 60;
 
-const recordOptions = (callId: string) => ({ record_format: "mp3", record_channels: "single", record_max_length: MAX_RECORDING_SECONDS, command_id: `record-${callId}` });
+// A merged line comes in as one mixed track. A call SealMe places itself is
+// recorded on the client's leg in two channels (client, rep), so who said
+// what never has to be guessed.
+const recordOptions = (callId: string, channels: "single" | "dual" = "single") => ({
+  record_format: "mp3",
+  record_channels: channels,
+  record_max_length: MAX_RECORDING_SECONDS,
+  command_id: `record-${callId}`,
+});
 
 // One verified event from the SealMe number. Throws only on our own
 // errors; the route reports them and still answers Telnyx, so a retry
@@ -44,6 +60,8 @@ export async function handleTelnyxEvent(event: TelnyxEvent): Promise<{ processCa
     case "call.answered":
       if (state?.k === "bye" && state.m) await callAction(id, "speak", { ...VOICE, payload: SAY[state.m], command_id: `bye-${id}` });
       if (state?.k === "notice") await callAction(id, "speak", { ...VOICE, payload: SAY.notice_prompt, command_id: `prompt-${id}` });
+      if (state?.k === "rep" && state.c) await repAnswered(id, state);
+      if (state?.k === "client" && state.c) await clientAnswered(id, state);
       return {};
     case "call.dtmf.received":
       if (state?.k === "notice" && p.digit === "1" && state.c) {
@@ -53,9 +71,11 @@ export async function handleTelnyxEvent(event: TelnyxEvent): Promise<{ processCa
     case "call.speak.ended":
       if (state?.k === "bye") await callAction(id, "hangup", { command_id: `hangup-${id}` });
       if (state?.k === "noticing" && state.c) await startRecordingAfterNotice(id, state.c);
+      if (state?.k === "cnotice" && state.c) await joinAndRecord(id, state.c);
       return {};
     case "call.hangup":
-      await callEnded(id, state);
+      if (state?.k === "rep" || state?.k === "client") await outboundLegEnded(id, state, p.hangup_cause ?? null);
+      else await callEnded(id, state);
       return {};
     case "call.recording.saved":
       return recordingSaved(id, state, p);
@@ -141,6 +161,77 @@ async function answerIncoming(callControlId: string, rawFrom: string | null): Pr
 async function startRecordingAfterNotice(callControlId: string, callId: string): Promise<void> {
   await callAction(callControlId, "record_start", { ...recordOptions(callId), client_state: encodeClientState({ k: "rec", c: callId }) });
   await prisma.phoneCall.update({ where: { id: callId }, data: { recorded: true } });
+}
+
+// SealMe calls the rep's phone first (startLeadCall). When they pick up,
+// it dials the client from the rep's own (verified) number. Without a
+// notice to play, the two are joined at once and the rep hears it ring.
+export async function callRep(callId: string, repPhone: string, announce: boolean): Promise<string> {
+  const from = process.env.TELNYX_PHONE_NUMBER;
+  if (!from) throw new Error("TELNYX_PHONE_NUMBER isn't set");
+  return dial({ to: repPhone, from, clientState: { k: "rep", c: callId, ...(announce ? { a: 1 } : {}) }, timeoutSecs: 30, commandId: `rep-${callId}` });
+}
+
+async function repAnswered(repLeg: string, state: CallState): Promise<void> {
+  const call = await prisma.phoneCall.findUnique({ where: { id: state.c! } });
+  if (!call || call.status !== "dialing" || !call.toNumber || !call.fromNumber || call.telnyxClientLegId) return;
+  const clientLeg = await dial({
+    to: call.toNumber,
+    from: call.fromNumber,
+    linkTo: repLeg,
+    clientState: { k: "client", c: call.id, ...(state.a ? { a: 1 } : {}) },
+    timeoutSecs: 30,
+    commandId: `client-${call.id}`,
+  });
+  await prisma.phoneCall.update({ where: { id: call.id }, data: { telnyxClientLegId: clientLeg } });
+  if (state.a) await callAction(repLeg, "speak", { ...VOICE, payload: SAY.holding, command_id: `holding-${call.id}` });
+  else await callAction(repLeg, "bridge", { call_control_id: clientLeg, play_ringtone: true, command_id: `bridge-${call.id}` });
+}
+
+async function clientAnswered(clientLeg: string, state: CallState): Promise<void> {
+  if (state.a) {
+    await callAction(clientLeg, "speak", { ...VOICE, payload: SAY.notice, client_state: encodeClientState({ k: "cnotice", c: state.c }), command_id: `cnotice-${state.c}` });
+    return;
+  }
+  await startRecordingClientLeg(clientLeg, state.c!);
+}
+
+// After the notice: join the rep and the client, then record.
+async function joinAndRecord(clientLeg: string, callId: string): Promise<void> {
+  const call = await prisma.phoneCall.findUnique({ where: { id: callId }, select: { telnyxCallControlId: true } });
+  if (!call?.telnyxCallControlId) return;
+  await callAction(call.telnyxCallControlId, "bridge", { call_control_id: clientLeg, command_id: `bridge-${callId}` });
+  await startRecordingClientLeg(clientLeg, callId);
+}
+
+async function startRecordingClientLeg(clientLeg: string, callId: string): Promise<void> {
+  await callAction(clientLeg, "record_start", { ...recordOptions(callId, "dual"), client_state: encodeClientState({ k: "live", c: callId }) });
+  await prisma.phoneCall.update({ where: { id: callId }, data: { status: "recording", recorded: true } });
+}
+
+// A leg ended before the two were talking: the rep didn't pick up, the
+// client didn't, or the rep gave up. The other leg is ended too, and the
+// call is set aside with the reason.
+async function outboundLegEnded(leg: string, state: CallState, cause: string | null): Promise<void> {
+  const call = await prisma.phoneCall.findUnique({ where: { id: state.c! } });
+  if (!call) return;
+  if (call.status !== "dialing") {
+    if (!call.endedAt) await prisma.phoneCall.update({ where: { id: call.id }, data: { endedAt: new Date() } });
+    return;
+  }
+  const now = new Date();
+  if (state.k === "client") {
+    // The rep is still on: tell them, then hang up.
+    if (call.telnyxCallControlId) {
+      await callAction(call.telnyxCallControlId, "speak", { ...VOICE, payload: SAY.nopickup, client_state: encodeClientState({ k: "bye", m: "nopickup", c: call.id }), command_id: `nopickup-${call.id}` }).catch(() => {});
+    }
+    await prisma.phoneCall.update({ where: { id: call.id }, data: { status: "skipped", outcome: "no_answer", extracted: { skipped: "no_pickup" }, endedAt: now, processedAt: now } });
+    return;
+  }
+  // The rep's leg ended: stop ringing the client if it got that far.
+  if (call.telnyxClientLegId) await callAction(call.telnyxClientLegId, "hangup", { command_id: `hangup-client-${call.id}` }).catch(() => {});
+  const missed = cause === "timeout" || cause === "no_answer" || cause === "user_busy" || cause === "call_rejected";
+  await prisma.phoneCall.update({ where: { id: call.id }, data: { status: "skipped", extracted: { skipped: missed && !call.telnyxClientLegId ? "rep_missed" : "cancelled" }, endedAt: now, processedAt: now } });
 }
 
 async function findCall(callControlId: string, state: CallState | null) {
