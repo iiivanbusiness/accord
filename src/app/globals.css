@@ -105,6 +105,13 @@
   --folder-front-bottom: #d3d3d9;
   --folder-paper: #ffffff;
   --folder-shadow: rgba(20, 20, 30, 0.25);
+
+  /* Dashboard line dots: how urgent a line is. */
+  --tone-urgent: #d70015;
+  --tone-due: #e8890c;
+  --tone-new: #0071e3;
+  --tone-good: #1a9e46;
+  --tone-quiet: #c7c7cc;
 }
 :root[data-theme="dark"] .sm-theme {
   --primary: #ffffff;
@@ -150,6 +157,12 @@
   --folder-front-bottom: #333335;
   --folder-paper: #f5f5f7;
   --folder-shadow: rgba(0, 0, 0, 0.6);
+
+  --tone-urgent: #ff453a;
+  --tone-due: #ff9f0a;
+  --tone-new: #2f9dff;
+  --tone-good: #32d74b;
+  --tone-quiet: #636366;
 }
 
 @theme inline {

@@ -268,6 +268,9 @@ model User {
   // Their own dashboard: which widgets show and where, per screen width
   // (see src/lib/dashboard-widgets.ts). Null means the default layout.
   dashboardLayout Json?
+  // Their Dashboard lines: which show, in what order, which start open
+  // (see src/lib/dashboard-lines.ts). Null means their role's default.
+  dashboardLines  Json?
 
   // SCIM provisioning (Okta/Azure AD/Entra pushing user lifecycle events).
   // scimExternalId is the IdP's own id for this person, kept so a later

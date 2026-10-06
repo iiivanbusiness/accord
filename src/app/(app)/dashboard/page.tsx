@@ -12,11 +12,16 @@ import GlowRingStat from "@/components/dashboard/GlowRingStat";
 import DashboardGrid from "@/components/dashboard/DashboardGrid";
 import { currentUserWithRole } from "@/lib/permissions";
 import { normalizeDashboard } from "@/lib/dashboard-widgets";
-import { saveDashboardLayout } from "./actions";
-import { YourDay } from "./your-day";
-import { TeamToday } from "./team-today";
+import { saveDashboardLayout, saveDashboardLines } from "./actions";
+import { myDayLines } from "./your-day";
+import { teamLines } from "./team-today";
+import { calendarLine, dealLines, notificationsLine } from "./more-lines";
 import { leadAccess } from "@/lib/lead-visibility";
 import { cookieTimeZone } from "@/lib/viewer-time";
+import { openAtStart, resolveLines, type LineId } from "@/lib/dashboard-lines";
+import DashboardLines from "@/components/DashboardLines";
+import TaskDigestToggle from "@/components/TaskDigestToggle";
+import { setTaskDigestEmail } from "@/app/(app)/preferences-actions";
 
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -64,12 +69,38 @@ export default async function DashboardPage() {
   const firstName = session?.user?.name?.trim().split(/\s+/)[0] ?? null;
   const hello = firstName ? `Hello, ${firstName}` : "Dashboard";
 
-  // With prospecting on, the Dashboard is the day: a rep sees their own;
-  // whoever hands out the work sees the team's, their own under it, and
-  // the deals below.
+  // With prospecting on, the Dashboard is a few lines, one per thing, each
+  // colored by how urgent it is: whoever hands out the work gets the
+  // team's day first, a rep their own next call.
   const prospecting = (await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { prospectingEnabled: true } }))?.prospectingEnabled ?? false;
-  const manager = prospecting ? (await leadAccess(user)).canAssign : false;
-  if (prospecting && !manager) return <YourDay title={hello} />;
+  if (prospecting) {
+    const role = (await leadAccess(user)).canAssign ? "manager" : "rep";
+    const prefs = resolveLines(user.dashboardLines, role);
+    const need = new Set<LineId>(prefs.order.filter((id) => !prefs.hidden.includes(id)));
+    const tz = await cookieTimeZone();
+    const [day, team, dealsLines, calendar, notifications] = await Promise.all([
+      myDayLines({ workspaceId, userId: user.id, tz, need }),
+      role === "manager" ? teamLines({ workspaceId, tz, managerId: user.id, need }) : [],
+      dealLines({ workspaceId, tz, need }),
+      calendarLine({ workspaceId, tz, need }),
+      notificationsLine({ userId: user.id, need }),
+    ]);
+    const lines = [...day.lines, ...team, ...dealsLines, ...calendar, ...notifications];
+    const dateLabel = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: tz }).format(now);
+    return (
+      <DashboardLines
+        title={hello}
+        subtitle={`${dateLabel} · ${day.progress}`}
+        role={role}
+        lines={lines}
+        prefs={prefs}
+        initialOpen={openAtStart(prefs, Object.fromEntries(lines.map((l) => [l.id, l.tone])))}
+        notice={day.notice}
+        customizeExtra={<TaskDigestToggle enabled={user.taskDigestEmail} action={setTaskDigestEmail} />}
+        saveAction={saveDashboardLines}
+      />
+    );
+  }
   const { where: visibility } = await dealVisibilityFilter();
 
   const in90Days = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
@@ -321,25 +352,6 @@ export default async function DashboardPage() {
       </div>
     ),
   };
-
-  if (manager) {
-    const tz = await cookieTimeZone();
-    const dateLabel = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: tz }).format(now);
-    return (
-      <div className="mx-auto flex w-full max-w-[920px] flex-col gap-6">
-        <div>
-          <h1 className="text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>{hello}</h1>
-          <div className="mt-1 text-[14px]" style={{ color: "var(--ink-muted)" }}>{dateLabel} · your team today</div>
-        </div>
-        <TeamToday workspaceId={workspaceId} tz={tz} managerId={user.id} />
-        <YourDay embedded title="Your own day" />
-        <div>
-          <h2 className="mb-3 text-[17px] font-medium">Deals</h2>
-          <DashboardGrid widgets={widgets} saved={normalizeDashboard(user.dashboardLayout)} saveAction={saveDashboardLayout} />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>

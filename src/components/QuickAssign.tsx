@@ -11,9 +11,12 @@ export default function QuickAssign({
   members,
   freeLeads,
   assignAction,
+  embedded = false,
 }: {
   members: { id: string; name: string }[];
   freeLeads: number;
+  // Inside a Dashboard line, which already says how many leads are free.
+  embedded?: boolean;
   assignAction: (input: { assigneeId: string; count: number; day: "today" | "tomorrow"; timezone: string }) => Promise<{ created: number }>;
 }) {
   const router = useRouter();
@@ -38,13 +41,15 @@ export default function QuickAssign({
   }
 
   return (
-    <section className="card flex flex-col gap-3 px-4 py-4 sm:px-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-[14px] font-medium">Hand out work</h2>
-        <span className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
-          {freeLeads.toLocaleString("en-US")} {freeLeads === 1 ? "lead" : "leads"} nobody is working on
-        </span>
-      </div>
+    <section className={`${embedded ? "" : "card "}flex flex-col gap-3 px-4 py-4 sm:px-5`}>
+      {!embedded && (
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-[14px] font-medium">Hand out work</h2>
+          <span className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
+            {freeLeads.toLocaleString("en-US")} {freeLeads === 1 ? "lead" : "leads"} nobody is working on
+          </span>
+        </div>
+      )}
       {freeLeads === 0 ? (
         <div className="text-[13px]" style={{ color: "var(--ink-muted)" }}>
           Every lead has someone on it. <Link href="/leads/import" className="font-medium" style={{ color: "var(--accent-blue)" }}>Import more leads</Link>
