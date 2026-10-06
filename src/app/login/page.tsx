@@ -14,9 +14,9 @@ const DEFAULT_ERROR_MESSAGE = "Something went wrong signing you in. Please try a
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ callbackUrl?: string; error?: string; reset?: string }>;
+  searchParams: Promise<{ callbackUrl?: string; error?: string; reset?: string; joined?: string }>;
 }) {
-  const { callbackUrl, error, reset } = await searchParams;
+  const { callbackUrl, error, reset, joined } = await searchParams;
 
   async function authenticate(formData: FormData) {
     "use server";
@@ -62,9 +62,9 @@ export default async function LoginPage({
             {ERROR_MESSAGE[error] ?? DEFAULT_ERROR_MESSAGE}
           </div>
         )}
-        {reset && (
+        {(reset || joined) && (
           <div className="chip chip-success mb-4 w-full justify-center py-2.5 text-[12.5px]">
-            Password updated. Sign in below.
+            {joined ? "You're in. Sign in with your email and new password." : "Password updated. Sign in below."}
           </div>
         )}
 

@@ -166,21 +166,32 @@ export async function sendReminderEmail(options: {
   if (error) throw new Error(error.message);
 }
 
+// An invite either carries a link to set a password (someone a teammate
+// invited) or just points at sign-in (provisioned by the company's IT over
+// SCIM, who sign in through their company account).
 export async function sendTeammateInviteEmail(options: {
   to: string;
   inviterName: string;
   workspaceName: string;
-  loginUrl: string;
+  setPasswordUrl?: string;
+  loginUrl?: string;
 }): Promise<void> {
+  const button = (href: string, label: string) =>
+    `<a href="${href}" style="display:inline-block;margin:0 0 20px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">${label}</a>`;
   await sendSystemEmail({
     to: [options.to],
     subject: `${options.inviterName} invited you to ${options.workspaceName} on SealMe`,
-    bodyHtml: `
+    bodyHtml: options.setPasswordUrl
+      ? `
       <p style="margin:0 0 14px;">${escapeHtml(options.inviterName)} invited you to join <strong>${escapeHtml(options.workspaceName)}</strong> on SealMe.</p>
-      <p style="margin:0 0 14px;">Sign in with Google using this email address (${escapeHtml(options.to)}) to get access.</p>
-      <a href="${options.loginUrl}" style="display:inline-block;margin:0 0 20px;padding:12px 22px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
-        Sign in
-      </a>
+      <p style="margin:0 0 14px;">Set your password to get in. The link works for 7 days.</p>
+      ${button(options.setPasswordUrl, "Set your password")}
+      <p style="margin:0 0 14px;color:#6e6e73;">If this address is a Google account, you can also just sign in with Google.</p>
+    `
+      : `
+      <p style="margin:0 0 14px;">${escapeHtml(options.inviterName)} invited you to join <strong>${escapeHtml(options.workspaceName)}</strong> on SealMe.</p>
+      <p style="margin:0 0 14px;">Sign in with your company account or with Google using this email address (${escapeHtml(options.to)}).</p>
+      ${button(options.loginUrl ?? "", "Sign in")}
     `,
   });
 }

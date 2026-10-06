@@ -231,7 +231,7 @@ export default async function SettingsPage({
         ))}
         <InviteTeammateForm inviteAction={inviteTeammate} />
         <div className="pb-3 text-[11.5px]" style={{ color: "var(--ink-muted)" }}>
-          They&apos;ll get an email. They need to sign in with Google using that address (no password yet for invited teammates).
+          They&apos;ll get an email with a link to set their password. Teammates with a Google account can also just sign in with Google.
         </div>
       </div>
     </div>

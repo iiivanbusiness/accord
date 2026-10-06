@@ -108,6 +108,8 @@ export async function disconnectSenderDomain() {
   revalidatePath("/settings");
 }
 
+const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 // Returns the error as data instead of throwing — a thrown Error's message
 // gets stripped to a generic "#441" digest by Next.js in production
 // (deliberate: it won't leak arbitrary server-side exception text to the
@@ -133,8 +135,15 @@ export async function inviteTeammate(formData: FormData): Promise<{ error: strin
     return { error: "That email is already tied to another SealMe workspace" };
   }
 
-  await prisma.user.create({
+  const invited = await prisma.user.create({
     data: { workspaceId: workspace.id, name: email, email, passwordHash: null },
+  });
+  // A link to set their own password, so a teammate without a Google
+  // account (Microsoft 365, anything else) can join. A week to use it;
+  // after that "Forgot password" does the same.
+  const rawToken = randomBytes(32).toString("hex");
+  await prisma.passwordResetToken.create({
+    data: { userId: invited.id, tokenHash: createHash("sha256").update(rawToken).digest("hex"), expiresAt: new Date(Date.now() + INVITE_TTL_MS) },
   });
   await logAudit({
     workspaceId: workspace.id,
@@ -148,7 +157,7 @@ export async function inviteTeammate(formData: FormData): Promise<{ error: strin
       to: email,
       inviterName: session?.user?.name ?? session?.user?.email ?? "A teammate",
       workspaceName: workspace.name,
-      loginUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/login`,
+      setPasswordUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/reset-password/${rawToken}?invite=1`,
     });
   } catch (err) {
     console.error("Failed to send teammate invite email", err);
