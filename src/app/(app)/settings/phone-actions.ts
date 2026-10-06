@@ -14,7 +14,7 @@ export async function saveMyPhoneNumber(raw: string): Promise<{ error?: string; 
 
   const trimmed = typeof raw === "string" ? raw.trim() : "";
   const phone = trimmed ? normalizePhone(trimmed) : null;
-  if (trimmed && !phone) return { error: "Enter the number with its country code, like +1 512 555 0100" };
+  if (trimmed && !phone) return { error: "Start with + and your country code, then the number without its leading 0, like +381 64 123 4567 or +1 512 555 0100" };
 
   try {
     await prisma.user.update({ where: { email }, data: { phone } });

@@ -8,8 +8,15 @@ export function normalizePhone(raw: string | null | undefined): string | null {
   if (!trimmed) return null;
   const digits = trimmed.replace(/\D/g, "");
   if (trimmed.startsWith("+")) return digits.length >= 8 && digits.length <= 15 ? `+${digits}` : null;
-  if (digits.length === 10) return `+1${digits}`;
-  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  // 00 is how most of the world dials out: 00381... is +381...
+  if (digits.startsWith("00") && trimmed.replace(/[\s().-]/g, "").startsWith("00")) {
+    const international = digits.slice(2);
+    return international.length >= 8 && international.length <= 15 ? `+${international}` : null;
+  }
+  // US area codes never start with 0 or 1, so "064 123 4567" (a Serbian
+  // mobile without its country code) isn't mistaken for one.
+  if (digits.length === 10 && /^[2-9]/.test(digits)) return `+1${digits}`;
+  if (digits.length === 11 && /^1[2-9]/.test(digits)) return `+${digits}`;
   return null;
 }
 

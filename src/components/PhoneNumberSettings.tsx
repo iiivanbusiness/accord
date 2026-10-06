@@ -35,7 +35,7 @@ export default function PhoneNumberSettings({ phone, sealmeNumber }: { phone: st
         <input
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="+1 512 555 0100"
+          placeholder="+381 64 123 4567"
           inputMode="tel"
           autoComplete="tel"
           aria-label="Your phone number"
