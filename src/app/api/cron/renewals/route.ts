@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { discardStaleCalls, fillTelnyxCosts } from "@/lib/call-inbox";
+import { syncPendingDocusignContracts } from "@/lib/docusign-sync";
 import { prisma } from "@/lib/db";
 import { sendAdminAlertEmail, sendRenewalReminderEmail, sendReviewOverdueEmail } from "@/lib/email";
 import { createNotification } from "@/lib/notifications";
@@ -186,6 +187,15 @@ export async function GET(req: Request) {
       await reportError(err, "Telnyx call costs");
     }
 
+    // DocuSign contracts whose "completed" event never arrived.
+    let docusign = { signed: 0 };
+    try {
+      docusign = { signed: await syncPendingDocusignContracts() };
+    } catch (err) {
+      console.error("DocuSign status check (piggybacked on renewals cron) crashed", err);
+      await reportError(err, "DocuSign status check");
+    }
+
     let rateLimitResult = { deleted: 0 };
     try {
       rateLimitResult = await cleanupRateLimitHits();
@@ -215,7 +225,7 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ renewals: { checked: dueContracts.length, sent }, overdueReviews: overdueReviewResult, staleDeals: staleResult, taskDigest: taskDigestResult, crmLeadSync, webhookRetries, staleCalls, callCosts, rateLimitCleanup: rateLimitResult, monthlyReset });
+    return NextResponse.json({ renewals: { checked: dueContracts.length, sent }, overdueReviews: overdueReviewResult, staleDeals: staleResult, taskDigest: taskDigestResult, crmLeadSync, webhookRetries, staleCalls, callCosts, docusign, rateLimitCleanup: rateLimitResult, monthlyReset });
   } catch (err) {
     console.error("Renewal reminder cron crashed", err);
     try {

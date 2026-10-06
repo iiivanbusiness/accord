@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { exchangeDocusignCode, createConnectSubscription } from "@/lib/docusign";
+import { exchangeDocusignCode } from "@/lib/docusign";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { requirePermission } from "@/lib/permissions";
 import { auth } from "@/lib/auth";
@@ -35,10 +35,6 @@ export async function GET(req: Request) {
         docusignEnabled: true,
       },
     });
-
-    // Best-effort — a failed Connect subscription doesn't block using
-    // DocuSign, it just means completions won't auto-sync here yet.
-    await createConnectSubscription(workspaceId).catch((err) => console.error("DocuSign Connect subscription failed", err));
 
     const session = await auth();
     await logAudit({ workspaceId, actorEmail: session?.user?.email, action: "docusign.connected", metadata: { accountEmail: tokens.accountEmail } });

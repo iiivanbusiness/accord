@@ -1,82 +1,38 @@
-import { createHmac, timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { finalizeContractSigned } from "@/lib/signing";
+import { syncDocusignContract } from "@/lib/docusign-sync";
+import { reportError } from "@/lib/error-report";
 
-type ConnectPayload = {
-  event?: string;
-  data?: {
-    envelopeId?: string;
-    envelopeSummary?: { status?: string; sentDateTime?: string; completedDateTime?: string; recipients?: { signers?: { name?: string; email?: string; routingOrder?: string; status?: string; signedDateTime?: string }[] } };
-  };
-};
+type EnvelopeEvent = { event?: string; envelopeId?: string; data?: { envelopeId?: string } };
 
-function verifySignature(rawBody: string, signatureHeader: string | null, hmacKey: string): boolean {
-  if (!signatureHeader) return false;
-  const expected = createHmac("sha256", hmacKey).update(rawBody, "utf8").digest("base64");
-  const a = Buffer.from(expected);
-  const b = Buffer.from(signatureHeader);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
-// DocuSign Connect POSTs here whenever a subscribed envelope event fires
-// (see createConnectSubscription — only "completed" is subscribed).
-// Verifies the HMAC signature DocuSign signs the body with, finds the
-// matching contract by envelopeId, and runs the same finalize path the
-// SealMe-native signing flow uses once every signer's done.
+// DocuSign calls this when an envelope SealMe sent is completed (the
+// envelope carries this URL, see sendDocusignEnvelope). Nothing in the
+// body is trusted: it only names the envelope, and SealMe asks DocuSign
+// with that workspace's own connection whether it's really completed
+// before marking anything signed. So a forged call can at most trigger a
+// lookup. Always 200 for envelopes SealMe doesn't know, or DocuSign
+// retries.
 export async function POST(req: Request) {
-  const rawBody = await req.text();
-
-  // Fail closed: without a configured key there's no way to tell a real
-  // DocuSign Connect event from anyone who's found this URL and POSTed a
-  // fake "completed" payload for a guessed/leaked envelopeId, which would
-  // mark that contract signed without an actual signature ever happening.
-  // createConnectSubscription already refuses to register a subscription
-  // without this key set, so in practice no legitimate traffic is lost by
-  // rejecting here too — this just closes the same gap on the receiving end.
-  const hmacKey = process.env.DOCUSIGN_CONNECT_HMAC_KEY;
-  if (!hmacKey) {
-    console.error("DocuSign webhook received but DOCUSIGN_CONNECT_HMAC_KEY isn't set. Rejecting (see createConnectSubscription).");
-    return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
-  }
-  const signature = req.headers.get("x-docusign-signature-1");
-  if (!verifySignature(rawBody, signature, hmacKey)) {
-    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-  }
-
-  let payload: ConnectPayload;
+  const raw = await req.text();
+  let payload: EnvelopeEvent;
   try {
-    payload = JSON.parse(rawBody) as ConnectPayload;
+    payload = JSON.parse(raw) as EnvelopeEvent;
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const envelopeId = payload.data?.envelopeId;
-  const status = payload.data?.envelopeSummary?.status;
-  if (!envelopeId || status !== "completed") {
-    return NextResponse.json({ ok: true, skipped: true });
-  }
+  const envelopeId = payload.data?.envelopeId ?? payload.envelopeId;
+  if (!envelopeId || !/^[0-9a-f-]{36}$/i.test(envelopeId)) return NextResponse.json({ ok: true, skipped: true });
 
-  const contract = await prisma.contract.findFirst({ where: { docusignEnvelopeId: envelopeId } });
+  const contract = await prisma.contract.findFirst({ where: { docusignEnvelopeId: envelopeId }, select: { id: true } });
   if (!contract) return NextResponse.json({ ok: true, skipped: true });
-  if (contract.status === "signed") return NextResponse.json({ ok: true, alreadySigned: true });
 
-  const signers = payload.data?.envelopeSummary?.recipients?.signers ?? [];
-  const primary = signers.find((s) => s.routingOrder === "1") ?? signers[0];
-
-  await prisma.contract.update({
-    where: { id: contract.id },
-    data: {
-      signerName: primary?.name ?? "Client",
-      signedAt: primary?.signedDateTime ? new Date(primary.signedDateTime) : new Date(),
-    },
-  });
-  // DocuSign already confirmed every recipient signed (that's what
-  // "completed" means) — our own ContractSigner rows exist for
-  // record-keeping/UI consistency, not as a second gate.
-  await prisma.contractSigner.updateMany({ where: { contractId: contract.id, status: "pending" }, data: { status: "signed", signedAt: new Date() } });
-
-  await finalizeContractSigned(contract.id);
-
-  return NextResponse.json({ ok: true });
+  try {
+    const signed = await syncDocusignContract(contract.id);
+    return NextResponse.json({ ok: true, signed });
+  } catch (err) {
+    await reportError(err, "DocuSign webhook", { contractId: contract.id });
+    // A failed lookup is retried by DocuSign, and by the daily check.
+    return NextResponse.json({ error: "Couldn't confirm with DocuSign" }, { status: 502 });
+  }
 }

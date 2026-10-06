@@ -136,6 +136,18 @@ export async function sendDocusignEnvelope(
       })),
     },
     status: "sent",
+    // DocuSign tells SealMe when this envelope is done. Set on the envelope
+    // itself, so nothing has to be configured in the client's DocuSign
+    // account; the event is only a nudge, SealMe reads the real status from
+    // DocuSign (see syncDocusignContract).
+    eventNotification: {
+      url: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/docusign/webhook`,
+      loggingEnabled: "true",
+      requireAcknowledgment: "true",
+      deliveryMode: "SIM",
+      events: ["envelope-completed"],
+      eventData: { version: "restv2.1", format: "json" },
+    },
   };
 
   const res = await fetch(`${baseUri}/v2.1/accounts/${accountId}/envelopes`, {
@@ -148,33 +160,19 @@ export async function sendDocusignEnvelope(
   return data.envelopeId;
 }
 
-// Registers a Connect webhook subscription so DocuSign notifies us when
-// an envelope this workspace sent is completed — called once, right
-// after a workspace connects. Best-effort: a workspace can still send
-// envelopes without this, they just won't auto-complete on our side
-// (someone would have to check DocuSign directly) until it succeeds.
-export async function createConnectSubscription(workspaceId: string): Promise<void> {
+export type DocusignEnvelopeStatus = {
+  status: string;
+  signers: { name: string; email: string; routingOrder: string; status: string; signedDateTime?: string }[];
+};
+
+// Where an envelope stands, straight from DocuSign. This is what decides a
+// contract is signed: a webhook only says "go look".
+export async function docusignEnvelopeStatus(workspaceId: string, envelopeId: string): Promise<DocusignEnvelopeStatus> {
   const { accessToken, baseUri, accountId } = await getValidAccessToken(workspaceId);
-  const hmacKey = process.env.DOCUSIGN_CONNECT_HMAC_KEY;
-  if (!hmacKey) return;
-
-  const body = {
-    configurationType: "custom",
-    urlToPublishTo: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/docusign/webhook`,
-    enableLog: "true",
-    requiresAcknowledgement: "true",
-    signMessageWithX509Cert: "false",
-    useSoapInterface: "false",
-    includeDocuments: "false",
-    envelopeEvents: [{ envelopeEventStatusCode: "completed" }],
-    eventData: { version: "restv2.1", format: "json" },
-    hmac: { hmacSignatures: [{ key: hmacKey, secretKey: hmacKey, algorithmName: "SHA256" }] },
-  };
-
-  const res = await fetch(`${baseUri}/v2.1/accounts/${accountId}/connect`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+  const res = await fetch(`${baseUri}/v2.1/accounts/${accountId}/envelopes/${encodeURIComponent(envelopeId)}?include=recipients`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) console.error(`DocuSign Connect subscription failed for workspace ${workspaceId}: ${res.status} ${await res.text()}`);
+  if (!res.ok) throw new Error(`DocuSign envelope lookup failed: ${res.status} ${await res.text()}`);
+  const data = (await res.json()) as { status?: string; recipients?: { signers?: DocusignEnvelopeStatus["signers"] } };
+  return { status: data.status ?? "unknown", signers: data.recipients?.signers ?? [] };
 }

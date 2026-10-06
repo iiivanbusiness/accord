@@ -9,7 +9,7 @@ import { dispatchWebhookEvent } from "@/lib/webhooks";
 import { notifySlack } from "@/lib/slack";
 import { syncDealToHubspot } from "@/lib/hubspot";
 import { syncDealToSalesforce } from "@/lib/salesforce";
-import { fillClauses } from "@/lib/contract";
+import { contractParty, fillClauses } from "@/lib/contract";
 import { ContractPdfDocument } from "@/lib/contract-pdf";
 import { sendDocusignEnvelope, type EnvelopeSigner } from "@/lib/docusign";
 
@@ -125,7 +125,7 @@ export async function performActualSend(contractId: string, pendingOverride?: Pe
   if (contract.deliveryMethod === "docusign") {
     const anchorFor = (i: number) => `[[sig${i}]]`;
     const signers: EnvelopeSigner[] = [
-      { name: to.split("@")[0], email: to, routingOrder: 1, anchor: anchorFor(1) },
+      { name: deal.client.name, email: to, routingOrder: 1, anchor: anchorFor(1) },
       ...contract.signers.map((s, i) => ({ name: s.name, email: s.email, routingOrder: i + 2, anchor: anchorFor(i + 2) })),
     ];
     const clauses = fillClauses(contract.template.clauses, deal.fields);
@@ -134,7 +134,7 @@ export async function performActualSend(contractId: string, pendingOverride?: Pe
         templateName={contract.template.name}
         agencyName={workspace.name}
         agencyLogo={workspace.logoImage}
-        clientName={deal.client.name}
+        clientName={contractParty(deal.fields, deal.client)}
         clauses={clauses}
         docusignAnchors={signers.map((s) => ({ label: `${s.name} (${s.routingOrder === 1 ? "Client" : "Signer " + s.routingOrder})`, anchor: s.anchor }))}
       />
