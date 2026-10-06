@@ -42,17 +42,34 @@ export function hubspotNameParts(name: string): { firstname: string; lastname?: 
   return parts.length > 1 ? { firstname: parts[0], lastname: parts.slice(1).join(" ") } : { firstname: parts[0] ?? name };
 }
 
+// HubSpot refuses a second contact with an email it already has, and says
+// which contact that is: "Contact already exists. Existing ID: 123".
+export function existingHubspotContactId(error: unknown): string | null {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes(" 409 ") ? (message.match(/Existing ID: (\d+)/)?.[1] ?? null) : null;
+}
+
 // Creates the Contact on first sync, updates it on every later one —
-// hubspotContactId on our Client row is the join key.
+// hubspotContactId on our Client row is the join key. A client whose email
+// is already in HubSpot (a repeat client, or someone the team added there
+// first) takes over that contact instead of failing the whole sync.
 async function upsertContact(accessToken: string, client: { id: string; name: string; company: string; email: string | null; hubspotContactId: string | null }): Promise<string> {
   const properties = { email: client.email ?? undefined, ...hubspotNameParts(client.name), company: client.company };
   if (client.hubspotContactId) {
     await hubspotFetch(accessToken, `/crm/v3/objects/contacts/${client.hubspotContactId}`, { method: "PATCH", body: JSON.stringify({ properties }) });
     return client.hubspotContactId;
   }
-  const created = await hubspotFetch(accessToken, "/crm/v3/objects/contacts", { method: "POST", body: JSON.stringify({ properties }) });
-  await prisma.client.update({ where: { id: client.id }, data: { hubspotContactId: created.id } });
-  return created.id;
+  let contactId: string;
+  try {
+    contactId = (await hubspotFetch(accessToken, "/crm/v3/objects/contacts", { method: "POST", body: JSON.stringify({ properties }) })).id;
+  } catch (err) {
+    const existing = existingHubspotContactId(err);
+    if (!existing) throw err;
+    await hubspotFetch(accessToken, `/crm/v3/objects/contacts/${existing}`, { method: "PATCH", body: JSON.stringify({ properties }) });
+    contactId = existing;
+  }
+  await prisma.client.update({ where: { id: client.id }, data: { hubspotContactId: contactId } });
+  return contactId;
 }
 
 async function upsertDeal(

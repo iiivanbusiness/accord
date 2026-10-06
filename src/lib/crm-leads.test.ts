@@ -7,7 +7,7 @@ vi.mock("@/lib/tasks", () => ({ isValidTimeZone: () => true }));
 vi.mock("@/lib/webhooks", () => ({ dispatchLeadsCreated: async () => {} }));
 
 import { clientCrmIds, upsertCrmLead, type CrmLeadRecord } from "./crm-leads";
-import { hubspotNameParts } from "./hubspot";
+import { existingHubspotContactId, hubspotNameParts } from "./hubspot";
 
 const ctx = { members: new Map(), teamOwnedOnly: false };
 const record = (o: Partial<CrmLeadRecord> = {}): CrmLeadRecord => ({
@@ -63,6 +63,9 @@ describe("Leads from the CRM", () => {
 describe("Names sent to HubSpot", () => {
   it("splits first and last name", () => {
     expect(hubspotNameParts("Jordan Lee")).toEqual({ firstname: "Jordan", lastname: "Lee" });
+    // A duplicate email points at the contact HubSpot already has.
+    expect(existingHubspotContactId(new Error('HubSpot API /crm/v3/objects/contacts failed: 409 {"message":"Contact already exists. Existing ID: 885468517591"}'))).toBe("885468517591");
+    expect(existingHubspotContactId(new Error("HubSpot API /crm/v3/objects/contacts failed: 400 bad property"))).toBeNull();
     expect(hubspotNameParts("  Ana  de la Cruz ")).toEqual({ firstname: "Ana", lastname: "de la Cruz" });
     expect(hubspotNameParts("Acme")).toEqual({ firstname: "Acme" });
   });
