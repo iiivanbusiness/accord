@@ -124,7 +124,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
       {currentUser && <AiDisclosureModal show={!currentUser.aiDisclosureAcknowledgedAt} />}
       <TimezoneSync stored={currentUser?.timezone ?? null} />
 
-      <FaqChatWidget />
+      <FaqChatWidget prospecting={workspace.prospectingEnabled} />
 
       <MobileNav
         items={mobileItems}

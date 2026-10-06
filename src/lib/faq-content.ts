@@ -1,4 +1,4 @@
-import { NAV_ITEMS } from "@/lib/nav-config";
+import { navGroupsFor } from "@/lib/nav-config";
 
 // Canned Q&A for the FAQ chat widget (see FaqChatWidget.tsx). No AI call,
 // no cost — this is a static lookup the user clicks through. Answers are
@@ -14,7 +14,13 @@ export type FaqCategory = {
   id: string;
   label: string;
   questions: FaqQuestion[];
+  // Only for workspaces with Leads turned on (prospecting).
+  prospecting?: boolean;
 };
+
+export function faqCategoriesFor(prospecting: boolean): FaqCategory[] {
+  return FAQ_CATEGORIES.filter((c) => prospecting || !c.prospecting);
+}
 
 // Flattened into plain text and used as the grounding facts for the
 // freeform AI support chat's system prompt (see support-chat/route.ts) —
@@ -24,10 +30,23 @@ export type FaqCategory = {
 // navigation questions ("where do I connect Salesforce", "where are my
 // deals") without needing any account data. This is app structure, not
 // account content, so it stays fine under the no-account-access rule.
-export function appNavigationText(): string {
-  const sidebar = NAV_ITEMS.map((item) => `${item.label} (${item.href})`).join(", ");
+export function appNavigationText(prospecting = false): string {
+  const sidebar = navGroupsFor({ prospecting, admin: false })
+    .flatMap((g) => g.items)
+    .map((item) => `${item.label} (${item.href})`)
+    .join(", ");
   return (
-    `Left sidebar, top to bottom: ${sidebar}.\n\n` +
+    `Left sidebar, top to bottom: ${sidebar}. Everything after the first four sits under More, which opens with a tap.\n\n` +
+    (prospecting
+      ? "Dashboard: a Today card at the top with one folder per thing (Team today for managers, Next up, Your day, Waiting on you, " +
+        "Notifications, Deals, Hand out work for managers, Calendar), each with a colored dot for how urgent it is. Tap a folder to open it; " +
+        "Customize in that card hides or reorders folders. The deal widgets sit below it, with their own Customize.\n\n" +
+        "Leads: the lead list with search and filters, Import (paste, CSV or Excel) and + Add lead at the top. Select leads and click Assign to give them to a rep. " +
+        "Open a lead to call it, add a cold call transcript, or Convert to deal.\n\n" +
+        "Calls: calls that need a look (Pending) and every call SealMe handled (History).\n\n" +
+        "Team (under More, managers only): each rep's tasks, calls and results, and moving tasks between reps.\n\n" +
+        "Your phone number: on the Settings page, its own section, where you add and verify the number SealMe rings when you tap Call.\n\n"
+      : "") +
     "Deals: click Deals in the sidebar, or go to /deals. Table and Board views, filterable by status and owner. " +
     "Click + Start a call to begin a new deal, either recording locally, pasting a transcript, or entering details by hand.\n\n" +
     "Clients: Clients in the sidebar lists every client across all deals.\n\n" +
@@ -48,8 +67,8 @@ export function appNavigationText(): string {
   );
 }
 
-export function faqKnowledgeText(): string {
-  return FAQ_CATEGORIES.map(
+export function faqKnowledgeText(prospecting = false): string {
+  return faqCategoriesFor(prospecting).map(
     (category) =>
       `## ${category.label}\n` +
       category.questions.map((q) => `Q: ${q.question}\nA: ${q.answer}`).join("\n\n")
@@ -57,6 +76,83 @@ export function faqKnowledgeText(): string {
 }
 
 export const FAQ_CATEGORIES: FaqCategory[] = [
+  {
+    id: "today",
+    label: "Leads and your day",
+    prospecting: true,
+    questions: [
+      {
+        question: "Where do I see what I have to do today?",
+        answer:
+          "On the Dashboard. The Today folders show your next call, the rest of your day, what's waiting on you and new notifications. A red dot means late, orange needs you today, blue is new and green is all good. Tap a folder to open it, and use Customize in that card to hide or reorder folders.",
+      },
+      {
+        question: "How do I get leads into SealMe?",
+        answer:
+          "Go to Leads and click Import. Paste rows from Excel or Google Sheets, or upload a CSV or Excel file; Apollo and Clay columns are recognized on their own. A lead with the same email, phone or CRM ID is updated instead of added twice. You can also click + Add lead, or bring leads in from HubSpot or Salesforce under Lead import in that CRM's card in Settings.",
+      },
+      {
+        question: "How do I give leads to my reps?",
+        answer:
+          "On Leads, select the leads and click Assign, then pick who, the day, an optional time, priority and a note. Or open Hand out work on the Dashboard to give a rep the next free leads as cold calls for today or tomorrow in one step. The Owner and roles with Manage team & roles can hand out work.",
+      },
+      {
+        question: "Can I get my tasks by email?",
+        answer: "Yes. SealMe can email you the day's list every morning. Turn it on or off under Customize in the Today card on the Dashboard.",
+      },
+      {
+        question: "How do I see how my team is doing?",
+        answer:
+          "Managers have a Team today folder on the Dashboard with each rep's calls, meetings and tasks done, and who's behind. The Team page, under More in the sidebar, has more detail and lets you move tasks from one rep to another.",
+      },
+      {
+        question: "How do I turn a lead into a deal?",
+        answer:
+          "Open the lead and click Convert to deal. SealMe creates the client and the deal and carries over the lead's call history. A sales call made through SealMe does this on its own.",
+      },
+    ],
+  },
+  {
+    id: "phone-calls",
+    label: "Phone calls",
+    prospecting: true,
+    questions: [
+      {
+        question: "How do I call a lead through SealMe?",
+        answer:
+          "First add and verify your phone number once, in Settings under Your phone number; SealMe texts you a code. Then tap Call on a lead or on Next up. SealMe rings your phone, and when you pick up it calls the lead from your number and connects you. It works the same when you tap Call on your computer.",
+      },
+      {
+        question: "What happens after I hang up?",
+        answer:
+          "SealMe transcribes the call and works out whether it was a cold call or a sales call. A cold call updates the lead with a summary, interest, objections and the next step. A sales call creates the client, the deal and a draft contract for you to review; nothing goes to the client on its own. If HubSpot or Salesforce is connected, the lead's status and a call summary are added there too.",
+      },
+      {
+        question: "Can I call before my number is verified?",
+        answer:
+          "Yes. Tap Call, then Call SealMe. When SealMe picks up, tap Add call, dial the lead, then Merge. Verifying your number skips those steps.",
+      },
+      {
+        question: "Is every call recorded?",
+        answer:
+          "No. SealMe follows the recording law of the client's US state, which it reads from the area code. Where one person's consent is enough, the call is recorded. In states that need everyone's consent (CA, CT, DE, FL, IL, MD, MA, MT, NV, NH, PA, WA), or when the state can't be told, the call isn't recorded and you call the client directly. Calls outside the US, to toll-free numbers or to leads with no number aren't recorded either.",
+      },
+      {
+        question: "Why wasn't my call written up?",
+        answer:
+          "Calls shorter than 30 seconds, voicemails, calls nobody picked up and calls SealMe wasn't allowed to record are skipped. The reason shows next to the call on the Calls page, under History.",
+      },
+      {
+        question: "What is the Calls page for?",
+        answer:
+          "It lists calls that need a look, for example one SealMe couldn't match to a lead. Pick the lead and click Process, or Discard to delete it. Calls nobody processes are deleted after 24 hours.",
+      },
+      {
+        question: "How long are call recordings kept?",
+        answer: "Only until the call is written up or discarded; then the recording is deleted from our phone provider. Calls nobody processes are deleted after 24 hours.",
+      },
+    ],
+  },
   {
     id: "recording",
     label: "Recording calls",
@@ -147,7 +243,8 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
       },
       {
         question: "Is the sync two-way?",
-        answer: "No, it's one-directional. SealMe pushes data to Salesforce or HubSpot; SealMe stays the source of truth until signing.",
+        answer:
+          "Deals go one way, from SealMe to Salesforce or HubSpot, and SealMe stays the source of truth until signing. If Leads is turned on for your workspace, contacts can also come in from your CRM as leads, set up under Lead import in that CRM's card in Settings.",
       },
     ],
   },

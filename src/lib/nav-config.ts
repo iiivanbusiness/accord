@@ -36,10 +36,6 @@ export function navGroupsFor({ prospecting, admin, manager = false }: { prospect
   ];
 }
 
-// Every item a regular member sees, in sidebar order (the AI help chat
-// describes the app from this).
-export const NAV_ITEMS: NavItem[] = navGroupsFor({ prospecting: false, admin: false }).flatMap((g) => g.items);
-
 // The phone's bottom bar has room for four buttons plus "More". Reps live
 // in prospecting on the phone, so those come first when it's on; anything
 // not built yet is skipped and the next item fills its spot.

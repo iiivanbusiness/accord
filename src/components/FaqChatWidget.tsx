@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { FAQ_CATEGORIES } from "@/lib/faq-content";
+import { faqCategoriesFor } from "@/lib/faq-content";
 
 type FaqMessage = { role: "assistant" | "user"; text: string };
 type AiMessage = { role: "assistant" | "user"; text: string };
@@ -28,7 +28,9 @@ const AI_GREETING = "Ask me anything about SealMe. I can't see your account or d
 // onWheel is attached passively and can't call preventDefault — and only
 // lets it through to native scrolling when the pointer is genuinely over a
 // scrollable region that isn't already at the boundary in that direction.
-export default function FaqChatWidget() {
+export default function FaqChatWidget({ prospecting = false }: { prospecting?: boolean }) {
+  // Leads and phone questions only where Leads is turned on.
+  const categories = faqCategoriesFor(prospecting);
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("faq");
   const panelRef = useRef<HTMLDivElement>(null);
@@ -45,7 +47,7 @@ export default function FaqChatWidget() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
-  const category = categoryId ? FAQ_CATEGORIES.find((c) => c.id === categoryId) ?? null : null;
+  const category = categoryId ? categories.find((c) => c.id === categoryId) ?? null : null;
 
   useEffect(() => {
     const panel = panelRef.current;
@@ -210,7 +212,7 @@ export default function FaqChatWidget() {
               <div className="flex-none border-t px-3.5 py-3" style={{ borderColor: "var(--hairline)" }}>
                 <div className="overscroll-contain flex max-h-[168px] flex-col gap-1 overflow-y-auto">
                   {!category
-                    ? FAQ_CATEGORIES.map((c) => (
+                    ? categories.map((c) => (
                         <OptionButton key={c.id} onClick={() => setCategoryId(c.id)}>
                           {c.label}
                         </OptionButton>

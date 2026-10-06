@@ -52,7 +52,7 @@ export async function POST(req: Request) {
 
   const workspace = await prisma.workspace.findUnique({
     where: { id: workspaceId },
-    select: { aiChatMessagesUsedThisMonth: true, aiChatMessagesLimit: true },
+    select: { aiChatMessagesUsedThisMonth: true, aiChatMessagesLimit: true, prospectingEnabled: true },
   });
   if (!workspace) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   if (workspace.aiChatMessagesUsedThisMonth >= workspace.aiChatMessagesLimit) {
@@ -71,7 +71,9 @@ export async function POST(req: Request) {
       system:
         "You are SealMe's support assistant, answering questions in a chat widget inside the app. " +
         "SealMe helps sales teams record calls, draft contracts from them with AI, route them for approval, " +
-        "get them signed, and sync closed deals to Salesforce or HubSpot.\n\n" +
+        "get them signed, and sync closed deals to Salesforce or HubSpot." +
+        (workspace.prospectingEnabled ? " This workspace also uses Leads: lead lists, tasks for reps, and phone calls through SealMe that write themselves up." : "") +
+        "\n\n" +
         "You do not have access to this user's account, deals, contracts, or any other personal data. Never " +
         "claim to look anything up, and never ask for account details. Answer only from the product facts below. " +
         "If a question needs account-specific info, or the facts below don't cover it, say you don't have that " +
@@ -81,9 +83,9 @@ export async function POST(req: Request) {
         "For navigation questions (where something is, how to get to a setting), give the exact page and section " +
         "from the navigation facts below, don't hedge with 'usually' or 'typically' when you already know the answer.\n\n" +
         "Navigation facts:\n" +
-        appNavigationText() +
+        appNavigationText(workspace.prospectingEnabled) +
         "\n\nProduct facts:\n" +
-        faqKnowledgeText(),
+        faqKnowledgeText(workspace.prospectingEnabled),
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
     });
 
