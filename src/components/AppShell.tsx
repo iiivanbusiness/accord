@@ -55,7 +55,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
     const Icon = NAV_ICONS[item.href];
     return { href: item.href, label: item.label, icon: <Icon /> };
   };
-  const navGroups = groups.map((g) => ({ label: g.label, items: g.items.map(withIcon) }));
+  const navGroups = groups.map((g) => ({ label: g.label, collapsible: g.collapsible, items: g.items.map(withIcon) }));
   const mobileItems = mobilePrimaryItems(groups, workspace.prospectingEnabled).map(withIcon);
 
   const navLinks = <SidebarNav groups={navGroups} />;
@@ -133,7 +133,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
             <div className="mb-7 px-1">
               <BrandLogo height={20} />
             </div>
-            {navLinks}
+            <SidebarNav groups={navGroups} expandAll />
             {workspaceFooter}
           </>
         }

@@ -10,9 +10,10 @@ export type SidebarNavItem = {
   icon: React.ReactNode;
 };
 
-export type SidebarNavGroup = { label: string; items: SidebarNavItem[] };
+export type SidebarNavGroup = { label: string; items: SidebarNavItem[]; collapsible?: boolean };
 
-export default function SidebarNav({ groups }: { groups: SidebarNavGroup[] }) {
+// expandAll: nothing folded (the phone's menu already is the "More").
+export default function SidebarNav({ groups, expandAll = false }: { groups: SidebarNavGroup[]; expandAll?: boolean }) {
   const items = groups.flatMap((g) => g.items);
   const pathname = usePathname();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -20,6 +21,16 @@ export default function SidebarNav({ groups }: { groups: SidebarNavGroup[] }) {
   const [pill, setPill] = useState<{ top: number; height: number } | null>(null);
 
   const activeHref = items.find((item) => pathname === item.href || pathname.startsWith(item.href + "/"))?.href;
+  // A folded group opens by itself when the page you're on is in it.
+  const [opened, setOpened] = useState<Set<string>>(new Set());
+  const isOpen = (group: SidebarNavGroup) => expandAll || !group.collapsible || opened.has(group.label) || group.items.some((i) => i.href === activeHref);
+  const toggle = (label: string) =>
+    setOpened((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
 
   useLayoutEffect(() => {
     const container = containerRef.current;
@@ -67,11 +78,28 @@ export default function SidebarNav({ groups }: { groups: SidebarNavGroup[] }) {
         </div>
       )}
       {groups.map((group, gi) => (
-        <div key={group.label} className={`flex flex-col gap-1 ${gi > 0 ? "mt-3.5" : ""}`}>
-          <div className="h-[18px] px-3 text-[10.5px] font-medium uppercase leading-[18px] tracking-[0.08em]" style={{ color: "var(--ink-muted)", opacity: 0.75 }}>
-            {group.label}
-          </div>
-          {group.items.map((item) => {
+        <div key={group.label || gi} className={`flex flex-col gap-1 ${gi > 0 ? "mt-3.5" : ""}`}>
+          {group.collapsible && !expandAll ? (
+            <button
+              type="button"
+              onClick={() => toggle(group.label)}
+              aria-expanded={isOpen(group)}
+              className="flex h-[35px] items-center gap-2.5 rounded-[10px] px-3 text-left text-[13.5px] font-medium"
+              style={{ color: "var(--ink-muted)" }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="flex-none transition-transform duration-150" style={{ transform: isOpen(group) ? "rotate(90deg)" : undefined }}>
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+              {group.label}
+            </button>
+          ) : (
+            group.label && (
+              <div className="h-[18px] px-3 text-[10.5px] font-medium uppercase leading-[18px] tracking-[0.08em]" style={{ color: "var(--ink-muted)", opacity: 0.75 }}>
+                {group.label}
+              </div>
+            )
+          )}
+          {isOpen(group) && group.items.map((item) => {
             const isActive = item.href === activeHref;
             return (
               <Link

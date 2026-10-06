@@ -1,48 +1,37 @@
 export type NavItem = { href: string; label: string };
-export type NavGroup = { label: string; items: NavItem[] };
+// collapsible: shown folded under its label until opened (or until the
+// page you're on is in it).
+export type NavGroup = { label: string; items: NavItem[]; collapsible?: boolean };
 
-// The sidebar, in groups. "Prospecting" (leads, tasks, calls) only shows
-// for workspaces with prospectingEnabled (see src/lib/prospecting.ts),
-// and Admin only for platform admins.
-const OVERVIEW: NavGroup = {
-  label: "Overview",
-  items: [
-    { href: "/dashboard", label: "Dashboard" },
-    { href: "/analytics", label: "Analytics" },
-    { href: "/calendar", label: "Calendar" },
-  ],
-};
-const PROSPECTING: NavGroup = {
-  label: "Prospecting",
-  items: [
-    { href: "/today", label: "Today" },
-    { href: "/leads", label: "Leads" },
-    { href: "/calls", label: "Calls" },
-  ],
-};
-const CLOSING: NavGroup = {
-  label: "Closing",
-  items: [
-    { href: "/deals", label: "Deals" },
-    { href: "/clients", label: "Clients" },
-    { href: "/templates", label: "Templates" },
-  ],
-};
-const WORKSPACE: NavGroup = {
-  label: "Workspace",
-  items: [
-    { href: "/feedback", label: "Feedback" },
-    { href: "/settings", label: "Settings" },
-  ],
-};
+// The sidebar: the few pages someone uses every day, then "More" for the
+// rest. Reps live in Today, Leads, Calls and Deals; without prospecting
+// (leads, tasks, calls) the everyday pages are the deal ones. Admin only
+// for platform admins, Team for people who assign the work.
+const ITEM = {
+  today: { href: "/today", label: "Today" },
+  leads: { href: "/leads", label: "Leads" },
+  calls: { href: "/calls", label: "Calls" },
+  deals: { href: "/deals", label: "Deals" },
+  dashboard: { href: "/dashboard", label: "Dashboard" },
+  calendar: { href: "/calendar", label: "Calendar" },
+  clients: { href: "/clients", label: "Clients" },
+  templates: { href: "/templates", label: "Templates" },
+  analytics: { href: "/analytics", label: "Analytics" },
+  team: { href: "/team", label: "Team" },
+  feedback: { href: "/feedback", label: "Feedback" },
+  settings: { href: "/settings", label: "Settings" },
+} satisfies Record<string, NavItem>;
 export const ADMIN_ITEM: NavItem = { href: "/admin", label: "Admin" };
-// Only for people who can manage the team (they assign the work).
-const TEAM_ITEM: NavItem = { href: "/team", label: "Team" };
 
 export function navGroupsFor({ prospecting, admin, manager = false }: { prospecting: boolean; admin: boolean; manager?: boolean }): NavGroup[] {
-  const workspace = admin ? { ...WORKSPACE, items: [...WORKSPACE.items, ADMIN_ITEM] } : WORKSPACE;
-  const prospectingGroup = manager ? { ...PROSPECTING, items: [...PROSPECTING.items, TEAM_ITEM] } : PROSPECTING;
-  return prospecting ? [OVERVIEW, prospectingGroup, CLOSING, workspace] : [OVERVIEW, CLOSING, workspace];
+  const everyday = prospecting ? [ITEM.today, ITEM.leads, ITEM.calls, ITEM.deals] : [ITEM.dashboard, ITEM.deals, ITEM.calendar, ITEM.clients];
+  const more = prospecting
+    ? [ITEM.dashboard, ITEM.calendar, ITEM.clients, ITEM.templates, ITEM.analytics, ...(manager ? [ITEM.team] : []), ITEM.feedback, ITEM.settings]
+    : [ITEM.templates, ITEM.analytics, ITEM.feedback, ITEM.settings];
+  return [
+    { label: "", items: everyday },
+    { label: "More", items: admin ? [...more, ADMIN_ITEM] : more, collapsible: true },
+  ];
 }
 
 // Every item a regular member sees, in sidebar order (the AI help chat

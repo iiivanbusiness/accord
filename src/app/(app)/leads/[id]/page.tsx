@@ -107,17 +107,38 @@ export default async function LeadPage({
           calls={calls.map((c) => ({ id: c.id, at: c.startedAt.toISOString(), who: c.user?.name ?? null, outcome: c.outcome, summary: c.summary, transcript: c.transcript, source: c.source }))}
           processAction={processColdCallTranscript.bind(null, lead.id)}
         />
-        <form action={updateLead.bind(null, lead.id)} className="card flex min-w-0 flex-col gap-5 p-5 sm:p-6">
-          <div className="text-[14px] font-medium">Details</div>
-          <LeadFields owners={owners} full values={lead} allowUnassigned={access.canAssign} />
-          <SubmitButton className="btn btn-primary w-full justify-center sm:w-auto sm:self-start" pendingText="Saving…">
-            Save changes
-          </SubmitButton>
-        </form>
+        {/* Folded: calls fill most of this in, and it's what you need least
+            before a call. */}
+        <details className="card min-w-0 overflow-hidden">
+          <summary className="flex cursor-pointer select-none items-baseline justify-between gap-3 px-5 py-4 sm:px-6">
+            <span className="text-[14px] font-medium">Edit details</span>
+            <span className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>Name, company, contact, owner, notes</span>
+          </summary>
+          <form action={updateLead.bind(null, lead.id)} className="flex min-w-0 flex-col gap-5 px-5 pb-5 sm:px-6 sm:pb-6">
+            <LeadFields owners={owners} full values={lead} allowUnassigned={access.canAssign} />
+            <SubmitButton className="btn btn-primary w-full justify-center sm:w-auto sm:self-start" pendingText="Saving…">
+              Save changes
+            </SubmitButton>
+          </form>
+        </details>
         </div>
 
         <div className="order-1 flex min-w-0 flex-col gap-4 lg:order-2">
           {lead.phone && !convertedDeal && <LeadCallButton leadName={lead.name} startAction={startLeadCall.bind(null, lead.id)} />}
+
+          <div className="card flex flex-col gap-2.5 p-5 text-[13px]">
+            <div className="text-[14px] font-medium">At a glance</div>
+            <Row label="Interest" value={lead.interest ? LEAD_INTEREST_LABEL[lead.interest] : "Not known yet"} />
+            <Row label="Decision maker" value={lead.isDecisionMaker === true ? "Yes" : lead.isDecisionMaker === false ? "No" : "Not known yet"} />
+            <Row label="Next step" value={[lead.nextStepAt ? formatDay(lead.nextStepAt) : null, lead.nextStep].filter(Boolean).join(" · ") || "None"} />
+            <Row label="Source" value={SOURCE_LABEL[lead.source] ?? lead.source} />
+            {lead.summary && (
+              <div className="mt-1 border-t pt-2.5" style={{ borderColor: "var(--hairline-soft)" }}>
+                <div className="mb-1 text-[12px] font-medium" style={{ color: "var(--ink-muted)" }}>Last call</div>
+                <div className="break-words">{lead.summary}</div>
+              </div>
+            )}
+          </div>
 
           <div className="card flex flex-col gap-3 p-5">
             <div className="text-[14px] font-medium">Stage</div>
@@ -151,19 +172,6 @@ export default async function LeadPage({
             deleteAction={deleteTask}
           />
 
-          <div className="card flex flex-col gap-2.5 p-5 text-[13px]">
-            <div className="text-[14px] font-medium">At a glance</div>
-            <Row label="Interest" value={lead.interest ? LEAD_INTEREST_LABEL[lead.interest] : "Not known yet"} />
-            <Row label="Decision maker" value={lead.isDecisionMaker === true ? "Yes" : lead.isDecisionMaker === false ? "No" : "Not known yet"} />
-            <Row label="Next step" value={[lead.nextStepAt ? formatDay(lead.nextStepAt) : null, lead.nextStep].filter(Boolean).join(" · ") || "None"} />
-            <Row label="Source" value={SOURCE_LABEL[lead.source] ?? lead.source} />
-            {lead.summary && (
-              <div className="mt-1 border-t pt-2.5" style={{ borderColor: "var(--hairline-soft)" }}>
-                <div className="mb-1 text-[12px] font-medium" style={{ color: "var(--ink-muted)" }}>Last call</div>
-                <div className="break-words">{lead.summary}</div>
-              </div>
-            )}
-          </div>
           {access.canAssign && <DeleteLeadButton action={deleteLead.bind(null, lead.id)} />}
         </div>
       </div>

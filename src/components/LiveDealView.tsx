@@ -264,6 +264,32 @@ export default function LiveDealView({
   }
   const missing = fields.filter((f) => f.status === "missing");
   const canSendToDocusignNow = docusignEnabled && status === "ready" && contractIsDraft && clientHasEmail;
+  const firstName = clientName.split(/\s+/)[0] || clientName;
+
+  // The one thing this deal needs next, said at the top so nobody has to
+  // hunt for the button.
+  const next: { title: string; detail: string; action?: React.ReactNode } =
+    status === "processing"
+      ? { title: "SealMe is reading the call", detail: "The terms fill in by themselves in a moment." }
+      : status === "extraction_failed"
+        ? { title: "Reading the call failed", detail: "Try again; nothing is lost.", action: <form action={retryExtractionAction}><NextButton>Try again</NextButton></form> }
+        : missing.length > 0
+          ? {
+              title: missing.length === 1 ? `Fill in ${missing[0].label.toLowerCase()}` : `Fill in ${missing.length} details`,
+              detail: "The call didn't cover them. Then the contract is ready to send.",
+              action: <a href="#missing" className="btn w-full justify-center" style={NEXT_BUTTON_STYLE}>Fill them in</a>,
+            }
+          : !hasContract
+            ? { title: "Make the contract", detail: `Everything's in. SealMe drafts it on the ${templateName ?? "default"} template.`, action: <form action={generateContractAction}><NextButton>Make the contract</NextButton></form> }
+            : status === "pending_approval"
+              ? { title: "Waiting for approval", detail: "It goes to the client as soon as it's approved.", action: <Link href={`/deals/${dealId}/contract`} className="btn w-full justify-center" style={NEXT_BUTTON_STYLE}>Open the contract</Link> }
+              : status === "changes_requested"
+                ? { title: "Make the requested changes", detail: "A reviewer asked for changes before it goes out.", action: <Link href={`/deals/${dealId}/contract`} className="btn w-full justify-center" style={NEXT_BUTTON_STYLE}>Open the contract</Link> }
+                : status === "sent"
+                  ? { title: `Waiting for ${firstName} to sign`, detail: contractViewedAt ? `They opened it ${timeAgo(contractViewedAt)}.` : "They haven't opened it yet." }
+                  : status === "signed"
+                    ? { title: "Signed", detail: "Nothing left to do on this deal." }
+                    : { title: "Check the contract and send it", detail: `${firstName} gets it to sign as soon as you send.`, action: <Link href={`/deals/${dealId}/contract`} className="btn w-full justify-center" style={NEXT_BUTTON_STYLE}>Review and send</Link> };
 
   return (
     <>
@@ -291,6 +317,15 @@ export default function LiveDealView({
           )}
         </div>
       </div>
+
+      <section className="mb-[18px] flex flex-col gap-3 rounded-[20px] p-5 sm:flex-row sm:items-center sm:justify-between" style={{ background: "var(--surface-inverted)", color: "var(--on-surface-inverted)" }}>
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="text-[11px] font-semibold" style={{ letterSpacing: "1px", color: "var(--on-surface-inverted-muted)" }}>NEXT STEP</span>
+          <h2 className="break-words text-[19px] font-semibold" style={{ letterSpacing: "-0.3px" }}>{next.title}</h2>
+          <div className="text-[13px]" style={{ color: "var(--on-surface-inverted-muted)" }}>{next.detail}</div>
+        </div>
+        {next.action && <div className="w-full flex-none sm:w-[220px]">{next.action}</div>}
+      </section>
 
       <div className="grid grid-cols-1 gap-[18px] lg:grid-cols-[1fr_300px]">
         <div className="flex flex-col gap-[18px]">
@@ -409,7 +444,7 @@ export default function LiveDealView({
               </div>
             </div>
           ) : missing.length > 0 ? (
-            <div className="card" style={{ borderColor: "rgba(245,185,77,.28)" }}>
+            <div id="missing" className="card scroll-mt-24" style={{ borderColor: "rgba(245,185,77,.28)" }}>
               <div className="rounded-t-[20px] border-b px-5 py-4" style={{ background: "var(--warn-soft)", borderColor: "rgba(245,185,77,.2)" }}>
                 <h2 className="text-[15px] font-medium" style={{ color: "var(--warn)" }}>Missing information</h2>
               </div>
@@ -453,5 +488,15 @@ export default function LiveDealView({
         </div>
       </div>
     </>
+  );
+}
+
+const NEXT_BUTTON_STYLE: React.CSSProperties = { height: 46, fontSize: 15, background: "var(--on-surface-inverted)", color: "var(--surface-inverted)" };
+
+function NextButton({ children }: { children: React.ReactNode }) {
+  return (
+    <button type="submit" className="btn w-full justify-center" style={NEXT_BUTTON_STYLE}>
+      {children}
+    </button>
   );
 }
