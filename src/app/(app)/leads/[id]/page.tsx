@@ -11,10 +11,12 @@ import LeadTasks from "@/components/LeadTasks";
 import LeadCalls from "@/components/LeadCalls";
 import ConvertLeadButton from "@/components/ConvertLeadButton";
 import DeleteLeadButton from "@/components/DeleteLeadButton";
+import LeadCallButton from "@/components/LeadCallButton";
 import { deleteLead, setLeadStage, updateLead } from "../actions";
 import { createLeadTask, deleteTask, setTaskStatus } from "../task-actions";
 import { processColdCallTranscript } from "../call-actions";
 import { convertLeadToDeal } from "../convert-actions";
+import { startLeadCall } from "../phone-actions";
 
 // Processing a pasted call transcript (an action on this page) waits on
 // Claude; give it room beyond the default.
@@ -115,6 +117,8 @@ export default async function LeadPage({
         </div>
 
         <div className="order-1 flex min-w-0 flex-col gap-4 lg:order-2">
+          {lead.phone && !convertedDeal && <LeadCallButton leadName={lead.name} templates={templates} startAction={startLeadCall.bind(null, lead.id)} />}
+
           <div className="card flex flex-col gap-3 p-5">
             <div className="text-[14px] font-medium">Stage</div>
             <div className="flex flex-wrap gap-1.5">

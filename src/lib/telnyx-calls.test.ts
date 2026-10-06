@@ -75,6 +75,8 @@ describe("Calls to the SealMe number", () => {
       expect(stateOf(lastAction()[2])?.k).toBe("bye");
     }
     expect(db.phoneCall.create.mock.calls.map((c) => c[0].data.consentRule)).toEqual(["no_number", "no_number", "toll_free", "non_us"]);
+    // Without a Call tap, the rep is told to tap Call on a lead first.
+    expect(telnyx.callAction.mock.calls.map((c) => stateOf(c[2])?.m)).toEqual(["nolead", "off", "off", "off"]);
   });
 
   it("plays the notice before recording an all-party state, when the workspace allows it", async () => {

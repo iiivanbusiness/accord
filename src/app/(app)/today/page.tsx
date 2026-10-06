@@ -9,6 +9,7 @@ import { formatTaskDue, TASK_TYPE_LABEL } from "@/lib/tasks";
 import TodayTaskRow, { type TodayTask } from "@/components/TodayTaskRow";
 import TaskDigestToggle from "@/components/TaskDigestToggle";
 import { setTaskStatus } from "../leads/task-actions";
+import { startLeadCall } from "../leads/phone-actions";
 import { setTaskDigestEmail } from "../preferences-actions";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -150,7 +151,7 @@ export default async function TodayPage() {
   const rows = (tasks: TaskRow[], when: (t: TaskRow) => string, opts: { overdue?: boolean; showType?: boolean } = {}) =>
     tasks.map((t, i) => (
       <div key={t.id} style={i ? { borderTop: "1px solid var(--hairline-soft)" } : undefined}>
-        <TodayTaskRow task={toRow(t, when(t))} overdue={opts.overdue} showType={opts.showType} statusAction={setTaskStatus} />
+        <TodayTaskRow task={toRow(t, when(t))} overdue={opts.overdue} showType={opts.showType} statusAction={setTaskStatus} callAction={startLeadCall} />
       </div>
     ));
 

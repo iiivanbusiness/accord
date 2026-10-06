@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useTransition } from "react";
 import { TASK_PRIORITY_CHIP, TASK_PRIORITY_LABEL, TASK_TYPE_LABEL } from "@/lib/tasks";
+import LeadCallButton from "@/components/LeadCallButton";
+import type { CallPlan } from "@/app/(app)/leads/phone-actions";
 
 export type TodayTask = {
   id: string;
@@ -15,17 +17,20 @@ export type TodayTask = {
 };
 
 // One task on the Today page: who to call, a Call button that dials from
-// this device, and Done / Skip (or Reopen, in the finished list).
+// this device (with SealMe on the line when it may record), and Done /
+// Skip (or Reopen, in the finished list).
 export default function TodayTaskRow({
   task,
   overdue,
   showType,
   statusAction,
+  callAction,
 }: {
   task: TodayTask;
   overdue?: boolean;
   showType?: boolean;
   statusAction: (taskId: string, status: "open" | "done" | "skipped") => Promise<void>;
+  callAction: (leadId: string, input: { mode: string; templateId?: string | null }) => Promise<CallPlan>;
 }) {
   const [pending, startTransition] = useTransition();
   const set = (status: "open" | "done" | "skipped") => startTransition(() => statusAction(task.id, status));
@@ -66,9 +71,13 @@ export default function TodayTaskRow({
         ) : (
           <>
             {task.lead?.phone && (
-              <a href={`tel:${task.lead.phone}`} className={`btn btn-sm ${callFirst ? "btn-primary" : "btn-secondary"}`} title={task.lead.phoneLabel ?? undefined}>
-                Call
-              </a>
+              <LeadCallButton
+                compact
+                primary={callFirst}
+                leadName={task.lead.name}
+                defaultMode={task.type === "sales_call" ? "sales" : "cold"}
+                startAction={(input) => callAction(task.lead!.id, input)}
+              />
             )}
             <button type="button" disabled={pending} onClick={() => set("done")} className={`btn btn-sm ${task.lead?.phone && callFirst ? "btn-secondary" : "btn-primary"}`}>
               Done

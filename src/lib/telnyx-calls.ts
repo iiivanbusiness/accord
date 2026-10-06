@@ -11,11 +11,12 @@ import { reportError } from "@/lib/error-report";
 //   noticing  playing the notice; recording starts when it ends
 //   bye     saying why SealMe isn't on this call, then hanging up
 type CallState = { k: "rec" | "notice" | "noticing" | "bye"; c?: string; m?: ByeReason };
-type ByeReason = "unknown" | "off";
+type ByeReason = "unknown" | "nolead" | "off";
 
 const VOICE = { voice: "AWS.Polly.Joanna-Neural", language: "en-US" };
 const SAY: Record<ByeReason | "notice_prompt" | "notice", string> = {
   unknown: "This is SealMe. This phone number isn't set up in SealMe yet. Add it in SealMe under Settings, then call again. Goodbye.",
+  nolead: "This is SealMe. No lead is waiting for this call. Tap Call on a lead in SealMe, then call again. Goodbye.",
   off: "This is SealMe. Recording is off for this call. Hang up and call your client directly.",
   notice_prompt: "SealMe is on the line. Once your client is on the call too, press 1 to play the recording notice. Nothing is recorded before that.",
   notice: "This call is being recorded.",
@@ -118,7 +119,7 @@ async function answerIncoming(callControlId: string, rawFrom: string | null): Pr
   }
 
   if (!record) {
-    await callAction(callControlId, "answer", { client_state: encodeClientState({ k: "bye", m: "off", c: callId }), command_id: `answer-${callControlId}` });
+    await callAction(callControlId, "answer", { client_state: encodeClientState({ k: "bye", m: intent ? "off" : "nolead", c: callId }), command_id: `answer-${callControlId}` });
     return;
   }
   if (announce) {
