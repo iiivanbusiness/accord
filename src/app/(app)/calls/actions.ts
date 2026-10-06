@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { requireProspecting } from "@/lib/prospecting";
 import { leadAccess } from "@/lib/lead-visibility";
 import { isExtractionConfigured } from "@/lib/extract-deal";
-import { runCallProcessing } from "@/lib/call-inbox";
+import { dropRecording, runCallProcessing } from "@/lib/call-inbox";
 import { cookieTimeZone } from "@/lib/viewer-time";
 
 const MAX_CHARS = 100_000;
@@ -76,13 +76,15 @@ export async function processCall(callId: string, input: { leadId: string; mode:
 }
 
 // "Discard": nothing is processed, nothing is charged, and the transcript
-// is gone.
+// (or the phone recording at Telnyx) is gone.
 export async function discardCall(callId: string): Promise<void> {
   const { callWhere } = await callScope();
+  const call = await prisma.phoneCall.findFirst({ where: { ...callWhere, id: callId }, select: { telnyxRecordingId: true } });
   const { count } = await prisma.phoneCall.updateMany({
     where: { ...callWhere, id: callId, status: { in: ["pending", "failed"] } },
-    data: { status: "discarded", transcript: null, summary: null },
+    data: { status: "discarded", transcript: null, summary: null, telnyxRecordingId: null },
   });
   if (count === 0) throw new Error("That call was already handled");
+  if (call?.telnyxRecordingId) after(() => dropRecording(call.telnyxRecordingId, callId));
   revalidatePath("/calls");
 }

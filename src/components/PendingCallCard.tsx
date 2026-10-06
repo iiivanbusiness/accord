@@ -13,7 +13,11 @@ type PendingCall = {
   source: string;
   rep: string | null;
   transcript: string;
+  // A phone call is transcribed only when it's processed.
+  awaitingTranscript: boolean;
   leadId: string | null;
+  mode: string; // cold | sales | unknown, from the Call button
+  templateId: string | null;
 };
 
 const PREVIEW_LINES = 4;
@@ -38,8 +42,8 @@ export default function PendingCallCard({
   const [leadId, setLeadId] = useState(call.leadId ?? "");
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState("cold");
-  const [templateId, setTemplateId] = useState("");
+  const [mode, setMode] = useState(call.mode === "sales" ? "sales" : "cold");
+  const [templateId, setTemplateId] = useState(call.templateId ?? "");
   const [showAll, setShowAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -75,6 +79,12 @@ export default function PendingCallCard({
         {processing && <span className="chip chip-neutral ml-auto">Processing…</span>}
         {call.status === "failed" && <span className="chip chip-warn ml-auto">Processing failed. Try again</span>}
       </div>
+
+      {call.awaitingTranscript && (
+        <div className="rounded-[12px] px-3.5 py-2.5 text-[12.5px]" style={{ background: "var(--canvas)", color: "var(--ink-muted)" }}>
+          Recorded call. SealMe writes it out when you process it.
+        </div>
+      )}
 
       {lines.length > 0 && (
         <div className="rounded-[12px] px-3.5 py-2.5 text-[12.5px] leading-relaxed" style={{ background: "var(--canvas)", color: "var(--ink-muted)" }}>

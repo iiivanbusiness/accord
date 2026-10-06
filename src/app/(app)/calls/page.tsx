@@ -40,7 +40,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
     tab === "pending"
       ? prisma.phoneCall.findMany({
           where: { ...callWhere, status: { in: ["pending", "processing", "failed"] } },
-          select: { id: true, status: true, source: true, transcript: true, durationSec: true, startedAt: true, leadId: true, mode: true, user: { select: { name: true } } },
+          select: { id: true, status: true, source: true, transcript: true, telnyxRecordingId: true, durationSec: true, startedAt: true, leadId: true, mode: true, templateId: true, user: { select: { name: true } } },
           orderBy: { startedAt: "desc" },
           take: 100,
         })
@@ -116,7 +116,7 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
           <CallRecordingUploader addAction={addUploadedCall} />
           {pending.length === 0 ? (
             <div className="card px-6 py-8 text-center text-[13.5px]" style={{ color: "var(--ink-muted)" }}>
-              No calls waiting. Once phone calling is on, calls show up here when you hang up. Until then, upload a recording above.
+              No calls waiting. Calls you make with SealMe on the line show up here when you hang up, and so do recordings you upload above.
             </div>
           ) : (
             pending.map((c) => (
@@ -130,7 +130,10 @@ export default async function CallsPage({ searchParams }: { searchParams: Promis
                   source: SOURCE_LABEL[c.source] ?? c.source,
                   rep: seesAll ? (c.user?.name ?? null) : null,
                   transcript: c.transcript ?? "",
+                  awaitingTranscript: !c.transcript && Boolean(c.telnyxRecordingId),
                   leadId: c.leadId,
+                  mode: c.mode,
+                  templateId: c.templateId,
                 }}
                 leads={leads.map((l) => ({ id: l.id, name: l.name, detail: l.company ?? l.phone ?? "" }))}
                 templates={templates}

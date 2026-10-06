@@ -4,6 +4,8 @@ import { INPUT_USD_PER_MTOK, OUTPUT_USD_PER_MTOK } from "@/lib/extract-cold-call
 import { reportError } from "@/lib/error-report";
 import { pushCallToCrm } from "@/lib/crm-call-sync";
 import { applySalesCall } from "@/lib/sales-call";
+import { deleteRecording, recordingDownload } from "@/lib/telnyx";
+import { RECORDING_LISTEN_PARAMS, transcriptFromListenResponse } from "@/lib/recording-transcript";
 
 // Calls shorter than this aren't worth a model call: nobody picked up, or
 // the line dropped.
@@ -18,6 +20,8 @@ export const STT_USD_PER_MINUTE = 0.0043;
 export const SKIP_LABEL: Record<string, string> = {
   too_short: "Under 30 seconds",
   one_speaker: "Only one voice (likely voicemail)",
+  no_speech: "Nothing was said",
+  not_recorded: "Not recorded (recording rules for the lead's state)",
 };
 
 // How many different people talk in a transcript. Diarized recordings
@@ -53,9 +57,16 @@ export function callCostUsd(call: { sttSeconds: number | null; aiInputTokens: nu
 // that would be set aside ("Process anyway", when the speaker split was
 // wrong).
 export async function runCallProcessing(callId: string, timeZone: string, options: { force?: boolean } = {}): Promise<void> {
-  const call = await prisma.phoneCall.findUnique({ where: { id: callId }, include: { lead: true } });
+  let call = await prisma.phoneCall.findUnique({ where: { id: callId }, include: { lead: true } });
   if (!call || call.status !== "processing") return;
   try {
+    if (!call.transcript && call.telnyxRecordingId) {
+      call = { ...call, ...(await transcribePhoneRecording(call.id, call.telnyxRecordingId, call.durationSec)) };
+      if (!call.transcript) {
+        await prisma.phoneCall.update({ where: { id: callId }, data: { status: "skipped", connected: false, extracted: { skipped: "no_speech" }, processedAt: new Date() } });
+        return;
+      }
+    }
     const skip = options.force ? null : skipReason(call);
     if (skip) {
       await prisma.phoneCall.update({
@@ -70,10 +81,10 @@ export async function runCallProcessing(callId: string, timeZone: string, option
     } else {
       if (call.mode !== "cold") throw new Error(`Calls of kind "${call.mode}" can't be processed`);
       await applyColdCall({
-      workspaceId: call.workspaceId,
-      userId: call.userId,
-      lead: call.lead,
-      transcript: call.transcript,
+        workspaceId: call.workspaceId,
+        userId: call.userId,
+        lead: call.lead,
+        transcript: call.transcript,
         timeZone,
         phoneCallId: call.id,
       });
@@ -87,12 +98,41 @@ export async function runCallProcessing(callId: string, timeZone: string, option
   await pushCallToCrm(callId);
 }
 
-// For the daily cron: calls left unprocessed for a day are dropped, and
-// their transcripts with them.
-export async function discardStaleCalls(now = new Date()): Promise<number> {
-  const { count } = await prisma.phoneCall.updateMany({
-    where: { status: { in: ["pending", "failed"] }, startedAt: { lt: new Date(now.getTime() - PENDING_TTL_MS) } },
-    data: { status: "discarded", transcript: null, summary: null },
+// A phone call's recording is transcribed only once someone asks for it
+// (Process), and then dropped at Telnyx: SealMe keeps the transcript, not
+// the audio.
+async function transcribePhoneRecording(callId: string, recordingId: string, durationSec: number | null): Promise<{ transcript: string; sttSeconds: number; durationSec: number | null; telnyxRecordingId: null }> {
+  const { url, seconds } = await recordingDownload(recordingId);
+  const language = process.env.DEEPGRAM_LANGUAGE || "en";
+  const res = await fetch(`https://api.deepgram.com/v1/listen?${RECORDING_LISTEN_PARAMS}&language=${language}`, {
+    method: "POST",
+    headers: { Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
   });
+  if (!res.ok) throw new Error(`Deepgram ${res.status}: ${await res.text()}`);
+  const heard = transcriptFromListenResponse(await res.json());
+  const saved = { transcript: heard.transcript, sttSeconds: heard.seconds, durationSec: durationSec ?? seconds ?? heard.seconds, telnyxRecordingId: null };
+  await prisma.phoneCall.update({ where: { id: callId }, data: saved });
+  await dropRecording(recordingId, callId);
+  return saved;
+}
+
+export async function dropRecording(recordingId: string | null, callId: string): Promise<void> {
+  if (!recordingId) return;
+  await deleteRecording(recordingId).catch((err) => reportError(err, "Deleting a call recording at Telnyx", { callId }));
+}
+
+// For the daily cron: calls left unprocessed for a day are dropped, with
+// their transcripts and any recording still at Telnyx. So is a call whose
+// recording never arrived.
+export async function discardStaleCalls(now = new Date()): Promise<number> {
+  const where = { status: { in: ["pending", "failed", "recording"] }, startedAt: { lt: new Date(now.getTime() - PENDING_TTL_MS) } };
+  const stale = await prisma.phoneCall.findMany({ where, select: { id: true, telnyxRecordingId: true } });
+  if (stale.length === 0) return 0;
+  const { count } = await prisma.phoneCall.updateMany({
+    where: { ...where, id: { in: stale.map((c) => c.id) } },
+    data: { status: "discarded", transcript: null, summary: null, telnyxRecordingId: null },
+  });
+  for (const c of stale) await dropRecording(c.telnyxRecordingId, c.id);
   return count;
 }

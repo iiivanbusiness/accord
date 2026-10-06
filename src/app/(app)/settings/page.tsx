@@ -4,6 +4,9 @@ import { auth } from "@/lib/auth";
 import { requireWorkspaceId } from "@/lib/workspace";
 import { getSenderDomainStatus, type SenderDomainRecord } from "@/lib/sender-domain";
 import TwoFactorSettings from "@/components/TwoFactorSettings";
+import PhoneNumberSettings from "@/components/PhoneNumberSettings";
+import { sealmeNumber } from "@/lib/telnyx";
+import { formatPhone } from "@/lib/phone";
 import DeleteAccountSettings from "@/components/DeleteAccountSettings";
 import RolesManager from "@/components/RolesManager";
 import RoleSelect from "@/components/RoleSelect";
@@ -491,6 +494,17 @@ export default async function SettingsPage({
     )}
 
     {canManageWorkspacePerm && <DeveloperSettingsLink />}
+
+    {currentUser && workspace.prospectingEnabled && (
+      <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
+        <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
+          <h2 className="text-[15px] font-medium">Your phone number</h2>
+        </div>
+        <div className="px-[22px] py-4">
+          <PhoneNumberSettings phone={currentUser.phone} sealmeNumber={sealmeNumber() ? formatPhone(sealmeNumber()) : null} />
+        </div>
+      </div>
+    )}
 
     {currentUser?.passwordHash && (
       <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">

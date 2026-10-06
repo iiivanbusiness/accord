@@ -1,11 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/db", () => ({ prisma: {} }));
+const { phoneCall, cold, telnyx } = vi.hoisted(() => ({
+  phoneCall: { findUnique: vi.fn(), update: vi.fn() },
+  cold: vi.fn(),
+  telnyx: { recordingDownload: vi.fn(), deleteRecording: vi.fn() },
+}));
+vi.mock("@/lib/db", () => ({ prisma: { phoneCall } }));
 vi.mock("@/lib/error-report", () => ({ reportError: async () => {} }));
 vi.mock("@/lib/crm-call-sync", () => ({ pushCallToCrm: async () => {} }));
 vi.mock("@/lib/sales-call", () => ({ applySalesCall: async () => {} }));
+vi.mock("@/lib/cold-call", () => ({ applyColdCall: cold }));
+vi.mock("@/lib/telnyx", () => telnyx);
 
-import { callCostUsd, skipReason, speakerCount } from "./call-inbox";
+import { callCostUsd, runCallProcessing, skipReason, speakerCount } from "./call-inbox";
 
 const twoVoices = "Speaker 1: Hi, is this Dana?\nSpeaker 2: Speaking, who's this?\nSpeaker 1: It's Sam from SealMe.";
 
@@ -29,5 +36,26 @@ describe("Calls inbox", () => {
     // 3 minutes at $0.0043 plus 2,000 in / 400 out at $1 / $5 per million.
     expect(callCostUsd({ sttSeconds: 180, aiInputTokens: 2000, aiOutputTokens: 400 })).toBeCloseTo(0.0129 + 0.002 + 0.002, 6);
     expect(callCostUsd({ sttSeconds: null, aiInputTokens: null, aiOutputTokens: null })).toBe(0);
+  });
+
+  it("writes out a phone recording only when it's processed, then drops the audio", async () => {
+    phoneCall.findUnique.mockResolvedValue({ id: "call1", status: "processing", mode: "cold", workspaceId: "w1", userId: "u1", lead: { id: "l1" }, transcript: null, telnyxRecordingId: "rec1", durationSec: 95 });
+    telnyx.recordingDownload.mockResolvedValue({ url: "https://telnyx.example/rec1.mp3", seconds: 95 });
+    telnyx.deleteRecording.mockResolvedValue(undefined);
+    const deepgram = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ metadata: { duration: 95 }, results: { utterances: [{ speaker: 0, transcript: "Hi, is this Dana?" }, { speaker: 1, transcript: "Speaking." }] } })),
+    );
+    vi.stubGlobal("fetch", deepgram);
+
+    await runCallProcessing("call1", "America/Chicago");
+
+    expect(JSON.parse(deepgram.mock.calls[0][1].body)).toEqual({ url: "https://telnyx.example/rec1.mp3" });
+    expect(phoneCall.update).toHaveBeenCalledWith({
+      where: { id: "call1" },
+      data: { transcript: "Speaker 1: Hi, is this Dana?\nSpeaker 2: Speaking.", sttSeconds: 95, durationSec: 95, telnyxRecordingId: null },
+    });
+    expect(telnyx.deleteRecording).toHaveBeenCalledWith("rec1");
+    expect(cold.mock.calls[0][0]).toMatchObject({ phoneCallId: "call1", transcript: "Speaker 1: Hi, is this Dana?\nSpeaker 2: Speaking." });
+    vi.unstubAllGlobals();
   });
 });
