@@ -101,7 +101,7 @@ export async function runCallProcessing(callId: string, timeZone: string, option
 // A phone call's recording is transcribed only once someone asks for it
 // (Process), and then dropped at Telnyx: SealMe keeps the transcript, not
 // the audio.
-async function transcribePhoneRecording(callId: string, recordingId: string, durationSec: number | null): Promise<{ transcript: string; sttSeconds: number; durationSec: number | null; telnyxRecordingId: null }> {
+async function transcribePhoneRecording(callId: string, recordingId: string, durationSec: number | null): Promise<{ transcript: string; sttSeconds: number; durationSec: number | null; telnyxRecordingId: string | null }> {
   const { url, seconds } = await recordingDownload(recordingId);
   const language = process.env.DEEPGRAM_LANGUAGE || "en";
   const res = await fetch(`https://api.deepgram.com/v1/listen?${RECORDING_LISTEN_PARAMS}&language=${language}`, {
@@ -111,9 +111,13 @@ async function transcribePhoneRecording(callId: string, recordingId: string, dur
   });
   if (!res.ok) throw new Error(`Deepgram ${res.status}: ${await res.text()}`);
   const heard = transcriptFromListenResponse(await res.json());
-  const saved = { transcript: heard.transcript, sttSeconds: heard.seconds, durationSec: durationSec ?? seconds ?? heard.seconds, telnyxRecordingId: null };
+  // Nothing heard: the recording stays at Telnyx for the day, so a silent
+  // line can be told apart from speech the model missed. The daily cron
+  // drops it then.
+  const keep = !heard.transcript;
+  const saved = { transcript: heard.transcript, sttSeconds: heard.seconds, durationSec: durationSec ?? seconds ?? heard.seconds, telnyxRecordingId: keep ? recordingId : null };
   await prisma.phoneCall.update({ where: { id: callId }, data: saved });
-  await dropRecording(recordingId, callId);
+  if (!keep) await dropRecording(recordingId, callId);
   return saved;
 }
 
@@ -126,13 +130,22 @@ export async function dropRecording(recordingId: string | null, callId: string):
 // their transcripts and any recording still at Telnyx. So is a call whose
 // recording never arrived.
 export async function discardStaleCalls(now = new Date()): Promise<number> {
-  const where = { status: { in: ["pending", "failed", "recording"] }, startedAt: { lt: new Date(now.getTime() - PENDING_TTL_MS) } };
+  const before = new Date(now.getTime() - PENDING_TTL_MS);
+  const where = { status: { in: ["pending", "failed", "recording"] }, startedAt: { lt: before } };
   const stale = await prisma.phoneCall.findMany({ where, select: { id: true, telnyxRecordingId: true } });
-  if (stale.length === 0) return 0;
-  const { count } = await prisma.phoneCall.updateMany({
-    where: { ...where, id: { in: stale.map((c) => c.id) } },
-    data: { status: "discarded", transcript: null, summary: null, telnyxRecordingId: null },
-  });
-  for (const c of stale) await dropRecording(c.telnyxRecordingId, c.id);
+  let count = 0;
+  if (stale.length) {
+    ({ count } = await prisma.phoneCall.updateMany({
+      where: { ...where, id: { in: stale.map((c) => c.id) } },
+      data: { status: "discarded", transcript: null, summary: null, telnyxRecordingId: null },
+    }));
+    for (const c of stale) await dropRecording(c.telnyxRecordingId, c.id);
+  }
+  // Recordings kept past processing (nothing was heard) go after a day too.
+  const kept = await prisma.phoneCall.findMany({ where: { telnyxRecordingId: { not: null }, status: { notIn: ["pending", "failed", "recording", "processing"] }, startedAt: { lt: before } }, select: { id: true, telnyxRecordingId: true } });
+  for (const c of kept) {
+    await dropRecording(c.telnyxRecordingId, c.id);
+    await prisma.phoneCall.update({ where: { id: c.id }, data: { telnyxRecordingId: null } });
+  }
   return count;
 }

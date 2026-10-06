@@ -58,4 +58,19 @@ describe("Calls inbox", () => {
     expect(cold.mock.calls[0][0]).toMatchObject({ phoneCallId: "call1", transcript: "Speaker 1: Hi, is this Dana?\nSpeaker 2: Speaking." });
     vi.unstubAllGlobals();
   });
+
+  it("keeps the recording for a day when nothing was heard", async () => {
+    phoneCall.findUnique.mockResolvedValue({ id: "call2", status: "processing", mode: "cold", workspaceId: "w1", userId: "u1", lead: { id: "l1" }, transcript: null, telnyxRecordingId: "rec2", durationSec: 62 });
+    phoneCall.update.mockClear();
+    telnyx.deleteRecording.mockClear();
+    telnyx.recordingDownload.mockResolvedValue({ url: "https://telnyx.example/rec2.mp3", seconds: 62 });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ metadata: { duration: 62 }, results: { utterances: [] } }))));
+
+    await runCallProcessing("call2", "America/Chicago");
+
+    expect(phoneCall.update.mock.calls[0][0].data).toMatchObject({ transcript: "", telnyxRecordingId: "rec2" });
+    expect(phoneCall.update.mock.calls[1][0].data).toMatchObject({ status: "skipped", extracted: { skipped: "no_speech" } });
+    expect(telnyx.deleteRecording).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
 });
