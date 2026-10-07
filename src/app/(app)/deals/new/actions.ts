@@ -14,6 +14,11 @@ import { reportError } from "@/lib/error-report";
 import { createDealFromTranscriptText, finishTranscriptDealInBackground, type TranscriptDeal } from "@/lib/transcript-deal";
 import { extractPlaceholderKeys } from "@/lib/contract";
 import { fieldMeta } from "@/lib/extract-deal";
+import { requireProspecting } from "@/lib/prospecting";
+import { leadAccess } from "@/lib/lead-visibility";
+import { runCallProcessing } from "@/lib/call-inbox";
+import { NEW_LEAD_NAME } from "@/lib/cold-call";
+import { cookieTimeZone } from "@/lib/viewer-time";
 
 export async function createDeal(formData: FormData) {
   const clientName = String(formData.get("clientName") ?? "").trim();
@@ -115,6 +120,45 @@ export async function createDealFromTranscript(formData: FormData) {
   after(() => finishTranscriptDealInBackground(workspaceId, made.dealId, made.callId, transcript));
 
   redirect(`/deals/${made.dealId}`);
+}
+
+// "Notes only" on Start a call: the call becomes notes on a lead (one
+// picked, or a new one the call names) and never a deal or contract. It's
+// written up in the background the same way as a call from the Calls
+// inbox, which is where the person lands to watch it finish.
+export async function createNotesFromTranscript(formData: FormData) {
+  const transcript = String(formData.get("transcript") ?? "").trim();
+  const leadId = String(formData.get("leadId") ?? "new").trim() || "new";
+  const fromRecording = formData.get("source") === "recording";
+  const seconds = Math.round(Number(formData.get("seconds")) || 0) || null;
+  if (!transcript) throw new Error("Add the recording or paste the transcript first");
+  if (transcript.length > 400_000) throw new Error("That transcript is too long. Use one call at a time");
+
+  const workspace = await requireProspecting();
+  const access = await leadAccess();
+  const lead =
+    leadId === "new"
+      ? await prisma.lead.create({ data: { workspaceId: workspace.id, ownerId: access.userId, name: NEW_LEAD_NAME, source: "call" }, select: { id: true } })
+      : await prisma.lead.findFirst({ where: { id: leadId, workspaceId: workspace.id, AND: [access.where] }, select: { id: true } });
+  if (!lead) throw new Error("That lead isn't available");
+
+  const call = await prisma.phoneCall.create({
+    data: {
+      workspaceId: workspace.id,
+      userId: access.userId,
+      leadId: lead.id,
+      source: fromRecording ? "upload" : "paste",
+      mode: "notes",
+      status: "processing",
+      transcript,
+      durationSec: seconds,
+      sttSeconds: fromRecording ? seconds : null,
+    },
+    select: { id: true },
+  });
+  const timeZone = await cookieTimeZone();
+  after(() => runCallProcessing(call.id, timeZone));
+  redirect("/calls");
 }
 
 // Desktop-app-only: starts a deal backed by a locally-recorded call instead

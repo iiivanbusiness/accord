@@ -5,11 +5,13 @@ import { requireWorkspaceId } from "@/lib/workspace";
 import LocalCaptureForm from "@/components/LocalCaptureForm";
 import CallUploadForm from "@/components/CallUploadForm";
 import SubmitButton from "@/components/SubmitButton";
-import { createDeal, createDealFromTranscript } from "./actions";
+import { createDeal, createDealFromTranscript, createNotesFromTranscript } from "./actions";
+import { searchTodoLeads } from "@/app/(app)/leads/task-actions";
 
 // Extracting terms from an hour-long transcript is one ~15-30s model call;
-// the follow-up work runs in after() within the same budget.
-export const maxDuration = 60;
+// the follow-up work, and writing up a notes-only call, run in after()
+// within the same budget.
+export const maxDuration = 300;
 
 function Field({ label, name, placeholder, required }: { label: string; name: string; placeholder?: string; required?: boolean }) {
   return (
@@ -59,7 +61,7 @@ export default async function NewDealPage({
           ? "SealMe records your system audio for the call. Nothing joins as a visible participant."
           : isManual
             ? "Enter what the call covered and it'll drop straight into the review flow."
-            : "Upload the call recording or its transcript, and SealMe will pull out the deal terms for you to review."}
+            : "Upload the call recording or its transcript. SealMe writes up the call, and drafts the contract if you want one."}
       </div>
     </div>
 
@@ -69,16 +71,6 @@ export default async function NewDealPage({
       <ModeTab href="/deals/new?mode=manual" active={isManual}>Enter manually</ModeTab>
     </div>
 
-    {/* Everything here makes a deal and a contract; a call that only needs notes goes to Calls. */}
-    {isTranscript && (
-      <div className="mb-5 max-w-[560px] text-[13px]" style={{ color: "var(--ink-muted)" }}>
-        Only need notes, no contract?{" "}
-        <Link href="/calls" className="font-medium" style={{ color: "var(--accent-blue)" }}>
-          Add the recording in Calls
-        </Link>
-        , and SealMe writes up the call on the lead.
-      </div>
-    )}
 
     {error && (
       <div className="chip chip-warn mb-4 max-w-[560px] w-full justify-start px-4 py-2.5 text-[12.5px]">
@@ -131,7 +123,12 @@ export default async function NewDealPage({
         for now.
       </div>
     ) : (
-      <CallUploadForm templates={templates.map((t) => ({ id: t.id, name: t.name }))} action={createDealFromTranscript} />
+      <CallUploadForm
+        templates={templates.map((t) => ({ id: t.id, name: t.name }))}
+        action={createDealFromTranscript}
+        notesAction={createNotesFromTranscript}
+        searchLeads={searchTodoLeads}
+      />
     )}
     </>
   );

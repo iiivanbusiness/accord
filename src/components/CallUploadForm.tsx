@@ -1,23 +1,32 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import SubmitButton from "@/components/SubmitButton";
 import { transcriptFromCaptionFile } from "@/lib/recording-transcript";
 import { formatCallDuration as formatDuration, formatFileSize as formatSize, isRecordingFile, transcribeRecordingFile } from "@/lib/recording-upload";
 
 type Stage = { kind: "idle" } | { kind: "uploading"; progress: number } | { kind: "transcribing" } | { kind: "ready"; seconds: number; turns: number } | { kind: "error"; message: string };
 
+type LeadOption = { id: string; name: string; company: string | null };
+
 // "Recording or transcript" on Start a call: upload the call's video or
 // audio (transcribed by Deepgram, then shown for a check) or paste the
-// transcript / load it from a text file. Either way the same deal
-// extraction runs on the text.
+// transcript / load it from a text file. Then either the deal terms are
+// read and a contract drafted, or (Notes only) the call is written up on a
+// lead and nothing else.
 export default function CallUploadForm({
   templates,
   action,
+  notesAction,
+  searchLeads,
 }: {
   templates: { id: string; name: string }[];
   action: (formData: FormData) => Promise<void>;
+  notesAction?: (formData: FormData) => Promise<void>;
+  searchLeads?: (q: string) => Promise<LeadOption[]>;
 }) {
+  const [need, setNeed] = useState<"contract" | "notes">("contract");
+  const notes = need === "notes" && Boolean(notesAction);
   const [source, setSource] = useState<"recording" | "text">("recording");
   const [transcript, setTranscript] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -63,6 +72,7 @@ export default function CallUploadForm({
   }
 
   const busy = stage.kind === "uploading" || stage.kind === "transcribing";
+  const seconds = stage.kind === "ready" ? stage.seconds : 0;
   const canSubmit = transcript.trim().length > 0 && !busy;
   const tab = (key: "recording" | "text", label: string) => (
     <button
@@ -78,8 +88,32 @@ export default function CallUploadForm({
   );
 
   return (
-    <form action={action} className="card flex max-w-[560px] flex-col gap-4 p-6">
+    <form action={notes ? notesAction : action} className="card flex max-w-[560px] flex-col gap-4 p-6">
       <input type="hidden" name="source" value={source === "recording" ? "recording" : "text"} />
+      <input type="hidden" name="seconds" value={seconds} />
+      {notesAction && (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[13px] font-medium">What you need</span>
+          <div className="flex rounded-full p-[3px] text-[13px]" style={{ background: "var(--surface-2)" }} role="radiogroup" aria-label="What you need">
+            {(["contract", "notes"] as const).map((n) => (
+              <button
+                key={n}
+                type="button"
+                role="radio"
+                aria-checked={need === n}
+                onClick={() => setNeed(n)}
+                className="flex-1 rounded-full px-3 py-1.5 font-medium"
+                style={need === n ? { background: "var(--surface-1)", color: "var(--ink)", boxShadow: "0 0 0 1px var(--hairline)" } : { color: "var(--ink-muted)" }}
+              >
+                {n === "contract" ? "Notes and contract" : "Notes only"}
+              </button>
+            ))}
+          </div>
+          <span className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
+            {notes ? "SealMe writes up the call on the lead and sets up the next step. No deal, no contract." : "SealMe reads the agreed terms and drafts the contract for you to check."}
+          </span>
+        </div>
+      )}
       <div className="flex gap-1 rounded-full border p-1" style={{ borderColor: "var(--hairline)", background: "var(--surface-1)" }}>
         {tab("recording", "Recording")}
         {tab("text", "Transcript")}
@@ -187,6 +221,9 @@ export default function CallUploadForm({
         </label>
       )}
 
+      {notes && searchLeads ? (
+        <LeadPicker search={searchLeads} />
+      ) : (
       <label className="flex flex-col gap-1.5">
         <span className="text-[13px] font-medium">Template</span>
         <select name="templateId" required className="input" defaultValue="">
@@ -200,16 +237,83 @@ export default function CallUploadForm({
           ))}
         </select>
       </label>
+      )}
 
       {canSubmit ? (
-        <SubmitButton className="btn btn-primary mt-2 w-full justify-center" pendingText="Reading the call, this can take up to a minute…">
-          Extract deal terms
+        <SubmitButton className="btn btn-primary mt-2 w-full justify-center" pendingText={notes ? "Saving the call…" : "Reading the call, this can take up to a minute…"}>
+          {notes ? "Write up the call" : "Extract deal terms"}
         </SubmitButton>
       ) : (
         <button type="button" disabled className="btn btn-primary mt-2 w-full justify-center" style={{ opacity: 0.5 }}>
-          {busy ? "Waiting for the transcript…" : "Extract deal terms"}
+          {busy ? "Waiting for the transcript…" : notes ? "Write up the call" : "Extract deal terms"}
         </button>
       )}
     </form>
+  );
+}
+
+// Who a notes-only call was with: a new lead the call fills in (the
+// default), or one already in Leads.
+function LeadPicker({ search }: { search: (q: string) => Promise<LeadOption[]> }) {
+  const [lead, setLead] = useState<LeadOption | null>(null);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<LeadOption[]>([]);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (timer.current) clearTimeout(timer.current);
+    if (lead || query.trim().length < 2) return;
+    timer.current = setTimeout(() => {
+      search(query.trim())
+        .then(setResults)
+        .catch(() => setResults([]));
+    }, 250);
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, [query, lead, search]);
+  const shown = lead || query.trim().length < 2 ? [] : results;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[13px] font-medium">Lead</span>
+      <input type="hidden" name="leadId" value={lead?.id ?? "new"} />
+      {lead ? (
+        <div className="flex items-center justify-between gap-3 rounded-[10px] px-3 py-2" style={{ border: "1px solid var(--hairline)" }}>
+          <span className="min-w-0 truncate text-[13.5px]">
+            <span className="font-medium">{lead.name}</span>
+            {lead.company && <span style={{ color: "var(--ink-muted)" }}> · {lead.company}</span>}
+          </span>
+          <button type="button" onClick={() => setLead(null)} className="text-[12.5px] font-medium" style={{ color: "var(--accent-blue)" }}>
+            Change
+          </button>
+        </div>
+      ) : (
+        <>
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search your leads" className="input" autoComplete="off" />
+          {shown.length > 0 && (
+            <div className="overflow-hidden rounded-[10px]" style={{ border: "1px solid var(--hairline)", background: "var(--surface-1)" }}>
+              {shown.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => {
+                    setLead(r);
+                    setQuery("");
+                  }}
+                  className="row-hover block w-full px-3 py-2 text-left text-[13.5px]"
+                >
+                  <span className="font-medium">{r.name}</span>
+                  {r.company && <span style={{ color: "var(--ink-muted)" }}> · {r.company}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+          <span className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
+            No lead picked: SealMe makes a new one and fills in who it was from the call.
+          </span>
+        </>
+      )}
+    </div>
   );
 }
