@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildTodo, type TodoCall, type TodoTask } from "./todo";
+import { planDay, type TodoTask } from "./todo";
 
 const me = { id: "u1", name: "Ivan" };
-const mia = { id: "u2", name: "Mia" };
-const lead = (id: string) => ({ id, name: id, company: null, campaign: null, phone: null });
+let n = 0;
 const task = (id: string, o: Partial<TodoTask> = {}): TodoTask => ({
   id,
   type: "cold_call",
@@ -13,41 +12,46 @@ const task = (id: string, o: Partial<TodoTask> = {}): TodoTask => ({
   priority: "normal",
   note: null,
   completedAt: null,
+  createdAt: new Date(Date.UTC(2026, 9, 1, 0, 0, n++)),
   assignee: me,
   createdBy: me,
-  lead: lead(`lead-${id}`),
+  lead: { id: `lead-${id}`, name: id, company: null, campaign: null, phone: null },
   ...o,
 });
-const call = (id: string, o: Partial<TodoCall> = {}): TodoCall => ({ id, mode: "cold", status: "processed", outcome: "interested", startedAt: new Date("2026-10-07T08:00:00Z"), user: me, lead: lead(`lead-${id}`), dealId: null, ...o });
 
 // 14:40 in Belgrade (UTC+2).
-const base = { now: new Date("2026-10-07T12:40:00Z"), today: "2026-10-07", tz: "Europe/Belgrade", meId: "u1", events: [] };
+const base = { now: new Date("2026-10-07T12:40:00Z"), today: "2026-10-07", tz: "Europe/Belgrade" };
 
-describe("buildTodo", () => {
-  it("puts late work first, then the day by the clock around now", () => {
-    const todo = buildTodo({
+describe("planDay", () => {
+  it("keeps hundreds of cold calls in one queue and puts timed work on the clock", () => {
+    const calls = Array.from({ length: 500 }, (_, i) => task(`call-${i}`));
+    const plan = planDay({
       ...base,
-      tasks: [
-        task("late", { dueDate: new Date("2026-10-06T00:00:00Z"), dueTime: "16:00" }),
-        task("missed", { dueTime: "13:00" }),
-        task("later", { dueTime: "17:30" }),
-        task("soon", { dueTime: "15:00" }),
-        task("whenever", { priority: "high" }),
-        task("done", { status: "done", completedAt: new Date("2026-10-07T07:37:00Z"), lead: lead("lead-hannah") }),
+      open: [
+        ...calls,
+        task("demo", { type: "sales_call", dueTime: "17:30" }),
+        task("callback", { dueTime: "16:00" }),
+        task("follow", { type: "follow_up", priority: "high" }),
+        task("note", { type: "other", lead: null, note: "Plan tomorrow" }),
       ],
-      calls: [call("hannah", { lead: lead("lead-hannah"), outcome: "follow_up" }), call("other", { user: mia, startedAt: new Date("2026-10-07T08:50:00Z") })],
     });
-    expect(todo.overdue.map((t) => t.id)).toEqual(["late"]);
-    expect(todo.done.map((i) => (i.kind === "task" ? i.task.id : i.kind === "call" ? i.call.id : i.event.id))).toEqual(["done", "other", "missed"]);
-    expect(todo.done[0]).toMatchObject({ time: "09:37", outcome: "follow_up" });
-    expect(todo.done[2]).toMatchObject({ late: true, time: "13:00" });
-    expect(todo.coming.map((i) => (i.kind === "task" ? i.task.id : ""))).toEqual(["soon", "later"]);
-    expect(todo.anytime.map((t) => t.id)).toEqual(["whenever"]);
-    expect(todo.nextId).toBe("late");
+    expect(plan.queue).toHaveLength(500);
+    expect(plan.scheduled.map((t) => t.id)).toEqual(["callback", "demo"]);
+    expect(plan.other.map((t) => t.id)).toEqual(["note"]);
+    expect(plan.next?.id).toBe("follow");
   });
 
-  it("picks the viewer's own next task, never a teammate's", () => {
-    const todo = buildTodo({ ...base, tasks: [task("theirs", { assignee: mia, dueTime: "14:50" }), task("mine", { dueTime: "16:00" })], calls: [] });
-    expect(todo.nextId).toBe("mine");
+  it("puts late work first, then what's due within half an hour", () => {
+    const late = planDay({ ...base, open: [task("old", { dueDate: new Date("2026-10-06T00:00:00Z") }), task("soon", { dueTime: "15:00" })] });
+    expect(late.next?.id).toBe("old");
+    const soon = planDay({ ...base, open: [task("soon", { dueTime: "15:00" }), task("whenever", { type: "follow_up" })] });
+    expect(soon.next?.id).toBe("soon");
+  });
+
+  it("takes the queue in order, urgent first, when working through it", () => {
+    const plan = planDay({ ...base, queueMode: true, open: [task("a"), task("b", { priority: "urgent" }), task("meeting", { type: "sales_call", dueTime: "14:50" })] });
+    expect(plan.next?.id).toBe("b");
+    expect(plan.queue.map((t) => t.id)).toEqual(["a"]);
+    expect(plan.scheduled.map((t) => t.id)).toEqual(["meeting"]);
   });
 });

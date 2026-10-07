@@ -61,7 +61,7 @@ const STATUS_CHIP: Record<string, string> = {
   signed: "chip-success",
 };
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ todo?: string }> }) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ todo?: string; queue?: string }> }) {
   const now = new Date();
   const [workspaceId, session, user] = await Promise.all([requireWorkspaceId(), auth(), currentUserWithRole()]);
   const firstName = session?.user?.name?.trim().split(/\s+/)[0] ?? null;
@@ -162,7 +162,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   let todayBlock: React.ReactNode = null;
   if (prospecting) {
-    const today = await todaySection({ workspaceId, me: user, tz, team: (await searchParams).todo !== "me", canAssign, phoneInGuide });
+    const params = await searchParams;
+    const today = await todaySection({ workspaceId, me: user, tz, view: params.todo, queue: params.queue === "1", canAssign, phoneInGuide });
     subtitle = `${new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: tz }).format(now)} · ${today.sentence}`;
     todayBlock = today.block;
   }
