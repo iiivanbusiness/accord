@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { currentUserWithRole } from "@/lib/permissions";
 import { normalizeDashboard, type SavedDashboard } from "@/lib/dashboard-widgets";
-import { toSavedLines, type SavedLines } from "@/lib/dashboard-lines";
 import { Prisma } from "@/generated/prisma/client";
 
 // Saves the signed-in person's own dashboard layout; null goes back to the
@@ -14,17 +13,6 @@ export async function saveDashboardLayout(layout: SavedDashboard | null): Promis
   await prisma.user.update({
     where: { id: user.id },
     data: { dashboardLayout: layout ? (normalizeDashboard(layout) as unknown as Prisma.InputJsonValue) : Prisma.DbNull },
-  });
-  revalidatePath("/dashboard");
-}
-
-// Saves which Dashboard lines the signed-in person sees, their order and
-// which start open; null goes back to their role's default.
-export async function saveDashboardLines(lines: SavedLines | null): Promise<void> {
-  const user = await currentUserWithRole();
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { dashboardLines: lines ? (toSavedLines(lines) as unknown as Prisma.InputJsonValue) : Prisma.DbNull },
   });
   revalidatePath("/dashboard");
 }

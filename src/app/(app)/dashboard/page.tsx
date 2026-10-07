@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -12,19 +13,13 @@ import GlowRingStat from "@/components/dashboard/GlowRingStat";
 import DashboardGrid from "@/components/dashboard/DashboardGrid";
 import { currentUserWithRole } from "@/lib/permissions";
 import { normalizeDashboard } from "@/lib/dashboard-widgets";
-import { hideGetStarted, saveDashboardLayout, saveDashboardLines } from "./actions";
-import { myDayLines } from "./your-day";
-import { teamLines } from "./team-today";
-import { calendarLine, dealLines, notificationsLine } from "./more-lines";
+import { hideGetStarted, saveDashboardLayout } from "./actions";
 import { leadAccess } from "@/lib/lead-visibility";
 import { cookieTimeZone } from "@/lib/viewer-time";
-import { openAtStart, resolveLines, type LineId } from "@/lib/dashboard-lines";
-import DashboardLines from "@/components/DashboardLines";
-import TaskDigestToggle from "@/components/TaskDigestToggle";
 import GetStarted from "@/components/dashboard/GetStarted";
 import { getStartedSteps } from "@/lib/get-started";
+import { todaySection } from "./today";
 import { isTelnyxConfigured } from "@/lib/telnyx";
-import { setTaskDigestEmail } from "@/app/(app)/preferences-actions";
 
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -66,46 +61,19 @@ const STATUS_CHIP: Record<string, string> = {
   signed: "chip-success",
 };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ todo?: string }> }) {
   const now = new Date();
   const [workspaceId, session, user] = await Promise.all([requireWorkspaceId(), auth(), currentUserWithRole()]);
   const firstName = session?.user?.name?.trim().split(/\s+/)[0] ?? null;
   const hello = firstName ? `Hello, ${firstName}` : "Dashboard";
 
-  // With prospecting on, a few lines sit above the widgets, one per thing,
-  // each colored by how urgent it is: whoever hands out the work gets the
-  // team's day first, a rep their own next call.
+  // With prospecting on, the to-do list and the day's numbers sit above
+  // the widgets: whoever hands out work sees the team's day by default,
+  // everyone else their own.
   const prospecting = (await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { prospectingEnabled: true } }))?.prospectingEnabled ?? false;
+  const canAssign = prospecting ? (await leadAccess(user)).canAssign : false;
+  const tz = prospecting ? await cookieTimeZone() : "UTC";
   let subtitle = "Everything happening across your workspace";
-  let linesBlock: (notice: boolean) => React.ReactNode = () => null;
-  if (prospecting) {
-    const role = (await leadAccess(user)).canAssign ? "manager" : "rep";
-    const prefs = resolveLines(user.dashboardLines, role);
-    const need = new Set<LineId>(prefs.order.filter((id) => !prefs.hidden.includes(id)));
-    const tz = await cookieTimeZone();
-    const [day, team, dealsLines, calendar, notifications] = await Promise.all([
-      myDayLines({ workspaceId, userId: user.id, tz, need }),
-      role === "manager" ? teamLines({ workspaceId, tz, managerId: user.id, need }) : [],
-      dealLines({ workspaceId, need }),
-      calendarLine({ workspaceId, tz, need }),
-      notificationsLine({ userId: user.id, need }),
-    ]);
-    const lines = [...day.lines, ...team, ...dealsLines, ...calendar, ...notifications];
-    subtitle = `${new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: tz }).format(now)} · ${day.progress}`;
-    linesBlock = (notice) => (
-      <div className="mb-8">
-        <DashboardLines
-          role={role}
-          lines={lines}
-          prefs={prefs}
-          initialOpen={openAtStart(prefs, Object.fromEntries(lines.map((l) => [l.id, l.tone])))}
-          notice={notice ? day.notice : null}
-          customizeExtra={<TaskDigestToggle enabled={user.taskDigestEmail} action={setTaskDigestEmail} />}
-          saveAction={saveDashboardLines}
-        />
-      </div>
-    );
-  }
   const { where: visibility } = await dealVisibilityFilter();
 
   const in90Days = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
@@ -190,6 +158,13 @@ export default async function DashboardPage() {
       // The guide already asks for the phone number; once is enough.
       phoneInGuide = steps.some((s) => s.id === "phone" && !s.done);
     }
+  }
+
+  let todayBlock: React.ReactNode = null;
+  if (prospecting) {
+    const today = await todaySection({ workspaceId, me: user, tz, team: (await searchParams).todo !== "me", canAssign, phoneInGuide });
+    subtitle = `${new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: tz }).format(now)} · ${today.sentence}`;
+    todayBlock = today.block;
   }
 
   // Folders-by-status — reuses the `deals` array already fetched above
@@ -415,9 +390,14 @@ export default async function DashboardPage() {
 
     {getStarted}
 
-    {linesBlock(!phoneInGuide)}
+    {todayBlock}
 
-    <DashboardGrid widgets={widgets} saved={normalizeDashboard(user.dashboardLayout)} saveAction={saveDashboardLayout} />
+    {/* Keyed, since the grid puts each one in a list next to its resize handle. */}
+    <DashboardGrid
+      widgets={Object.fromEntries(Object.entries(widgets).map(([id, w]) => [id, <Fragment key={id}>{w}</Fragment>]))}
+      saved={normalizeDashboard(user.dashboardLayout)}
+      saveAction={saveDashboardLayout}
+    />
     </>
   );
 }

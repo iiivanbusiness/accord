@@ -110,6 +110,47 @@ export async function createLeadTask(leadId: string, input: TaskInput): Promise<
   revalidatePath(`/leads/${leadId}`);
 }
 
+// "+ Add to-do" on the Dashboard: a task on a lead, or (for an Other
+// to-do) on its own, with the note saying what to do.
+export async function createTodo(input: TaskInput & { leadId: string | null }): Promise<void> {
+  if (input.leadId) {
+    await createLeadTask(input.leadId, input);
+  } else {
+    const workspace = await requireProspecting();
+    const access = await leadAccess();
+    if (input.type !== "other") throw new Error("Pick a lead, or make it an Other to-do");
+    const task = clean(input);
+    if (!task.note) throw new Error("Write what needs doing");
+    const assigneeId = access.canAssign ? await activeMember(workspace.id, input.assigneeId) : access.userId;
+    if (!assigneeId) throw new Error("Pick who it's for");
+    await prisma.task.create({ data: { workspaceId: workspace.id, assigneeId, createdById: access.userId, ...task } });
+    if (assigneeId !== access.userId) {
+      const actor = await currentUserWithRole();
+      await notifyTasksAssigned({ workspaceId: workspace.id, assigneeId, actorName: actor.name, count: 1, type: task.type, dueDate: task.dueDate, dueTime: task.dueTime });
+    }
+  }
+  revalidatePath("/dashboard");
+}
+
+// The lead picker in "+ Add to-do": leads this person can see, by name or
+// company.
+export async function searchTodoLeads(q: string): Promise<{ id: string; name: string; company: string | null }[]> {
+  const workspace = await requireProspecting();
+  const access = await leadAccess();
+  const term = typeof q === "string" ? q.trim().slice(0, 100) : "";
+  if (term.length < 2) return [];
+  return prisma.lead.findMany({
+    where: {
+      workspaceId: workspace.id,
+      AND: [access.where, { OR: [{ name: { contains: term, mode: "insensitive" } }, { company: { contains: term, mode: "insensitive" } }] }],
+      stage: { notIn: ["converted", "lost"] },
+    },
+    select: { id: true, name: true, company: true },
+    orderBy: { updatedAt: "desc" },
+    take: 8,
+  });
+}
+
 // Done, skipped, or back to open. The assignee can do this, and so can a
 // manager (for a rep who's out, or a task that no longer applies).
 export async function setTaskStatus(taskId: string, status: "open" | "done" | "skipped"): Promise<void> {
