@@ -26,7 +26,7 @@ import SalesforceSettingsPanel from "@/components/SalesforceSettingsPanel";
 import CrmLeadImportPanel from "@/components/CrmLeadImportPanel";
 import { readHubspotFilter, readSalesforceFilter } from "@/lib/crm-leads";
 import { loadCrmLeadOptions, saveCrmLeadFilter, saveHubspotWebhookSecret, setCrmLeadImport, setSalesforceWebhookKey, syncCrmLeadsNow } from "./crm-lead-actions";
-import { isDocusignConfigured } from "@/lib/docusign";
+import { canConnectDocusign, isDocusignConfigured } from "@/lib/docusign";
 import { canConnectSalesforce, isSalesforceConfigured } from "@/lib/salesforce";
 import { listSlackChannels, isSlackConfigured } from "@/lib/slack";
 import {
@@ -438,6 +438,7 @@ export default async function SettingsPage({
         </div>
         <DocusignSettingsPanel
           configured={isDocusignConfigured()}
+          available={canConnectDocusign(workspace.id)}
           connected={Boolean(workspace.docusignRefreshToken)}
           accountEmail={workspace.docusignAccountEmail}
           enabled={workspace.docusignEnabled}

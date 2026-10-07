@@ -21,6 +21,17 @@ export function isDocusignConfigured(): boolean {
   return Boolean(process.env.DOCUSIGN_CLIENT_ID && process.env.DOCUSIGN_CLIENT_SECRET);
 }
 
+// Until DocuSign approves SealMe's app (Go-Live) it only runs against
+// DocuSign's demo environment, where a customer's real account can't sign
+// in. So Connect is offered to everyone only in production, and before
+// that just to the workspaces in DOCUSIGN_CONNECT_WORKSPACES
+// (comma-separated ids, or "*").
+export function canConnectDocusign(workspaceId: string): boolean {
+  if (isProduction()) return true;
+  const allowed = (process.env.DOCUSIGN_CONNECT_WORKSPACES ?? "").split(",").map((id) => id.trim());
+  return allowed.includes("*") || allowed.includes(workspaceId);
+}
+
 function redirectUri(): string {
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   return `${base}/api/docusign/callback`;

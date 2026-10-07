@@ -5,6 +5,7 @@ import ExternalConnectLink from "./ExternalConnectLink";
 
 export default function DocusignSettingsPanel({
   configured,
+  available,
   connected,
   accountEmail,
   enabled,
@@ -12,6 +13,7 @@ export default function DocusignSettingsPanel({
   disconnectAction,
 }: {
   configured: boolean;
+  available: boolean;
   connected: boolean;
   accountEmail: string | null;
   enabled: boolean;
@@ -36,6 +38,17 @@ export default function DocusignSettingsPanel({
     return (
       <div className="px-[22px] py-[18px] text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
         DocuSign isn&apos;t set up for this deployment yet. A DOCUSIGN_CLIENT_ID/SECRET needs to be configured first.
+      </div>
+    );
+  }
+
+  if (!connected && !available) {
+    return (
+      <div className="flex flex-col gap-1 px-[22px] py-[18px]">
+        <span className="chip chip-neutral w-fit">Coming soon</span>
+        <div className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
+          DocuSign is still approving SealMe&apos;s app for everyone&apos;s DocuSign accounts. We&apos;ll turn this on as soon as they do. Until then, contracts go out with SealMe&apos;s built-in e-signature.
+        </div>
       </div>
     );
   }
