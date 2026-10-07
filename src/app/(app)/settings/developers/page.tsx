@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { requirePermission } from "@/lib/permissions";
+import { currentUserWithRole } from "@/lib/permissions";
+import AdminOnly from "@/components/AdminOnly";
 import { MAX_WEBHOOK_ATTEMPTS, WEBHOOK_EVENTS } from "@/lib/webhooks";
 import { API_RATE_LIMIT } from "@/lib/api-auth";
 import { findSandbox } from "@/lib/sandbox";
@@ -94,7 +95,8 @@ function KeysAndWebhooks({ scope, setup }: { scope: DevScope; setup: Awaited<Ret
 }
 
 export default async function DeveloperSettingsPage() {
-  const user = await requirePermission("canManageWorkspace");
+  const user = await currentUserWithRole();
+  if (!user.role?.canManageWorkspace) return <AdminOnly workspaceId={user.workspaceId} title="API & webhooks" what="set up the API and webhooks" />;
   const [live, sandbox] = await Promise.all([loadDevSetup(user.workspaceId), findSandbox(user.workspaceId)]);
   const sandboxSetup = sandbox ? await loadDevSetup(sandbox.id) : null;
   const sandboxCounts = sandbox

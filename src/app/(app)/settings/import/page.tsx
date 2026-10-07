@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { requirePermission } from "@/lib/permissions";
+import { currentUserWithRole } from "@/lib/permissions";
+import AdminOnly from "@/components/AdminOnly";
 import BulkImportForm from "@/components/BulkImportForm";
 import { importClientsAndDeals } from "../import-actions";
 
 export default async function BulkImportPage() {
-  await requirePermission("canManageWorkspace");
+  const user = await currentUserWithRole();
+  if (!user.role?.canManageWorkspace) return <AdminOnly workspaceId={user.workspaceId} title="Bulk import" what="import clients and deals" />;
 
   return (
     <>
