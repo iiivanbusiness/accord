@@ -16,6 +16,15 @@ const TARGET_STAGE: Record<string, string> = {
   not_interested: "lost",
 };
 
+// The stage a call's outcome moves a lead to, if any. Stage only moves
+// forward (or to lost), and a converted lead stays put.
+export function stageAfterOutcome(current: string, outcome: string): string | null {
+  const target = TARGET_STAGE[outcome];
+  if (!target || current === "converted" || target === current) return null;
+  if (target === "lost" || current === "lost" || (STAGE_ORDER[target] ?? 0) > (STAGE_ORDER[current] ?? 0)) return target;
+  return null;
+}
+
 export type ColdCallSummary = {
   outcome: string;
   stage: string | null; // the stage it moved to, if it moved
@@ -27,7 +36,10 @@ export type ColdCallSummary = {
 
 type ApplyColdCall = {
   workspaceId: string;
-  userId: string; // whose call it was: their open task closes, follow-ups go to them
+  // Whose call it was: their open task closes, follow-ups go to them. Null
+  // for a call logged through the API without a rep (follow-ups are then
+  // unassigned, for a manager to hand out).
+  userId: string | null;
   lead: Lead;
   transcript: string;
   timeZone: string;
@@ -47,12 +59,7 @@ export async function applyColdCall({ workspaceId, userId, lead, transcript, tim
   const now = new Date();
   const reached = !UNREACHED_OUTCOMES.has(result.outcome);
 
-  // Stage only moves forward (or to lost), and a converted lead stays put.
-  let stage: string | null = null;
-  const target = TARGET_STAGE[result.outcome];
-  if (target && lead.stage !== "converted" && target !== lead.stage) {
-    if (target === "lost" || lead.stage === "lost" || (STAGE_ORDER[target] ?? 0) > (STAGE_ORDER[lead.stage] ?? 0)) stage = target;
-  }
+  const stage = stageAfterOutcome(lead.stage, result.outcome);
 
   const email = result.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(result.email) ? result.email.toLowerCase() : null;
   const nextStepAt = result.nextStepDate && isValidDay(result.nextStepDate) ? new Date(`${result.nextStepDate}T00:00:00Z`) : null;

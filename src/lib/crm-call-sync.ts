@@ -135,6 +135,7 @@ export async function pushCallToCrm(callId: string): Promise<void> {
     select: {
       id: true,
       status: true,
+      source: true,
       mode: true,
       outcome: true,
       summary: true,
@@ -146,7 +147,9 @@ export async function pushCallToCrm(callId: string): Promise<void> {
       workspace: { select: { id: true, hubspotEnabled: true, hubspotAccessToken: true, salesforceEnabled: true, salesforceRefreshToken: true } },
     },
   });
-  if (!call || call.status !== "processed" || !call.lead) return;
+  // A call logged through the API came from the customer's own dialer,
+  // which logs it to their CRM already.
+  if (!call || call.status !== "processed" || !call.lead || call.source === "api") return;
   const { lead, workspace } = call;
 
   if (lead.hubspotContactId && workspace.hubspotEnabled && workspace.hubspotAccessToken && !call.hubspotCallId) {

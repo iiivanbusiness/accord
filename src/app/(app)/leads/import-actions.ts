@@ -24,6 +24,7 @@ type CleanRow = {
   phone: string | null;
   domain: string | null;
   ownerEmail: string | null;
+  campaign: string | null;
   notes: string | null;
 };
 
@@ -40,6 +41,7 @@ function clean(row: ImportRow): CleanRow | null {
     phone: normalizePhone(rawPhone) ?? rawPhone,
     domain: clip(row.domain, 253)?.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "") || null,
     ownerEmail: clip(row.ownerEmail, 254)?.toLowerCase() ?? null,
+    campaign: clip(row.campaign, 100),
     notes: clip(row.notes, 4000),
   };
 }
@@ -62,7 +64,9 @@ export async function startLeadImport(source: string, fileName: string | null): 
 export async function importLeadsChunk(
   importId: string,
   rows: ImportRow[],
-  assignment: ImportAssignment
+  assignment: ImportAssignment,
+  // The campaign for every row that doesn't name its own.
+  campaign: string | null = null,
 ): Promise<{ created: number; updated: number; skipped: number }> {
   const workspace = await requireProspecting();
   const access = await leadAccess();
@@ -82,9 +86,10 @@ export async function importLeadsChunk(
 
   let skipped = 0;
   const cleaned: CleanRow[] = [];
+  const defaultCampaign = typeof campaign === "string" ? campaign.trim().slice(0, 100) || null : null;
   for (const row of rows) {
     const c = clean(row ?? {});
-    if (c) cleaned.push(c);
+    if (c) cleaned.push({ ...c, campaign: c.campaign ?? defaultCampaign });
     else skipped++;
   }
 
@@ -93,7 +98,7 @@ export async function importLeadsChunk(
   const existing = emails.length || phones.length
     ? await prisma.lead.findMany({
         where: { workspaceId: workspace.id, OR: [...(emails.length ? [{ email: { in: emails } }] : []), ...(phones.length ? [{ phone: { in: phones } }] : [])] },
-        select: { id: true, ownerId: true, name: true, company: true, title: true, email: true, phone: true, domain: true, notes: true },
+        select: { id: true, ownerId: true, name: true, company: true, title: true, email: true, phone: true, domain: true, notes: true, campaign: true },
       })
     : [];
   const byEmail = new Map(existing.filter((l) => l.email).map((l) => [l.email!, l]));
@@ -122,7 +127,7 @@ export async function importLeadsChunk(
       continue;
     }
     const fill: Partial<CleanRow> = {};
-    for (const field of ["company", "title", "email", "phone", "domain", "notes"] as const) {
+    for (const field of ["company", "title", "email", "phone", "domain", "notes", "campaign"] as const) {
       if (!match[field] && row[field]) fill[field] = row[field];
     }
     if (Object.keys(fill).length === 0) {

@@ -29,6 +29,7 @@ type TaskRow = {
     id: string;
     name: string;
     company: string | null;
+    campaign: string | null;
     title: string | null;
     phone: string | null;
     summary: string | null;
@@ -53,7 +54,7 @@ function toRow(t: TaskRow, when: string): TodayTask {
       ? {
           id: t.lead.id,
           name: t.lead.name,
-          detail: [t.lead.title, t.lead.company].filter(Boolean).join(" · ") || formatPhone(t.lead.phone) || "",
+          detail: [t.lead.campaign, t.lead.title, t.lead.company].filter(Boolean).join(" · ") || formatPhone(t.lead.phone) || "",
           phone: t.lead.phone,
           phoneLabel: formatPhone(t.lead.phone),
         }
@@ -96,7 +97,7 @@ export async function myDayLines({ workspaceId, userId, tz, need }: { workspaceI
     dueTime: true,
     priority: true,
     note: true,
-    lead: { select: { id: true, name: true, company: true, title: true, phone: true, summary: true, objections: true, isDecisionMaker: true } },
+    lead: { select: { id: true, name: true, company: true, campaign: true, title: true, phone: true, summary: true, objections: true, isDecisionMaker: true } },
   } as const;
 
   const wantWaiting = need.has("waiting");
@@ -378,7 +379,8 @@ export async function myDayLines({ workspaceId, userId, tz, need }: { workspaceI
 function NextUp({ task, overdue }: { task: TaskRow; overdue: boolean }) {
   const lead = task.lead;
   const isCall = task.type === "cold_call" || task.type === "sales_call";
-  const detail = [lead?.company, TASK_TYPE_LABEL[task.type] ?? task.type, overdue ? `was due ${formatTaskDue(task.dueDate, task.dueTime)}` : task.dueTime ? `due ${task.dueTime}` : "today"]
+  // An agency rep calls for several clients: say which one first.
+  const detail = [lead?.campaign ? `For ${lead.campaign}` : null, lead?.company, TASK_TYPE_LABEL[task.type] ?? task.type, overdue ? `was due ${formatTaskDue(task.dueDate, task.dueTime)}` : task.dueTime ? `due ${task.dueTime}` : "today"]
     .filter(Boolean)
     .join(" · ");
   const facts = [

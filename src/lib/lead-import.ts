@@ -12,6 +12,7 @@ export const IMPORT_FIELDS = [
   { key: "domain", label: "Website" },
   // Managers only: who the lead goes to, by their SealMe login email.
   { key: "ownerEmail", label: "Owner email" },
+  { key: "campaign", label: "Campaign" },
   // Any number of columns can go here; each becomes a "Header: value" line.
   { key: "notes", label: "Notes" },
 ] as const;
@@ -38,6 +39,7 @@ const SYNONYMS: Record<ImportFieldKey, string[]> = {
   phone: ["phone", "phone number", "mobile", "mobile phone", "mobile number", "direct phone", "work phone", "corporate phone", "cell", "cell phone", "telephone", "direct dial", "telefon", "broj telefona", "mobilni", "mobilni telefon", "tel", "broj"],
   domain: ["website", "domain", "company domain", "company website", "website url", "url", "web", "company url", "sajt", "veb sajt", "web sajt", "internet stranica", "domen"],
   ownerEmail: ["owner", "owner email", "owner email address", "lead owner", "contact owner", "account owner", "record owner", "hubspot owner", "sales rep", "sales rep email", "rep", "rep email", "assigned to", "assigned rep", "vlasnik", "prodavac", "zaduzen"],
+  campaign: ["campaign", "campaign name", "list", "list name", "sequence", "sequence name", "kampanja", "naziv kampanje", "lista"],
   notes: ["notes", "note", "comments", "comment", "description", "remarks", "napomena", "napomene", "beleska", "beleske", "biljeska", "biljeske", "komentar", "komentari", "opis"],
 };
 

@@ -6,7 +6,7 @@ import { LEAD_STAGES, LEAD_STAGE_LABEL } from "@/lib/lead-stages";
 
 // Same URL-driven pattern as DealsFilterBar: every control writes to the
 // query string and the page re-queries, so a filtered list is a link.
-export default function LeadsFilterBar({ owners, showOwnerFilter }: { owners: { id: string; name: string }[]; showOwnerFilter: boolean }) {
+export default function LeadsFilterBar({ owners, showOwnerFilter, campaigns = [] }: { owners: { id: string; name: string }[]; showOwnerFilter: boolean; campaigns?: string[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -31,7 +31,7 @@ export default function LeadsFilterBar({ owners, showOwnerFilter }: { owners: { 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
-  const hasFilters = Boolean(searchParams.get("q") || searchParams.get("stage") || searchParams.get("owner"));
+  const hasFilters = Boolean(searchParams.get("q") || searchParams.get("stage") || searchParams.get("owner") || searchParams.get("campaign"));
 
   return (
     <div className="mb-3.5 flex flex-wrap items-center gap-2">
@@ -65,6 +65,20 @@ export default function LeadsFilterBar({ owners, showOwnerFilter }: { owners: { 
           <option value="">Any owner</option>
           {owners.map((o) => (
             <option key={o.id} value={o.id}>{o.name}</option>
+          ))}
+        </select>
+      )}
+      {campaigns.length > 0 && (
+        <select
+          value={searchParams.get("campaign") ?? ""}
+          onChange={(e) => updateParam("campaign", e.target.value)}
+          className="input flex-1 sm:w-[180px] sm:flex-none"
+          style={{ fontSize: "13px", padding: "7px 11px" }}
+          aria-label="Campaign"
+        >
+          <option value="">Any campaign</option>
+          {campaigns.map((c) => (
+            <option key={c} value={c}>{c}</option>
           ))}
         </select>
       )}

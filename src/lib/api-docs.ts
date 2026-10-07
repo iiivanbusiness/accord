@@ -5,7 +5,7 @@
 export type DocField = { name: string; type: string; required?: boolean; description: string };
 export type DocEndpoint = {
   id: string;
-  group: "Deals" | "Clients" | "Contracts" | "Templates" | "Leads";
+  group: "Deals" | "Clients" | "Contracts" | "Templates" | "Leads" | "Calls" | "Tasks";
   method: "GET" | "POST" | "PATCH";
   path: string;
   summary: string;
@@ -16,7 +16,7 @@ export type DocEndpoint = {
   exampleBody?: Record<string, unknown>;
   responses: { status: number; description: string; schema?: SchemaName; list?: boolean; example?: unknown }[];
 };
-export type SchemaName = "Deal" | "DealDetail" | "Client" | "Contract" | "Template" | "Lead";
+export type SchemaName = "Deal" | "DealDetail" | "Client" | "Contract" | "Template" | "Lead" | "Call" | "Task";
 
 const iso = "2026-10-04T14:32:10.000Z";
 
@@ -76,6 +76,7 @@ export const EXAMPLES: Record<SchemaName, Record<string, unknown>> = {
   Lead: {
     id: "cmlead5e6f0005",
     externalId: "hs-48213",
+    campaign: "Acme Freight Q4",
     name: "Sam Rivera",
     company: "Acme Freight",
     title: "Head of Revenue Operations",
@@ -96,6 +97,52 @@ export const EXAMPLES: Record<SchemaName, Record<string, unknown>> = {
     lastContactedAt: iso,
     convertedDealId: null,
     convertedAt: null,
+    url: "https://app.sealme.net/leads/cmlead5e6f0005",
+    createdAt: iso,
+    updatedAt: iso,
+  },
+  Call: {
+    id: "cmcall3d4e0006",
+    externalId: "pb-77120",
+    leadId: "cmlead5e6f0005",
+    leadExternalId: "hs-48213",
+    leadName: "Sam Rivera",
+    campaign: "Acme Freight Q4",
+    dealId: null,
+    status: "processed",
+    kind: "cold",
+    outcome: "meeting_booked",
+    connected: true,
+    skipReason: null,
+    summary: "Sam runs RevOps for 40 reps. Contracts take a week after a call. Agreed to a demo Tuesday at 2pm.",
+    source: "api",
+    toNumber: "+12025550161",
+    recorded: false,
+    durationSec: 312,
+    rep: { name: "Dana Lopez", email: "dana@yourcompany.com" },
+    url: "https://app.sealme.net/leads/cmlead5e6f0005",
+    startedAt: iso,
+    endedAt: iso,
+    processedAt: iso,
+    updatedAt: iso,
+  },
+  Task: {
+    id: "cmtask7g8h0008",
+    externalId: "aih-mtg-5521",
+    type: "sales_call",
+    status: "open",
+    leadId: "cmlead5e6f0005",
+    leadExternalId: "hs-48213",
+    leadName: "Sam Rivera",
+    campaign: "Acme Freight Q4",
+    dealId: null,
+    assignee: { name: "Dana Lopez", email: "dana@yourcompany.com" },
+    date: "2026-10-20",
+    time: "14:00",
+    timeZone: "America/New_York",
+    priority: "normal",
+    note: "Demo with the RevOps team",
+    completedAt: null,
     url: "https://app.sealme.net/leads/cmlead5e6f0005",
     createdAt: iso,
     updatedAt: iso,
@@ -152,6 +199,7 @@ export const SCHEMA_FIELDS: Record<SchemaName, DocField[]> = {
   Lead: [
     { name: "id", type: "string", description: "Lead id." },
     { name: "externalId", type: "string | null", description: "Your own id for the lead, if you sent one." },
+    { name: "campaign", type: "string | null", description: "The campaign it's in, such as the client an agency is calling for." },
     { name: "name, company, title, email, phone, domain", type: "string | null", description: "Who the person is. Phone is E.164 when it parses." },
     { name: "stage", type: "string", description: "new, contacted, interested, meeting, converted or lost." },
     { name: "interest", type: "string | null", description: "cold, warm or hot." },
@@ -164,12 +212,48 @@ export const SCHEMA_FIELDS: Record<SchemaName, DocField[]> = {
     { name: "url", type: "string", description: "Where the lead opens in SealMe." },
     { name: "lastContactedAt, createdAt, updatedAt", type: "string", description: "ISO 8601." },
   ],
+  Call: [
+    { name: "id", type: "string", description: "Call id." },
+    { name: "externalId", type: "string | null", description: "Your dialer's id for the call, if you logged it with one." },
+    { name: "leadId / leadExternalId / leadName / campaign", type: "string | null", description: "The lead it was with." },
+    { name: "dealId", type: "string | null", description: "The deal a sales call started." },
+    { name: "status", type: "string", description: "processing, processed, skipped (set aside: nobody picked up, too short, not recorded), failed, pending, recording or discarded." },
+    { name: "kind", type: "string | null", description: "cold or sales." },
+    { name: "outcome", type: "string | null", description: "meeting_booked, interested, follow_up, not_interested, wrong_person, voicemail or no_answer." },
+    { name: "connected", type: "boolean", description: "Whether they actually talked." },
+    { name: "skipReason", type: "string | null", description: "Why a skipped call was set aside, e.g. no_pickup or too_short." },
+    { name: "summary", type: "string | null", description: "SealMe's notes, or the summary you logged." },
+    { name: "source", type: "string", description: "phone (through SealMe), paste, desktop, or api (logged by you)." },
+    { name: "toNumber", type: "string | null", description: "The number called." },
+    { name: "recorded", type: "boolean", description: "Whether SealMe recorded it." },
+    { name: "durationSec", type: "number | null", description: "Length in seconds." },
+    { name: "rep", type: "object | null", description: "{ name, email } of who made it." },
+    { name: "transcript", type: "string | null", description: "Only from GET /calls/{id}." },
+    { name: "url", type: "string | null", description: "The lead in SealMe, where the call is in its history." },
+    { name: "startedAt, endedAt, processedAt, updatedAt", type: "string | null", description: "ISO 8601." },
+  ],
+  Task: [
+    { name: "id", type: "string", description: "Task id." },
+    { name: "externalId", type: "string | null", description: "Your id for a meeting you booked through the API." },
+    { name: "type", type: "string", description: "cold_call, sales_call (a booked meeting), follow_up or other." },
+    { name: "status", type: "string", description: "open, done or skipped." },
+    { name: "leadId / leadExternalId / leadName / campaign", type: "string | null", description: "The lead it's about." },
+    { name: "dealId", type: "string | null", description: "The deal it's about, for tasks on a deal." },
+    { name: "assignee", type: "object | null", description: "{ name, email } of the rep it's for." },
+    { name: "date / time / timeZone", type: "string | null", description: "The day (YYYY-MM-DD) and optional time (HH:mm) in that IANA time zone." },
+    { name: "priority", type: "string", description: "low, normal, high or urgent." },
+    { name: "note", type: "string | null", description: "What it's about." },
+    { name: "completedAt", type: "string | null", description: "When it was done or skipped." },
+    { name: "url", type: "string | null", description: "The lead (or deal) in SealMe." },
+    { name: "createdAt, updatedAt", type: "string", description: "ISO 8601." },
+  ],
 };
 
 const cursorParams: DocField[] = [{ name: "cursor", type: "string", description: "nextCursor from the previous page. Pages hold 50 items." }];
 const updatedSince: DocField = { name: "updatedSince", type: "string", description: "ISO 8601. Only what changed at or after this time." };
 const leadBody: DocField[] = [
   { name: "name", type: "string", required: true, description: "The person's name. Required on create." },
+  { name: "campaign", type: "string", description: "The campaign it's in, up to 100 characters. An agency uses it for the client it's calling for; every event about the lead carries it." },
   { name: "externalId", type: "string", description: "Your own id for the lead (your CRM's or dialer's), up to 200 characters. Unique in the workspace: a second lead with the same one answers 409. Comes back on the lead and in every webhook about it." },
   { name: "company", type: "string", description: "Company." },
   { name: "title", type: "string", description: "Job title." },
@@ -295,6 +379,7 @@ export const ENDPOINTS: DocEndpoint[] = [
       { name: "stage", type: "string", description: "new, contacted, interested, meeting, converted or lost." },
       { name: "ownerEmail", type: "string", description: "Only one rep's leads." },
       { name: "externalId", type: "string", description: "The lead with this externalId (your own id)." },
+      { name: "campaign", type: "string", description: "Only one campaign's leads." },
       updatedSince,
       ...cursorParams,
     ],
@@ -341,6 +426,139 @@ export const ENDPOINTS: DocEndpoint[] = [
       { status: 409, description: "Another lead already has that externalId.", example: { error: "Another lead already has this externalId", existingId: "cmlead9a1b0007" } },
     ],
   },
+  {
+    id: "list-calls",
+    group: "Calls",
+    method: "GET",
+    path: "/calls",
+    summary: "List calls",
+    description: "Every call, logged by you or made through SealMe, oldest first. For a nightly sync, ask for what changed since the last run with updatedSince.",
+    query: [
+      { name: "leadId", type: "string", description: "Only one lead's calls." },
+      { name: "leadExternalId", type: "string", description: "The same, by your id for the lead." },
+      { name: "externalId", type: "string", description: "The call you logged with this id." },
+      { name: "status", type: "string", description: "processing, processed, skipped, failed, pending, recording or discarded." },
+      updatedSince,
+      ...cursorParams,
+    ],
+    responses: [{ status: 200, description: "A page of calls (without transcripts).", schema: "Call", list: true }],
+  },
+  {
+    id: "get-call",
+    group: "Calls",
+    method: "GET",
+    path: "/calls/{id}",
+    summary: "Get a call",
+    description: "One call, with its transcript.",
+    responses: [{ status: 200, description: "The call.", schema: "Call" }, { status: 404, description: "No such call in this workspace." }],
+  },
+  {
+    id: "log-call",
+    group: "Calls",
+    method: "POST",
+    path: "/calls",
+    summary: "Log a call",
+    description:
+      "A call made in your own dialer. With just an outcome it's saved right away (201): it goes in the lead's history, the lead moves on (a meeting moves it to Meeting, not interested to Lost) and the rep's open call task on the lead is done. Send its transcript or a link to its recording instead and SealMe writes it up like its own calls (202, status processing): notes, the lead's details, follow-ups, and for a sales call a deal and contract. call.completed fires once it's done.",
+    write: true,
+    body: [
+      { name: "leadId", type: "string", description: "The lead the call was with. Or send leadExternalId." },
+      { name: "leadExternalId", type: "string", description: "Your id for the lead, instead of leadId." },
+      { name: "repEmail", type: "string", description: "Who made the call, by their SealMe login. Defaults to the lead's owner; without either the call is saved without a rep. A sales call needs one." },
+      { name: "outcome", type: "string", description: "meeting_booked, interested, follow_up, not_interested, wrong_person, voicemail or no_answer. Required without a transcript or recording; with one, SealMe works it out." },
+      { name: "summary", type: "string", description: "Notes on the call, up to 4,000 characters." },
+      { name: "transcript", type: "string", description: "What was said, \"Name: text\" per line, up to 400,000 characters." },
+      { name: "recordingUrl", type: "string", description: "An https link SealMe can download the recording from (mp3, wav, m4a...). Used once to transcribe it, then forgotten." },
+      { name: "kind", type: "string", description: "cold or sales. Left out, SealMe tells from the transcript." },
+      { name: "startedAt", type: "string", description: "ISO 8601. Defaults to now." },
+      { name: "durationSec", type: "number", description: "Length in seconds." },
+      { name: "toNumber", type: "string", description: "The number called; defaults to the lead's." },
+      { name: "externalId", type: "string", description: "Your dialer's id for the call. Logging the same one twice answers 409." },
+    ],
+    exampleBody: { leadExternalId: "hs-48213", repEmail: "dana@yourcompany.com", outcome: "no_answer", startedAt: "2026-10-07T14:05:00Z", durationSec: 28, externalId: "pb-77120" },
+    responses: [
+      { status: 201, description: "Logged with its outcome.", schema: "Call" },
+      { status: 202, description: "Being written up from the transcript or recording; call.completed follows.", schema: "Call" },
+      { status: 409, description: "Already logged.", example: { error: "A call with this externalId already exists", existingId: "cmcall3d4e0006" } },
+      { status: 400, description: "Something in the body is wrong; the error says what." },
+      { status: 404, description: "No such lead in this workspace." },
+    ],
+  },
+  {
+    id: "book-meeting",
+    group: "Tasks",
+    method: "POST",
+    path: "/meetings",
+    summary: "Book a meeting",
+    description:
+      "A meeting booked outside SealMe. It goes on the rep's day as a sales call (a task), the lead moves to Meeting (and to the rep, if nobody had it), the rep gets a notification, and meeting.booked fires. Move or cancel it with PATCH /tasks/{id}.",
+    write: true,
+    body: [
+      { name: "leadId", type: "string", description: "The lead it's with. Or send leadExternalId." },
+      { name: "leadExternalId", type: "string", description: "Your id for the lead, instead of leadId." },
+      { name: "date", type: "string", required: true, description: "YYYY-MM-DD." },
+      { name: "time", type: "string", description: "HH:mm." },
+      { name: "timeZone", type: "string", description: "IANA time zone of date and time. Defaults to the rep's." },
+      { name: "repEmail", type: "string", description: "Who takes the meeting, by their SealMe login. Defaults to the lead's owner; without either it's unassigned, for a manager to hand out." },
+      { name: "note", type: "string", description: "What it's about." },
+      { name: "externalId", type: "string", description: "Your id for the meeting. Booking the same one twice answers 409." },
+    ],
+    exampleBody: { leadExternalId: "hs-48213", date: "2026-10-20", time: "14:00", timeZone: "America/New_York", repEmail: "dana@yourcompany.com", note: "Demo with the RevOps team", externalId: "aih-mtg-5521" },
+    responses: [
+      { status: 201, description: "The sales call on the rep's day.", schema: "Task" },
+      { status: 409, description: "Already booked.", example: { error: "A meeting with this externalId already exists", existingId: "cmtask7g8h0008" } },
+      { status: 400, description: "Something in the body is wrong; the error says what." },
+      { status: 404, description: "No such lead in this workspace." },
+    ],
+  },
+  {
+    id: "list-tasks",
+    group: "Tasks",
+    method: "GET",
+    path: "/tasks",
+    summary: "List tasks",
+    description: "Every task, oldest first. For a nightly sync, ask for what changed since the last run with updatedSince.",
+    query: [
+      { name: "status", type: "string", description: "open, done or skipped." },
+      { name: "type", type: "string", description: "cold_call, sales_call, follow_up or other." },
+      { name: "assigneeEmail", type: "string", description: "Only one rep's tasks." },
+      { name: "leadId", type: "string", description: "Only one lead's tasks." },
+      { name: "leadExternalId", type: "string", description: "The same, by your id for the lead." },
+      { name: "externalId", type: "string", description: "The meeting you booked with this id." },
+      updatedSince,
+      ...cursorParams,
+    ],
+    responses: [{ status: 200, description: "A page of tasks.", schema: "Task", list: true }],
+  },
+  {
+    id: "get-task",
+    group: "Tasks",
+    method: "GET",
+    path: "/tasks/{id}",
+    summary: "Get a task",
+    description: "One task.",
+    responses: [{ status: 200, description: "The task.", schema: "Task" }, { status: 404, description: "No such task in this workspace." }],
+  },
+  {
+    id: "update-task",
+    group: "Tasks",
+    method: "PATCH",
+    path: "/tasks/{id}",
+    summary: "Update a task",
+    description: "Move it (date, time, timeZone), give it to someone else (repEmail), or close it: status done, or skipped for a cancelled meeting. Changes only the fields you send; null clears time and note. Fires task.completed when it closes.",
+    write: true,
+    body: [
+      { name: "date", type: "string", description: "YYYY-MM-DD." },
+      { name: "time", type: "string", description: "HH:mm, or null for any time that day." },
+      { name: "timeZone", type: "string", description: "IANA time zone." },
+      { name: "repEmail", type: "string", description: "Who it's for, by their SealMe login; null leaves it unassigned." },
+      { name: "status", type: "string", description: "open, done or skipped." },
+      { name: "priority", type: "string", description: "low, normal, high or urgent." },
+      { name: "note", type: "string", description: "What it's about; null clears it." },
+    ],
+    exampleBody: { date: "2026-10-21", time: "10:30" },
+    responses: [{ status: 200, description: "The updated task.", schema: "Task" }, { status: 404, description: "No such task in this workspace." }],
+  },
 ];
 
 export type DocEvent = { name: string; when: string; data: Record<string, unknown> };
@@ -348,7 +566,7 @@ export type DocEvent = { name: string; when: string; data: Record<string, unknow
 const deal = { dealUrl: "https://app.sealme.net/deals/cmdeal8f2k0001", feeDisplay: "$8,500", dealValue: 8500, currency: "USD" };
 const contractLinks = { ...deal, contractUrl: "https://app.sealme.net/deals/cmdeal8f2k0001/contract" };
 const leadUrl = "https://app.sealme.net/leads/cmlead5e6f0005";
-const leadNow = { leadId: "cmlead5e6f0005", externalId: "hs-48213", name: "Sam Rivera", company: "Acme Freight", title: "Head of Revenue Operations", email: "sam.rivera@example.com", phone: "+12025550161" };
+const leadNow = { leadId: "cmlead5e6f0005", externalId: "hs-48213", campaign: "Acme Freight Q4", name: "Sam Rivera", company: "Acme Freight", title: "Head of Revenue Operations", email: "sam.rivera@example.com", phone: "+12025550161" };
 const rep = { name: "Dana Lopez", email: "dana@yourcompany.com" };
 
 // Every event about a lead or a deal also carries leadUrl / dealUrl (and
@@ -373,11 +591,13 @@ export const EVENTS: DocEvent[] = [
   { name: "lead.converted", when: "A lead is turned into a deal.", data: { leadId: "cmlead5e6f0005", dealId: "cmdeal8f2k0001", clientId: "cmcli4h1x0002", name: "Sam Rivera", company: "Acme Freight", convertedAt: iso, leadUrl, ...deal } },
   {
     name: "call.completed",
-    when: "SealMe is done with a call: its notes are written (status processed, with the outcome), or it was set aside (status skipped: nobody picked up, too short, nothing recorded...). A call processed again later fires again with the same callId.",
+    when: "SealMe is done with a call: its notes are written (status processed, with the outcome), or it was set aside (status skipped: nobody picked up, too short, nothing recorded...). Calls you log through the API fire it too (source api, with your externalCallId). A call processed again later fires again with the same callId.",
     data: {
       callId: "cmcall3d4e0006",
+      externalCallId: null,
       leadId: "cmlead5e6f0005",
       externalId: "hs-48213",
+      campaign: "Acme Freight Q4",
       leadName: "Sam Rivera",
       company: "Acme Freight",
       dealId: null,
@@ -400,18 +620,20 @@ export const EVENTS: DocEvent[] = [
   },
   {
     name: "meeting.booked",
-    when: "A cold call ends with a meeting, or someone puts a sales call with a lead on a rep's day by hand (source manual). date and time are in timeZone; either can be null when the call didn't pin it down.",
-    data: { leadId: leadNow.leadId, externalId: leadNow.externalId, leadName: leadNow.name, company: leadNow.company, title: leadNow.title, email: leadNow.email, phone: leadNow.phone, date: "2026-10-20", time: "14:00", timeZone: "America/New_York", rep, source: "call", callId: "cmcall3d4e0006", taskId: "cmtask7g8h0008", bookedAt: iso, leadUrl },
+    when: "A cold call ends with a meeting (source call), someone puts a sales call with a lead on a rep's day by hand (manual), or one is booked through POST /meetings (api). date and time are in timeZone; either can be null when the call didn't pin it down.",
+    data: { leadId: leadNow.leadId, externalId: leadNow.externalId, campaign: leadNow.campaign, leadName: leadNow.name, company: leadNow.company, title: leadNow.title, email: leadNow.email, phone: leadNow.phone, date: "2026-10-20", time: "14:00", timeZone: "America/New_York", rep, source: "call", callId: "cmcall3d4e0006", taskId: "cmtask7g8h0008", bookedAt: iso, leadUrl },
   },
   {
     name: "task.completed",
-    when: "A task is marked done or skipped: by a person (completedBy), or because a processed call covered it (callId).",
+    when: "A task is marked done or skipped: by a person (completedBy), because a processed call covered it (callId), or through PATCH /tasks/{id}. externalTaskId is your id for a meeting you booked through the API.",
     data: {
       taskId: "cmtask7g8h0008",
+      externalTaskId: null,
       type: "cold_call",
       status: "done",
       leadId: "cmlead5e6f0005",
       externalId: "hs-48213",
+      campaign: "Acme Freight Q4",
       leadName: "Sam Rivera",
       dealId: null,
       assignee: rep,
@@ -481,7 +703,8 @@ export function openApiSpec() {
     const error = (description: string) => ({ description, content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } } });
     responses["401"] = error("Missing or wrong API key.");
     responses["429"] = error("Over the rate limit; see Retry-After.");
-    if (e.write || e.group === "Leads") responses["403"] = error(e.group === "Leads" ? "The key is read-only, or Prospecting is off for this workspace." : "The key is read-only.");
+    const prospecting = e.group === "Leads" || e.group === "Calls" || e.group === "Tasks";
+    if (e.write || prospecting) responses["403"] = error(prospecting ? "The key is read-only, or Prospecting is off for this workspace." : "The key is read-only.");
     paths[e.path] = {
       ...(paths[e.path] ?? {}),
       [e.method.toLowerCase()]: {
@@ -497,7 +720,7 @@ export function openApiSpec() {
   }
   return {
     openapi: "3.1.0",
-    info: { title: "SealMe API", version: "1.0.0", description: "Read deals, clients, contracts and leads, start deals from call transcripts, and add leads. Webhooks are described at /developers.", contact: { email: "ivan@sealme.net" } },
+    info: { title: "SealMe API", version: "1.0.0", description: "Read deals, clients, contracts, leads, calls and tasks, start deals from call transcripts, add leads, log calls from your own dialer and book meetings. Webhooks are described at /developers.", contact: { email: "ivan@sealme.net" } },
     servers: [{ url: BASE_URL }],
     security: [{ bearerAuth: [] }],
     tags: [
@@ -506,6 +729,8 @@ export function openApiSpec() {
       { name: "Contracts", description: "A deal's contract and where it is in signing." },
       { name: "Templates", description: "Contract templates a deal can use." },
       { name: "Leads", description: "Prospects before they become deals (Prospecting)." },
+      { name: "Calls", description: "Calls with leads, made through SealMe or logged from your own dialer (Prospecting)." },
+      { name: "Tasks", description: "Reps' to-dos, including booked meetings (Prospecting)." },
     ],
     paths,
     components: {

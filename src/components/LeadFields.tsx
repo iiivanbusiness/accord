@@ -15,6 +15,7 @@ type LeadValues = {
   notes?: string | null;
   nextStep?: string | null;
   nextStepAt?: Date | null;
+  campaign?: string | null;
 };
 
 function Field({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
@@ -32,11 +33,13 @@ export default function LeadFields({
   owners,
   full,
   allowUnassigned = true,
+  campaigns = [],
 }: {
   values?: LeadValues;
   owners: { id: string; name: string }[];
   full?: boolean;
   allowUnassigned?: boolean;
+  campaigns?: string[]; // the workspace's campaigns so far, offered as suggestions
 }) {
   const day = values.nextStepAt ? values.nextStepAt.toISOString().slice(0, 10) : "";
   const decision = values.isDecisionMaker === true ? "yes" : values.isDecisionMaker === false ? "no" : "";
@@ -65,6 +68,17 @@ export default function LeadFields({
       <Field label="Phone">
         <input name="phone" type="tel" defaultValue={values.phone ?? ""} placeholder="+1 512 555 0100" className="input" autoComplete="off" />
       </Field>
+      {/* Only where campaigns are used, or on a lead's full edit form. */}
+      {(full || campaigns.length > 0) && (
+        <Field label="Campaign">
+          <input name="campaign" list="lead-campaigns" defaultValue={values.campaign ?? ""} placeholder="Acme Freight Q4" className="input" autoComplete="off" />
+          <datalist id="lead-campaigns">
+            {campaigns.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
+        </Field>
+      )}
       {full && (
         <>
           <Field label="Website">

@@ -30,6 +30,7 @@ const TRACKED_LEAD_FIELDS: Record<string, string> = {
   notes: "notes",
   ownerId: "owner",
   externalId: "externalId",
+  campaign: "campaign",
 };
 
 export type LeadChange = { leadId: string; changed: string[]; previousStage: string | null };
@@ -81,6 +82,7 @@ export async function dispatchCallCompleted(workspaceId: string, callId: string)
       where: { id: callId, workspaceId },
       select: {
         id: true,
+        externalId: true,
         leadId: true,
         dealId: true,
         status: true,
@@ -96,7 +98,7 @@ export async function dispatchCallCompleted(workspaceId: string, callId: string)
         startedAt: true,
         endedAt: true,
         processedAt: true,
-        lead: { select: { name: true, company: true, externalId: true } },
+        lead: { select: { name: true, company: true, externalId: true, campaign: true } },
         user: { select: { name: true, email: true } },
       },
     });
@@ -104,8 +106,10 @@ export async function dispatchCallCompleted(workspaceId: string, callId: string)
     return [
       {
         callId: c.id,
+        externalCallId: c.externalId,
         leadId: c.leadId,
         externalId: c.lead?.externalId ?? null,
+        campaign: c.lead?.campaign ?? null,
         leadName: c.lead?.name ?? null,
         company: c.lead?.company ?? null,
         dealId: c.dealId,
@@ -134,20 +138,20 @@ export type BookedMeeting = {
   date: string | null; // YYYY-MM-DD in timeZone, when it's known
   time: string | null; // HH:mm
   timeZone: string;
-  source: "call" | "manual";
+  source: "call" | "manual" | "api";
   callId?: string | null;
   taskId?: string | null; // the sales call task it put on the rep's day
 };
 
-// meeting.booked: a cold call ended with a meeting, or someone put a sales
-// call with a lead on a rep's day by hand.
+// meeting.booked: a cold call ended with a meeting, someone put a sales
+// call with a lead on a rep's day by hand, or one came in through the API.
 export async function dispatchMeetingsBooked(workspaceId: string, meetings: BookedMeeting[]): Promise<void> {
   if (meetings.length === 0) return;
   await dispatchWebhookEvents(workspaceId, "meeting.booked", async () => {
     const [leads, reps] = await Promise.all([
       prisma.lead.findMany({
         where: { workspaceId, id: { in: [...new Set(meetings.map((m) => m.leadId))] } },
-        select: { id: true, externalId: true, name: true, company: true, title: true, email: true, phone: true },
+        select: { id: true, externalId: true, campaign: true, name: true, company: true, title: true, email: true, phone: true },
       }),
       prisma.user.findMany({ where: { workspaceId, id: { in: [...new Set(meetings.map((m) => m.repId).filter((id): id is string => Boolean(id)))] } }, select: { id: true, name: true, email: true } }),
     ]);
@@ -161,6 +165,7 @@ export async function dispatchMeetingsBooked(workspaceId: string, meetings: Book
         {
           leadId: lead.id,
           externalId: lead.externalId,
+          campaign: lead.campaign,
           leadName: lead.name,
           company: lead.company,
           title: lead.title,
@@ -190,6 +195,7 @@ export async function dispatchTasksCompleted(workspaceId: string, taskIds: strin
         where: { workspaceId, id: { in: taskIds }, status: { in: ["done", "skipped"] } },
         select: {
           id: true,
+          externalId: true,
           type: true,
           status: true,
           leadId: true,
@@ -200,7 +206,7 @@ export async function dispatchTasksCompleted(workspaceId: string, taskIds: strin
           priority: true,
           note: true,
           completedAt: true,
-          lead: { select: { name: true, externalId: true } },
+          lead: { select: { name: true, externalId: true, campaign: true } },
           assignee: { select: { name: true, email: true } },
         },
       }),
@@ -208,10 +214,12 @@ export async function dispatchTasksCompleted(workspaceId: string, taskIds: strin
     ]);
     return tasks.map((t) => ({
       taskId: t.id,
+      externalTaskId: t.externalId,
       type: t.type,
       status: t.status,
       leadId: t.leadId,
       externalId: t.lead?.externalId ?? null,
+      campaign: t.lead?.campaign ?? null,
       leadName: t.lead?.name ?? null,
       dealId: t.dealId,
       assignee: person(t.assignee),

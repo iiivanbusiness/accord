@@ -59,8 +59,8 @@ export async function seedSandbox(sandboxId: string): Promise<void> {
   if (ws.prospectingEnabled) {
     await prisma.lead.createMany({
       data: [
-        { workspaceId: sandboxId, name: "Sam Rivera", company: "Acme Freight", title: "Head of Revenue Operations", email: "sam.rivera@example.com", phone: "+12025550161", stage: "new", source: "manual" },
-        { workspaceId: sandboxId, name: "Morgan Lee", company: "Lumen Health", title: "VP Sales", email: "morgan.lee@example.com", phone: "+12025550162", stage: "contacted", interest: "warm", source: "manual" },
+        { workspaceId: sandboxId, name: "Sam Rivera", company: "Acme Freight", title: "Head of Revenue Operations", email: "sam.rivera@example.com", phone: "+12025550161", stage: "new", source: "manual", campaign: "Sample campaign", externalId: "sample-1001" },
+        { workspaceId: sandboxId, name: "Morgan Lee", company: "Lumen Health", title: "VP Sales", email: "morgan.lee@example.com", phone: "+12025550162", stage: "contacted", interest: "warm", source: "manual", campaign: "Sample campaign", externalId: "sample-1002" },
         { workspaceId: sandboxId, name: "Taylor Brooks", company: "Orbit Labs", title: "COO", email: "taylor.brooks@example.com", phone: "+12025550163", stage: "interested", interest: "hot", source: "manual" },
       ],
     });

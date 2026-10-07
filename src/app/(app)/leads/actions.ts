@@ -56,6 +56,7 @@ function leadFieldsFrom(formData: FormData) {
     notes: text(formData, "notes")?.slice(0, 4000) ?? null,
     nextStep: text(formData, "nextStep"),
     nextStepAt: parseDay(text(formData, "nextStepAt")),
+    campaign: text(formData, "campaign")?.slice(0, 100) ?? null,
   };
 }
 

@@ -1158,6 +1158,10 @@ model Lead {
   // The id the lead has in whatever system sent it through the API (an
   // agency's dialer or CRM), so they can find and update it by their own id.
   externalId           String?
+  // Which campaign the lead is part of. An agency calling for several
+  // clients uses it for the client ("Acme Freight Q4"), so a rep sees who
+  // they're calling for and every event carries it.
+  campaign             String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1169,6 +1173,7 @@ model Lead {
   @@unique([workspaceId, hubspotContactId])
   @@unique([workspaceId, salesforceRecordId])
   @@unique([workspaceId, externalId])
+  @@index([workspaceId, campaign])
   @@index([workspaceId, ownerId])
   @@index([workspaceId, stage])
   @@index([workspaceId, email])
@@ -1207,10 +1212,14 @@ model Task {
   status      String    @default("open") // open | done | skipped
   note        String?
   completedAt DateTime?
+  // A meeting booked through the API: its id in the system that booked it.
+  externalId  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([workspaceId, externalId])
+  @@index([workspaceId, updatedAt])
   @@index([workspaceId, assigneeId, status, dueDate])
   @@index([leadId])
 }
@@ -1252,7 +1261,7 @@ model PhoneCall {
 
   mode   String @default("unknown") // cold | sales | unknown | auto (sorted from the transcript when processed)
   status String @default("recording") // dialing (SealMe ringing the rep or client) | recording | pending | processing | processed | discarded | failed | skipped
-  source String @default("phone") // phone | paste (a transcript pasted on the lead page) | desktop
+  source String @default("phone") // phone | paste (a transcript pasted on the lead page) | desktop | api (logged by another dialer)
   // What happened, from the transcript: meeting_booked | interested | follow_up
   // | not_interested | voicemail | no_answer | wrong_person. connected is
   // true when they actually talked (what /team counts as connected).
@@ -1266,6 +1275,11 @@ model PhoneCall {
   consentState String? // US state code from the area code
   consentRule  String? // one_party | all_party | unknown | non_us | toll_free
   recorded     Boolean @default(false)
+
+  // A call logged through the API: its id in the dialer that made it, and
+  // where its recording can be fetched until SealMe has transcribed it.
+  externalId   String?
+  recordingUrl String?
 
   telnyxCallControlId String? @unique
   // When SealMe calls the rep and then the client, the client's leg.
@@ -1297,7 +1311,12 @@ model PhoneCall {
   startedAt   DateTime  @default(now())
   endedAt     DateTime?
   processedAt DateTime?
+  // The default lets rows from before this column (and from code that
+  // doesn't know it yet) fill it in on their own.
+  updatedAt   DateTime  @default(now()) @updatedAt
 
+  @@unique([workspaceId, externalId])
+  @@index([workspaceId, updatedAt])
   @@index([workspaceId, status])
   @@index([userId, status])
   @@index([leadId])

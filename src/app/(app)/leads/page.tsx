@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { after } from "next/server";
 import { prisma } from "@/lib/db";
+import { workspaceCampaigns } from "@/lib/campaigns";
 import { requireProspecting } from "@/lib/prospecting";
 import { currentUserWithRole } from "@/lib/permissions";
 import { leadAccess } from "@/lib/lead-visibility";
@@ -40,7 +41,7 @@ function formatDay(date: Date): string {
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; q?: string; stage?: string; owner?: string; deleted?: string }>;
+  searchParams: Promise<{ tab?: string; q?: string; stage?: string; owner?: string; campaign?: string; deleted?: string }>;
 }) {
   const workspace = await requireProspecting();
   const user = await currentUserWithRole();
@@ -52,7 +53,7 @@ export default async function LeadsPage({
   // A rep only ever sees their own leads, so the tabs and owner filter are
   // a manager's view.
   const tab = access.canViewAll ? (params.tab ?? "") : "";
-  const { q, stage, owner } = params;
+  const { q, stage, owner, campaign } = params;
 
   // AND, not a spread: the visibility rule and the search are both ORs.
   const where = {
@@ -62,6 +63,7 @@ export default async function LeadsPage({
       tab === "mine" ? { ownerId: user.id } : tab === "unassigned" ? { ownerId: null } : {},
       stage && isLeadStage(stage) ? { stage } : {},
       owner && tab === "" ? { ownerId: owner } : {},
+      campaign ? { campaign } : {},
       q
         ? {
             OR: [
@@ -75,7 +77,7 @@ export default async function LeadsPage({
     ],
   };
 
-  const [leads, members, total] = await Promise.all([
+  const [leads, members, total, campaigns] = await Promise.all([
     prisma.lead.findMany({
       where,
       select: {
@@ -89,6 +91,7 @@ export default async function LeadsPage({
         interest: true,
         nextStep: true,
         nextStepAt: true,
+        campaign: true,
         updatedAt: true,
         owner: { select: { name: true } },
       },
@@ -99,6 +102,7 @@ export default async function LeadsPage({
       ? prisma.user.findMany({ where: { workspaceId: workspace.id, deactivatedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } })
       : Promise.resolve([]),
     prisma.lead.count({ where: { workspaceId: workspace.id, ...access.where } }),
+    workspaceCampaigns(workspace.id),
   ]);
 
   const tabHref = (key: string) => (key ? `/leads?tab=${key}` : "/leads");
@@ -141,7 +145,7 @@ export default async function LeadsPage({
         <div className="chip chip-success mb-3 w-full justify-start px-4 py-2.5 text-[12.5px]" role="status">Lead deleted.</div>
       )}
 
-      <LeadsFilterBar owners={access.canViewAll ? members : []} showOwnerFilter={access.canViewAll && tab === ""} />
+      <LeadsFilterBar owners={access.canViewAll ? members : []} showOwnerFilter={access.canViewAll && tab === ""} campaigns={campaigns} />
 
       {leads.length === 0 ? (
         <div className="card flex flex-col items-start gap-3 p-6">
@@ -173,9 +177,10 @@ export default async function LeadsPage({
               return {
                 id: lead.id,
                 name: lead.name,
-                subtitle: [lead.title, lead.company].filter(Boolean).join(" · ") || lead.email || formatPhone(lead.phone) || "",
+                subtitle: [lead.campaign, lead.title, lead.company].filter(Boolean).join(" · ") || lead.email || formatPhone(lead.phone) || "",
                 secondary: lead.title || lead.email || formatPhone(lead.phone) || "",
                 company: lead.company,
+                campaign: lead.campaign,
                 stageLabel: LEAD_STAGE_LABEL[lead.stage] ?? lead.stage,
                 stageChip: LEAD_STAGE_CHIP[lead.stage] ?? "chip-neutral",
                 interest: lead.interest ? LEAD_INTEREST_LABEL[lead.interest] : "-",

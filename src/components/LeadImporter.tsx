@@ -27,12 +27,17 @@ export default function LeadImporter({
   canAssign,
   startAction,
   chunkAction,
+  campaigns = [],
 }: {
   owners: { id: string; name: string; email: string }[];
   canAssign: boolean;
   startAction: (source: string, fileName: string | null) => Promise<{ importId: string }>;
-  chunkAction: (importId: string, rows: ImportRow[], assignment: ImportAssignment) => Promise<Result>;
+  chunkAction: (importId: string, rows: ImportRow[], assignment: ImportAssignment, campaign: string | null) => Promise<Result>;
+  campaigns?: string[];
 }) {
+  // Most imports have no campaign, so the field stays behind a link until asked for.
+  const [campaignOpen, setCampaignOpen] = useState(false);
+  const [campaign, setCampaign] = useState("");
   const [mode, setMode] = useState<"paste" | "file">("paste");
   const [workbook, setWorkbook] = useState<Workbook | null>(null);
   const [reading, setReading] = useState(false);
@@ -183,7 +188,7 @@ export default function LeadImporter({
             : assignMode === "column"
               ? { mode: "column", fallbackOwnerId: fallbackOwner || null }
               : { mode: "one", ownerId: owner || null };
-        const r = await chunkAction(importId, mappedRows.slice(i, i + IMPORT_CHUNK_SIZE), assignment);
+        const r = await chunkAction(importId, mappedRows.slice(i, i + IMPORT_CHUNK_SIZE), assignment, campaign.trim() || null);
         total.created += r.created;
         total.updated += r.updated;
         total.skipped += r.skipped;
@@ -332,6 +337,33 @@ export default function LeadImporter({
             leadCount={withName}
             disabled={Boolean(progress)}
           />
+        )}
+        {campaignOpen ? (
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[13.5px] font-medium">Campaign</span>
+            <input
+              value={campaign}
+              onChange={(e) => setCampaign(e.target.value)}
+              list="import-campaigns"
+              placeholder="Acme Freight Q4"
+              maxLength={100}
+              className="input max-w-[300px]"
+              disabled={Boolean(progress)}
+              autoFocus
+            />
+            <datalist id="import-campaigns">
+              {campaigns.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
+            <span className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
+              {mapping.includes("campaign") ? "For rows whose campaign column is empty." : "Every lead in this import goes into it."}
+            </span>
+          </label>
+        ) : (
+          <button type="button" onClick={() => setCampaignOpen(true)} className="self-start text-[13px] font-medium" style={{ color: "var(--accent-blue)" }} disabled={Boolean(progress)}>
+            + Put these leads in a campaign
+          </button>
         )}
         <div className="text-[13px]">
           {hasNameColumn ? (

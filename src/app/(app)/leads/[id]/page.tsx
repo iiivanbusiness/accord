@@ -6,6 +6,7 @@ import { leadAccess } from "@/lib/lead-visibility";
 import { LEAD_STAGES, LEAD_STAGE_LABEL, LEAD_INTEREST_LABEL } from "@/lib/lead-stages";
 import { formatPhone } from "@/lib/phone";
 import LeadFields from "@/components/LeadFields";
+import { workspaceCampaigns } from "@/lib/campaigns";
 import SubmitButton from "@/components/SubmitButton";
 import LeadTasks from "@/components/LeadTasks";
 import LeadCalls from "@/components/LeadCalls";
@@ -38,7 +39,7 @@ export default async function LeadPage({
   const { created, saved } = await searchParams;
 
   const access = await leadAccess();
-  const [lead, members, tasks, calls, templates] = await Promise.all([
+  const [lead, members, tasks, calls, templates, campaigns] = await Promise.all([
     prisma.lead.findFirst({ where: { id, workspaceId: workspace.id, ...access.where }, include: { owner: { select: { id: true, name: true } } } }),
     access.canAssign
       ? prisma.user.findMany({ where: { workspaceId: workspace.id, deactivatedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } })
@@ -56,6 +57,7 @@ export default async function LeadPage({
       take: 50,
     }),
     prisma.contractTemplate.findMany({ where: { workspaceId: workspace.id }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    workspaceCampaigns(workspace.id),
   ]);
   if (!lead) notFound();
   const convertedDeal = lead.convertedDealId
@@ -80,6 +82,8 @@ export default async function LeadPage({
 
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
       <div className="min-w-0">
+        {/* Who the rep is calling for, when the workspace runs campaigns for several clients. */}
+        {lead.campaign && <div className="chip chip-neutral mb-2 w-fit">{lead.campaign}</div>}
         <h1 className="break-words text-[25px] font-medium" style={{ letterSpacing: "-0.8px" }}>{lead.name}</h1>
         {subtitle && <div className="mt-1 break-words text-[13.5px]" style={{ color: "var(--ink-muted)" }}>{subtitle}</div>}
         <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
@@ -115,7 +119,7 @@ export default async function LeadPage({
             <span className="text-[12.5px]" style={{ color: "var(--ink-muted)" }}>Name, company, contact, owner, notes</span>
           </summary>
           <form action={updateLead.bind(null, lead.id)} className="flex min-w-0 flex-col gap-5 px-5 pb-5 sm:px-6 sm:pb-6">
-            <LeadFields owners={owners} full values={lead} allowUnassigned={access.canAssign} />
+            <LeadFields owners={owners} full values={lead} allowUnassigned={access.canAssign} campaigns={campaigns} />
             <SubmitButton className="btn btn-primary w-full justify-center sm:w-auto sm:self-start" pendingText="Saving…">
               Save changes
             </SubmitButton>

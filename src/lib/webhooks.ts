@@ -252,11 +252,12 @@ export async function leadWebhookData(workspaceId: string, leadIds: string[]): P
   if (leadIds.length === 0) return [];
   const leads = await prisma.lead.findMany({
     where: { workspaceId, id: { in: leadIds } },
-    select: { id: true, externalId: true, name: true, company: true, title: true, email: true, phone: true, stage: true, source: true, createdAt: true, owner: { select: { name: true, email: true } } },
+    select: { id: true, externalId: true, campaign: true, name: true, company: true, title: true, email: true, phone: true, stage: true, source: true, createdAt: true, owner: { select: { name: true, email: true } } },
   });
   return leads.map((l) => ({
     leadId: l.id,
     externalId: l.externalId,
+    campaign: l.campaign,
     name: l.name,
     company: l.company,
     title: l.title,

@@ -8,7 +8,7 @@ import { dispatchLeadsCreated } from "@/lib/webhooks";
 const PAGE_SIZE = 50;
 const NOT_ON = "Leads aren't turned on for this workspace";
 
-// GET /api/v1/leads?stage=&ownerEmail=&externalId=&updatedSince=&cursor=
+// GET /api/v1/leads?stage=&ownerEmail=&externalId=&campaign=&updatedSince=&cursor=
 export async function GET(req: Request) {
   const auth = await apiGuard(req);
   if (auth instanceof Response) return auth;
@@ -19,6 +19,7 @@ export async function GET(req: Request) {
   if (stage && !isLeadStage(stage)) return apiError(400, "stage must be one of new, contacted, interested, meeting, converted, lost");
   const ownerEmail = url.searchParams.get("ownerEmail")?.trim().toLowerCase() || null;
   const externalId = url.searchParams.get("externalId")?.trim() || null;
+  const campaign = url.searchParams.get("campaign")?.trim() || null;
   const cursor = url.searchParams.get("cursor");
   const since = parseIsoParam(url.searchParams.get("updatedSince"), "updatedSince");
   if ("error" in since) return apiError(400, since.error);
@@ -29,6 +30,7 @@ export async function GET(req: Request) {
       ...(stage ? { stage } : {}),
       ...(ownerEmail ? { owner: { email: { equals: ownerEmail, mode: "insensitive" } } } : {}),
       ...(externalId ? { externalId } : {}),
+      ...(campaign ? { campaign: { equals: campaign, mode: "insensitive" } } : {}),
       ...(since.date ? { updatedAt: { gte: since.date } } : {}),
     },
     select: LEAD_API_SELECT,

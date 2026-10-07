@@ -88,8 +88,11 @@ export async function runCallProcessing(callId: string, timeZone: string, option
   let call = await prisma.phoneCall.findUnique({ where: { id: callId }, include: { lead: true } });
   if (!call || call.status !== "processing") return;
   try {
-    if (!call.transcript && call.telnyxRecordingId) {
-      call = { ...call, ...(await transcribePhoneRecording(call.id, call.telnyxRecordingId, call.durationSec, Boolean(call.telnyxClientLegId))) };
+    if (!call.transcript && (call.telnyxRecordingId || call.recordingUrl)) {
+      const heard = call.telnyxRecordingId
+        ? await transcribePhoneRecording(call.id, call.telnyxRecordingId, call.durationSec, Boolean(call.telnyxClientLegId))
+        : await transcribeRecordingUrl(call.id, call.recordingUrl!, call.durationSec);
+      call = { ...call, ...heard };
       if (!call.transcript) {
         await prisma.phoneCall.update({ where: { id: callId }, data: { status: "skipped", connected: false, extracted: { skipped: "no_speech" }, processedAt: new Date() } });
         await dispatchCallCompleted(call.workspaceId, callId);
@@ -106,7 +109,7 @@ export async function runCallProcessing(callId: string, timeZone: string, option
       return;
     }
     const { lead, userId, transcript } = call;
-    if (!lead || !userId || !transcript) throw new Error("This call has no lead, rep or transcript");
+    if (!lead || !transcript) throw new Error("This call has no lead or transcript");
     const { workspaceId, mode: picked } = call;
     // Every model call below counts toward this call's cost: sorting it,
     // the notes, and for a sales call the template pick, the deal and the
@@ -124,7 +127,7 @@ export async function runCallProcessing(callId: string, timeZone: string, option
         await applySalesCall(callId, { draftOnly: sorted });
       } else {
         await applyColdCall({ workspaceId, userId, lead, transcript, timeZone, phoneCallId: callId });
-        if (options.auto) {
+        if (options.auto && userId) {
           await createNotification({
             workspaceId,
             userId,
@@ -188,6 +191,23 @@ async function transcribePhoneRecording(
   const saved = { transcript: heard.transcript, sttSeconds: billedSeconds, durationSec: durationSec ?? seconds ?? heard.seconds, telnyxRecordingId: keep ? recordingId : null };
   await prisma.phoneCall.update({ where: { id: callId }, data: saved });
   if (!keep) await dropRecording(recordingId, callId);
+  return saved;
+}
+
+// A call logged through the API with a link to its recording: Deepgram
+// fetches it from there. The link is forgotten once it's transcribed; if
+// Deepgram can't get it, it stays so the call can be processed again.
+async function transcribeRecordingUrl(callId: string, url: string, durationSec: number | null): Promise<{ transcript: string; sttSeconds: number; durationSec: number | null; recordingUrl: null }> {
+  const language = process.env.DEEPGRAM_LANGUAGE || "en";
+  const res = await fetch(`https://api.deepgram.com/v1/listen?${RECORDING_LISTEN_PARAMS}&language=${language}`, {
+    method: "POST",
+    headers: { Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  if (!res.ok) throw new Error(`Deepgram ${res.status}: ${(await res.text()).slice(0, 500)}`);
+  const heard = transcriptFromListenResponse(await res.json());
+  const saved = { transcript: heard.transcript, sttSeconds: heard.seconds, durationSec: durationSec ?? heard.seconds, recordingUrl: null };
+  await prisma.phoneCall.update({ where: { id: callId }, data: saved });
   return saved;
 }
 

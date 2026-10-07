@@ -8,14 +8,15 @@ export const metadata = {
   description: "The SealMe REST API and webhooks: deals, contracts, clients and leads.",
 };
 
-const GROUPS = ["Deals", "Clients", "Contracts", "Templates", "Leads"] as const;
+const GROUPS = ["Deals", "Clients", "Contracts", "Templates", "Leads", "Calls", "Tasks"] as const;
+const SAMPLE_ID: Partial<Record<DocEndpoint["group"], string>> = { Leads: "cmlead5e6f0005", Clients: "cmcli4h1x0002", Contracts: "cmcon2b9q0003", Calls: "cmcall3d4e0006", Tasks: "cmtask7g8h0008" };
 
 function json(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
 
 function curlFor(e: DocEndpoint) {
-  const path = e.path.replace("{id}", e.group === "Leads" ? "cmlead5e6f0005" : e.group === "Clients" ? "cmcli4h1x0002" : e.group === "Contracts" ? "cmcon2b9q0003" : "cmdeal8f2k0001");
+  const path = e.path.replace("{id}", SAMPLE_ID[e.group] ?? "cmdeal8f2k0001");
   const query = e.method === "GET" && e.id === "list-deals" ? "?status=ready" : e.id === "list-leads" ? "?stage=new" : "";
   const lines = [`curl ${e.method === "GET" ? "" : `-X ${e.method} `}${BASE_URL}${path}${query}`, `  -H "Authorization: Bearer sk_live_…"`];
   if (e.exampleBody) lines.push(`  -H "Content-Type: application/json"`, `  -d '${JSON.stringify(e.exampleBody)}'`);
@@ -175,7 +176,13 @@ export default function DevelopersPage() {
 
           {GROUPS.map((group) => (
             <Section key={group} id={group.toLowerCase()} title={group}>
-              {group === "Leads" && <p>Leads are part of Prospecting, which is turned on per workspace. Without it these answer 403.</p>}
+              {group === "Leads" && <p>Leads are part of Prospecting, which is turned on per workspace. Without it these answer 403. An agency calling for several clients can put each lead in a campaign (the client), and filter and get events by it.</p>}
+              {group === "Calls" && (
+                <p>
+                  Calls made in SealMe, and calls from your own dialer that you log here. Log one with just its outcome and it&apos;s saved right away; send its transcript or a link to its recording and SealMe writes the notes and updates the lead the same way it does for its own calls. Calls you log aren&apos;t written to your CRM by SealMe, since your dialer usually does that already. Part of Prospecting.
+                </p>
+              )}
+              {group === "Tasks" && <p>The reps&apos; to-dos: cold calls, sales calls (booked meetings), follow-ups. Book a meeting from outside SealMe, move it, or cancel it. Part of Prospecting.</p>}
               {ENDPOINTS.filter((e) => e.group === group).map((e) => {
                 const example = exampleResponse(e);
                 return (

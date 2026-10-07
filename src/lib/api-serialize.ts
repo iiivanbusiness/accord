@@ -71,6 +71,7 @@ export function serializeDealDetail(
 export function serializeLead(lead: {
   id: string;
   externalId: string | null;
+  campaign: string | null;
   name: string;
   company: string | null;
   title: string | null;
@@ -97,6 +98,7 @@ export function serializeLead(lead: {
   return {
     id: lead.id,
     externalId: lead.externalId,
+    campaign: lead.campaign,
     name: lead.name,
     company: lead.company,
     title: lead.title,
@@ -126,6 +128,7 @@ export function serializeLead(lead: {
 export const LEAD_API_SELECT = {
   id: true,
   externalId: true,
+  campaign: true,
   name: true,
   company: true,
   title: true,

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireProspecting } from "@/lib/prospecting";
 import { leadAccess } from "@/lib/lead-visibility";
 import LeadImporter from "@/components/LeadImporter";
+import { workspaceCampaigns } from "@/lib/campaigns";
 import LocalDateTime from "@/components/LocalDateTime";
 import { importLeadsChunk, startLeadImport } from "../import-actions";
 
@@ -35,7 +36,7 @@ export default async function ImportLeadsPage() {
         </div>
       </div>
 
-      <LeadImporter owners={owners} canAssign={access.canAssign} startAction={startLeadImport} chunkAction={importLeadsChunk} />
+      <LeadImporter owners={owners} canAssign={access.canAssign} startAction={startLeadImport} chunkAction={importLeadsChunk} campaigns={await workspaceCampaigns(workspace.id)} />
 
       {history.length > 0 && (
         <div className="mt-8 max-w-[860px]">

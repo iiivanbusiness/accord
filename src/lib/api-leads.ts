@@ -23,6 +23,7 @@ type LeadInput = {
   ownerId?: string | null;
   convertedAt?: Date | null;
   externalId?: string | null;
+  campaign?: string | null;
 };
 
 // Reads the lead fields a request sent. Only keys that are present are
@@ -43,7 +44,7 @@ export async function parseLeadInput(workspaceId: string, body: Record<string, u
   if (has("name") && !name) return { error: "\"name\" can't be empty" };
   if (name) data.name = name;
 
-  for (const [k, max] of [["company", 200], ["title", 200], ["notes", 4000], ["nextStep", 500]] as const) {
+  for (const [k, max] of [["company", 200], ["title", 200], ["notes", 4000], ["nextStep", 500], ["campaign", 100]] as const) {
     const v = str(k, max);
     if (v !== undefined) data[k] = v;
   }

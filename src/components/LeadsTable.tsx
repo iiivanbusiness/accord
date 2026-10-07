@@ -10,6 +10,7 @@ export type LeadRow = {
   subtitle: string;
   secondary: string;
   company: string | null;
+  campaign: string | null;
   stageLabel: string;
   stageChip: string;
   interest: string;
@@ -148,6 +149,7 @@ export default function LeadsTable({
                     </td>
                     <td className={`${cell} ${SHOW.company}`} style={muted}>
                       <div className="max-w-[160px] truncate" title={lead.company ?? undefined}>{lead.company ?? "-"}</div>
+                      {lead.campaign && <div className="max-w-[160px] truncate text-[12px]" title={`Campaign: ${lead.campaign}`}>{lead.campaign}</div>}
                     </td>
                     <td className={cell} style={border}>
                       <span className={`chip whitespace-nowrap ${lead.stageChip}`}>{lead.stageLabel}</span>
