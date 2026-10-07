@@ -4,6 +4,7 @@ import { consentFor, isCallTestWorkspace, recordingDecision } from "@/lib/call-c
 import { MIN_PROCESS_SECONDS } from "@/lib/call-inbox";
 import { callAction, decodeClientState, deleteRecording, dial, encodeClientState, findRecordingId, type TelnyxEvent } from "@/lib/telnyx";
 import { reportError } from "@/lib/error-report";
+import { dispatchCallCompleted } from "@/lib/webhook-events";
 
 // What a call is doing, carried on the call itself (client_state).
 // The rep calling the SealMe number and merging:
@@ -220,8 +221,9 @@ async function startRecordingClientLeg(clientLeg: string, callId: string): Promi
   } catch (err) {
     // They're talking, but nothing is recorded: say so on the call instead
     // of it ending up "cancelled", and tell us.
-    await prisma.phoneCall.update({ where: { id: callId }, data: { status: "skipped", extracted: { skipped: "record_failed" }, processedAt: new Date() } });
+    const failed = await prisma.phoneCall.update({ where: { id: callId }, data: { status: "skipped", extracted: { skipped: "record_failed" }, processedAt: new Date() } });
     await reportError(err, "Starting a call recording", { callId });
+    await dispatchCallCompleted(failed.workspaceId, callId);
     return;
   }
   await prisma.phoneCall.update({ where: { id: callId }, data: { status: "recording", recorded: true } });
@@ -244,6 +246,7 @@ async function outboundLegEnded(leg: string, state: CallState, cause: string | n
       await callAction(call.telnyxCallControlId, "speak", { ...VOICE, payload: SAY.nopickup, client_state: encodeClientState({ k: "bye", m: "nopickup", c: call.id }), command_id: `nopickup-${call.id}` }).catch(() => {});
     }
     await prisma.phoneCall.update({ where: { id: call.id }, data: { status: "skipped", outcome: "no_answer", extracted: { skipped: "no_pickup" }, endedAt: now, processedAt: now } });
+    await dispatchCallCompleted(call.workspaceId, call.id);
     return;
   }
   // The rep's leg ended: stop ringing the client if it got that far.
@@ -265,6 +268,7 @@ async function callEnded(callControlId: string, state: CallState | null): Promis
   const now = new Date();
   if (call.status === "recording" && !call.recorded) {
     await prisma.phoneCall.update({ where: { id: call.id }, data: { status: "skipped", extracted: { skipped: "not_recorded" }, endedAt: now, processedAt: now } });
+    await dispatchCallCompleted(call.workspaceId, call.id);
     return;
   }
   if (!call.endedAt) await prisma.phoneCall.update({ where: { id: call.id }, data: { endedAt: now } });
@@ -293,6 +297,7 @@ async function recordingSaved(callControlId: string, state: CallState | null, p:
     },
   });
   if (tooShort && recordingId) await deleteRecording(recordingId).catch((err) => reportError(err, "Deleting a short call's recording", { callId: call.id }));
+  if (tooShort) await dispatchCallCompleted(call.workspaceId, call.id);
   // Tied to a lead (the rep tapped Call): the notes write themselves.
   return !tooShort && call.leadId ? { processCallId: call.id } : {};
 }

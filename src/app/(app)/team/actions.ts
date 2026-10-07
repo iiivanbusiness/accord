@@ -7,6 +7,7 @@ import { leadAccess } from "@/lib/lead-visibility";
 import { cookieTimeZone, dayInZone } from "@/lib/viewer-time";
 import { currentUserWithRole } from "@/lib/permissions";
 import { notifyTasksMoved } from "@/lib/task-notify";
+import { dispatchLeadsUpdated } from "@/lib/webhook-events";
 
 // "unassigned" stands for open tasks whose assignee's account was removed.
 export type MoveTasksInput = { fromUserId: string; toUserId: string; scope: "all" | "due"; makeOwner: boolean };
@@ -40,6 +41,9 @@ export async function moveTasks(input: MoveTasksInput): Promise<{ moved: number 
   if (tasks.length === 0) return { moved: 0 };
 
   const leadIds = [...new Set(tasks.map((t) => t.leadId).filter((id): id is string => Boolean(id)))];
+  const handedOver = input.makeOwner && leadIds.length && to.id !== fromId
+    ? await prisma.lead.findMany({ where: { id: { in: leadIds }, workspaceId: workspace.id, ownerId: fromId }, select: { id: true } })
+    : [];
   await prisma.$transaction([
     prisma.task.updateMany({ where: { id: { in: tasks.map((t) => t.id) } }, data: { assigneeId: to.id } }),
     // Only leads the old person owned change hands; someone else's lead
@@ -48,6 +52,7 @@ export async function moveTasks(input: MoveTasksInput): Promise<{ moved: number 
       ? [prisma.lead.updateMany({ where: { id: { in: leadIds }, workspaceId: workspace.id, ownerId: fromId }, data: { ownerId: to.id } })]
       : []),
   ]);
+  await dispatchLeadsUpdated(workspace.id, handedOver.map((l) => ({ leadId: l.id, changed: ["owner"], previousStage: null })));
 
   if (to.id !== access.userId) {
     const actor = await currentUserWithRole();

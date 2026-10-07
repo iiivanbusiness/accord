@@ -3,6 +3,7 @@ import { after } from "next/server";
 import { prisma } from "@/lib/db";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { checkPublicHttpsUrl } from "@/lib/outbound-url";
+import { feeCurrency, parseFee } from "@/lib/money";
 
 // Everything a WebhookEndpoint can subscribe to.
 export const WEBHOOK_EVENTS = [
@@ -13,7 +14,11 @@ export const WEBHOOK_EVENTS = [
   "contract.declined",
   "contract.expired",
   "lead.created",
+  "lead.updated",
   "lead.converted",
+  "call.completed",
+  "meeting.booked",
+  "task.completed",
 ] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 
@@ -43,7 +48,7 @@ async function soon(fn: () => Promise<unknown>): Promise<void> {
 // Records `event` for every enabled endpoint in this workspace subscribed
 // to it and sends it in the background. Never throws into, or slows down,
 // whatever action triggered it.
-export async function dispatchWebhookEvent(workspaceId: string, event: WebhookEvent, data: Record<string, unknown>): Promise<void> {
+export async function dispatchWebhookEvent(workspaceId: string, event: WebhookEvent, data: EventData): Promise<void> {
   await dispatchWebhookEvents(workspaceId, event, [data]);
 }
 
@@ -53,8 +58,12 @@ export async function dispatchWebhookEvent(workspaceId: string, event: WebhookEv
 // request that caused it.
 const SEND_NOW_LIMIT = 50;
 
-export async function dispatchWebhookEvents(workspaceId: string, event: WebhookEvent, items: Record<string, unknown>[]): Promise<void> {
-  if (items.length === 0) return;
+type EventData = Record<string, unknown>;
+
+// items can be a function, so whatever it takes to build them (loading
+// leads, calls...) only happens when an endpoint is listening.
+export async function dispatchWebhookEvents(workspaceId: string, event: WebhookEvent, items: EventData[] | (() => Promise<EventData[]>)): Promise<void> {
+  if (Array.isArray(items) && items.length === 0) return;
   try {
     const endpoints = await prisma.webhookEndpoint.findMany({ where: { workspaceId, enabled: true }, select: { id: true, events: true } });
     const subscribed = endpoints.filter((e) => {
@@ -65,9 +74,11 @@ export async function dispatchWebhookEvents(workspaceId: string, event: WebhookE
       }
     });
     if (subscribed.length === 0) return;
+    const built = await withLinksAndValue(workspaceId, Array.isArray(items) ? items : await items());
+    if (built.length === 0) return;
 
     const now = new Date();
-    const rows = items.flatMap((data) => {
+    const rows = built.flatMap((data) => {
       const eventId = `evt_${randomBytes(12).toString("hex")}`;
       const created = new Date().toISOString();
       // timestamp duplicates created for receivers built against v1.
@@ -82,6 +93,32 @@ export async function dispatchWebhookEvents(workspaceId: string, event: WebhookE
   } catch (err) {
     console.error(`Couldn't queue webhook ${event}`, err);
   }
+}
+
+const appUrl = () => process.env.NEXT_PUBLIC_APP_URL ?? "https://app.sealme.net";
+
+// Every event that names a lead or a deal also links to it in SealMe, and
+// one about a deal carries its value as a number (feeDisplay is free text
+// like "$4,000 a month"), so a receiver can show a button and add up
+// pipeline without parsing anything.
+async function withLinksAndValue(workspaceId: string, items: EventData[]): Promise<EventData[]> {
+  const str = (v: unknown) => (typeof v === "string" && v ? v : null);
+  const needValue = [...new Set(items.filter((d) => str(d.dealId) && d.dealValue === undefined).map((d) => d.dealId as string))];
+  const fees = needValue.length
+    ? new Map((await prisma.deal.findMany({ where: { workspaceId, id: { in: needValue } }, select: { id: true, feeDisplay: true } })).map((d) => [d.id, d.feeDisplay]))
+    : new Map<string, string>();
+  return items.map((d) => {
+    const leadId = str(d.leadId);
+    const dealId = str(d.dealId);
+    const fee = dealId ? (str(d.feeDisplay) ?? fees.get(dealId) ?? null) : null;
+    return {
+      ...d,
+      ...(leadId ? { leadUrl: `${appUrl()}/leads/${leadId}` } : {}),
+      ...(dealId ? { dealUrl: `${appUrl()}/deals/${dealId}` } : {}),
+      ...(dealId && str(d.contractId) ? { contractUrl: `${appUrl()}/deals/${dealId}/contract` } : {}),
+      ...(dealId && d.dealValue === undefined ? { feeDisplay: fee, dealValue: fee ? parseFee(fee) || null : null, currency: fee ? feeCurrency(fee) : null } : {}),
+    };
+  });
 }
 
 type SendResult = { ok: boolean; status: number | null; error: string | null };
@@ -215,10 +252,11 @@ export async function leadWebhookData(workspaceId: string, leadIds: string[]): P
   if (leadIds.length === 0) return [];
   const leads = await prisma.lead.findMany({
     where: { workspaceId, id: { in: leadIds } },
-    select: { id: true, name: true, company: true, title: true, email: true, phone: true, stage: true, source: true, createdAt: true, owner: { select: { name: true, email: true } } },
+    select: { id: true, externalId: true, name: true, company: true, title: true, email: true, phone: true, stage: true, source: true, createdAt: true, owner: { select: { name: true, email: true } } },
   });
   return leads.map((l) => ({
     leadId: l.id,
+    externalId: l.externalId,
     name: l.name,
     company: l.company,
     title: l.title,
@@ -232,8 +270,9 @@ export async function leadWebhookData(workspaceId: string, leadIds: string[]): P
 }
 
 export async function dispatchLeadsCreated(workspaceId: string, leadIds: string[]): Promise<void> {
+  if (leadIds.length === 0) return;
   try {
-    await dispatchWebhookEvents(workspaceId, "lead.created", await leadWebhookData(workspaceId, leadIds));
+    await dispatchWebhookEvents(workspaceId, "lead.created", () => leadWebhookData(workspaceId, leadIds));
   } catch (err) {
     console.error("Couldn't queue lead.created", err);
   }
@@ -243,22 +282,26 @@ export async function dispatchLeadsCreated(workspaceId: string, leadIds: string[
 // recorder, a pasted transcript, a lead conversion, a renewal or the API.
 export async function dispatchDealCreated(workspaceId: string, dealId: string): Promise<void> {
   try {
-    const deal = await prisma.deal.findUnique({
-      where: { id: dealId },
-      select: { id: true, status: true, source: true, service: true, feeDisplay: true, createdAt: true, client: { select: { id: true, name: true, company: true } }, owner: { select: { name: true, email: true } } },
-    });
-    if (!deal) return;
-    await dispatchWebhookEvent(workspaceId, "deal.created", {
-      dealId: deal.id,
-      clientId: deal.client.id,
-      clientName: deal.client.name,
-      company: deal.client.company,
-      service: deal.service,
-      feeDisplay: deal.feeDisplay,
-      status: deal.status,
-      source: deal.source,
-      owner: deal.owner ? { name: deal.owner.name, email: deal.owner.email } : null,
-      createdAt: deal.createdAt.toISOString(),
+    await dispatchWebhookEvents(workspaceId, "deal.created", async () => {
+      const deal = await prisma.deal.findUnique({
+        where: { id: dealId },
+        select: { id: true, status: true, source: true, service: true, feeDisplay: true, createdAt: true, client: { select: { id: true, name: true, company: true } }, owner: { select: { name: true, email: true } } },
+      });
+      if (!deal) return [];
+      return [
+        {
+          dealId: deal.id,
+          clientId: deal.client.id,
+          clientName: deal.client.name,
+          company: deal.client.company,
+          service: deal.service,
+          feeDisplay: deal.feeDisplay,
+          status: deal.status,
+          source: deal.source,
+          owner: deal.owner ? { name: deal.owner.name, email: deal.owner.email } : null,
+          createdAt: deal.createdAt.toISOString(),
+        },
+      ];
     });
   } catch (err) {
     console.error("Couldn't queue deal.created", err);

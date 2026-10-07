@@ -27,8 +27,11 @@ export const EXAMPLES: Record<SchemaName, Record<string, unknown>> = {
     source: "api",
     service: "Brand identity refresh",
     fee: "$8,500",
+    value: 8500,
+    currency: "USD",
     client: { id: "cmcli4h1x0002", name: "Avery Chen", company: "Northwind Studio", email: "avery.chen@example.com" },
     owner: { name: "Dana Lopez", email: "dana@yourcompany.com" },
+    url: "https://app.sealme.net/deals/cmdeal8f2k0001",
     createdAt: iso,
     updatedAt: iso,
   },
@@ -38,8 +41,11 @@ export const EXAMPLES: Record<SchemaName, Record<string, unknown>> = {
     source: "api",
     service: "Brand identity refresh",
     fee: "$8,500",
+    value: 8500,
+    currency: "USD",
     client: { id: "cmcli4h1x0002", name: "Avery Chen", company: "Northwind Studio", email: "avery.chen@example.com" },
     owner: { name: "Dana Lopez", email: "dana@yourcompany.com" },
+    url: "https://app.sealme.net/deals/cmdeal8f2k0001",
     createdAt: iso,
     updatedAt: iso,
     summary: "Avery wants a full brand refresh before the spring launch. Agreed on $8,500, half upfront.",
@@ -49,9 +55,9 @@ export const EXAMPLES: Record<SchemaName, Record<string, unknown>> = {
       { key: "fee", label: "Fee", value: "$8,500", status: "extracted" },
       { key: "startDate", label: "Start date", value: null, status: "missing" },
     ],
-    contract: { id: "cmcon2b9q0003", status: "sent", sentAt: iso, signedAt: null },
+    contract: { id: "cmcon2b9q0003", status: "sent", sentAt: iso, signedAt: null, url: "https://app.sealme.net/deals/cmdeal8f2k0001/contract" },
   },
-  Client: { id: "cmcli4h1x0002", name: "Avery Chen", company: "Northwind Studio", email: "avery.chen@example.com", billingAddress: null, createdAt: iso },
+  Client: { id: "cmcli4h1x0002", name: "Avery Chen", company: "Northwind Studio", email: "avery.chen@example.com", billingAddress: null, url: "https://app.sealme.net/clients/cmcli4h1x0002", createdAt: iso },
   Contract: {
     id: "cmcon2b9q0003",
     status: "signed",
@@ -64,10 +70,12 @@ export const EXAMPLES: Record<SchemaName, Record<string, unknown>> = {
     signerName: "Avery Chen",
     renewalDate: "2027-10-04T00:00:00.000Z",
     autoRenews: false,
+    url: "https://app.sealme.net/deals/cmdeal8f2k0001/contract",
   },
   Template: { id: "cmtpl7c3d0004", name: "Service Agreement", description: "General-purpose agreement for project work.", locked: false },
   Lead: {
     id: "cmlead5e6f0005",
+    externalId: "hs-48213",
     name: "Sam Rivera",
     company: "Acme Freight",
     title: "Head of Revenue Operations",
@@ -88,6 +96,7 @@ export const EXAMPLES: Record<SchemaName, Record<string, unknown>> = {
     lastContactedAt: iso,
     convertedDealId: null,
     convertedAt: null,
+    url: "https://app.sealme.net/leads/cmlead5e6f0005",
     createdAt: iso,
     updatedAt: iso,
   },
@@ -100,8 +109,11 @@ export const SCHEMA_FIELDS: Record<SchemaName, DocField[]> = {
     { name: "source", type: "string", description: "Where the deal came from: zoom, meet, local, upload, manual, renewal or api." },
     { name: "service", type: "string", description: "What's being sold, as agreed on the call." },
     { name: "fee", type: "string", description: "The agreed fee, as written (e.g. \"$4,000 a month\")." },
+    { name: "value", type: "number | null", description: "The fee as a number (\"$4,000 a month\" is 4000; \"$8.5k\" is 8500). Null when the fee has no number in it." },
+    { name: "currency", type: "string | null", description: "ISO code read from the fee (\"$\" is USD, \"€\" EUR...). Null when the fee doesn't say." },
     { name: "client", type: "object", description: "{ id, name, company, email }" },
     { name: "owner", type: "object | null", description: "{ name, email } of the teammate who owns the deal." },
+    { name: "url", type: "string", description: "Where the deal opens in SealMe." },
     { name: "createdAt", type: "string", description: "ISO 8601." },
     { name: "updatedAt", type: "string", description: "ISO 8601." },
   ],
@@ -109,7 +121,7 @@ export const SCHEMA_FIELDS: Record<SchemaName, DocField[]> = {
     { name: "…", type: "", description: "Everything in Deal, plus:" },
     { name: "summary", type: "string | null", description: "A short summary of the call." },
     { name: "terms", type: "array", description: "The agreed terms: { key, label, value, status }, status being extracted, confirmed, user_edited or missing." },
-    { name: "contract", type: "object | null", description: "{ id, status, sentAt, signedAt } once a contract exists." },
+    { name: "contract", type: "object | null", description: "{ id, status, sentAt, signedAt, url } once a contract exists." },
   ],
   Client: [
     { name: "id", type: "string", description: "Client id." },
@@ -117,6 +129,7 @@ export const SCHEMA_FIELDS: Record<SchemaName, DocField[]> = {
     { name: "company", type: "string", description: "Company name." },
     { name: "email", type: "string | null", description: "Where contracts are sent." },
     { name: "billingAddress", type: "string | null", description: "Billing address." },
+    { name: "url", type: "string", description: "Where the client opens in SealMe." },
     { name: "createdAt", type: "string", description: "ISO 8601." },
   ],
   Contract: [
@@ -128,6 +141,7 @@ export const SCHEMA_FIELDS: Record<SchemaName, DocField[]> = {
     { name: "signerName", type: "string | null", description: "Who signed for the client." },
     { name: "renewalDate", type: "string | null", description: "When the agreement renews, read from the signed contract." },
     { name: "autoRenews", type: "boolean | null", description: "Whether it renews on its own." },
+    { name: "url", type: "string", description: "Where the contract opens in SealMe." },
   ],
   Template: [
     { name: "id", type: "string", description: "Template id, for POST /deals." },
@@ -137,6 +151,7 @@ export const SCHEMA_FIELDS: Record<SchemaName, DocField[]> = {
   ],
   Lead: [
     { name: "id", type: "string", description: "Lead id." },
+    { name: "externalId", type: "string | null", description: "Your own id for the lead, if you sent one." },
     { name: "name, company, title, email, phone, domain", type: "string | null", description: "Who the person is. Phone is E.164 when it parses." },
     { name: "stage", type: "string", description: "new, contacted, interested, meeting, converted or lost." },
     { name: "interest", type: "string | null", description: "cold, warm or hot." },
@@ -146,6 +161,7 @@ export const SCHEMA_FIELDS: Record<SchemaName, DocField[]> = {
     { name: "source", type: "string", description: "manual, paste, csv, xlsx, hubspot, salesforce, call or api." },
     { name: "owner", type: "object | null", description: "{ name, email } of the rep it's assigned to." },
     { name: "convertedDealId / convertedAt", type: "string | null", description: "Set once the lead became a deal." },
+    { name: "url", type: "string", description: "Where the lead opens in SealMe." },
     { name: "lastContactedAt, createdAt, updatedAt", type: "string", description: "ISO 8601." },
   ],
 };
@@ -154,6 +170,7 @@ const cursorParams: DocField[] = [{ name: "cursor", type: "string", description:
 const updatedSince: DocField = { name: "updatedSince", type: "string", description: "ISO 8601. Only what changed at or after this time." };
 const leadBody: DocField[] = [
   { name: "name", type: "string", required: true, description: "The person's name. Required on create." },
+  { name: "externalId", type: "string", description: "Your own id for the lead (your CRM's or dialer's), up to 200 characters. Unique in the workspace: a second lead with the same one answers 409. Comes back on the lead and in every webhook about it." },
   { name: "company", type: "string", description: "Company." },
   { name: "title", type: "string", description: "Job title." },
   { name: "email", type: "string", description: "Email. A lead with the same email or phone already here answers 409." },
@@ -277,6 +294,7 @@ export const ENDPOINTS: DocEndpoint[] = [
     query: [
       { name: "stage", type: "string", description: "new, contacted, interested, meeting, converted or lost." },
       { name: "ownerEmail", type: "string", description: "Only one rep's leads." },
+      { name: "externalId", type: "string", description: "The lead with this externalId (your own id)." },
       updatedSince,
       ...cursorParams,
     ],
@@ -297,13 +315,13 @@ export const ENDPOINTS: DocEndpoint[] = [
     method: "POST",
     path: "/leads",
     summary: "Add a lead",
-    description: "Adds a lead. If one with the same email or phone is already here the answer is 409 with its id, so a sync can update it instead. Fires lead.created.",
+    description: "Adds a lead. If one with the same externalId, email or phone is already here the answer is 409 with its id, so a sync can update it instead. Fires lead.created.",
     write: true,
     body: leadBody,
     exampleBody: { name: "Sam Rivera", company: "Acme Freight", email: "sam.rivera@example.com", phone: "+1 202 555 0161", ownerEmail: "dana@yourcompany.com" },
     responses: [
       { status: 201, description: "The new lead.", schema: "Lead" },
-      { status: 409, description: "Already here.", example: { error: "A lead with this email or phone already exists", existingId: "cmlead5e6f0005" } },
+      { status: 409, description: "Already here.", example: { error: "A lead with this externalId already exists", existingId: "cmlead5e6f0005" } },
       { status: 400, description: "Something in the body is wrong; the error says what." },
     ],
   },
@@ -313,29 +331,101 @@ export const ENDPOINTS: DocEndpoint[] = [
     method: "PATCH",
     path: "/leads/{id}",
     summary: "Update a lead",
-    description: "Changes only the fields you send; null clears one. Setting stage to converted records when.",
+    description: "Changes only the fields you send; null clears one. Setting stage to converted records when. Fires lead.updated when something changed.",
     write: true,
     body: leadBody.map((f) => ({ ...f, required: false })),
     exampleBody: { stage: "meeting", nextStep: "Demo with the RevOps team", nextStepAt: "2026-10-20" },
-    responses: [{ status: 200, description: "The updated lead.", schema: "Lead" }, { status: 404, description: "No such lead in this workspace." }],
+    responses: [
+      { status: 200, description: "The updated lead.", schema: "Lead" },
+      { status: 404, description: "No such lead in this workspace." },
+      { status: 409, description: "Another lead already has that externalId.", example: { error: "Another lead already has this externalId", existingId: "cmlead9a1b0007" } },
+    ],
   },
 ];
 
 export type DocEvent = { name: string; when: string; data: Record<string, unknown> };
 
+const deal = { dealUrl: "https://app.sealme.net/deals/cmdeal8f2k0001", feeDisplay: "$8,500", dealValue: 8500, currency: "USD" };
+const contractLinks = { ...deal, contractUrl: "https://app.sealme.net/deals/cmdeal8f2k0001/contract" };
+const leadUrl = "https://app.sealme.net/leads/cmlead5e6f0005";
+const leadNow = { leadId: "cmlead5e6f0005", externalId: "hs-48213", name: "Sam Rivera", company: "Acme Freight", title: "Head of Revenue Operations", email: "sam.rivera@example.com", phone: "+12025550161" };
+const rep = { name: "Dana Lopez", email: "dana@yourcompany.com" };
+
+// Every event about a lead or a deal also carries leadUrl / dealUrl (and
+// contractUrl with a contract), and one about a deal its value as a number.
 export const EVENTS: DocEvent[] = [
   {
     name: "deal.created",
     when: "A deal is started: from a call, a pasted transcript, a converted lead, a renewal or the API. Deals started from a transcript fire once their terms are in.",
-    data: { dealId: "cmdeal8f2k0001", clientId: "cmcli4h1x0002", clientName: "Avery Chen", company: "Northwind Studio", service: "Brand identity refresh", feeDisplay: "$8,500", status: "ready", source: "api", owner: { name: "Dana Lopez", email: "dana@yourcompany.com" }, createdAt: iso },
+    data: { dealId: "cmdeal8f2k0001", clientId: "cmcli4h1x0002", clientName: "Avery Chen", company: "Northwind Studio", service: "Brand identity refresh", feeDisplay: "$8,500", status: "ready", source: "api", owner: rep, createdAt: iso, dealUrl: deal.dealUrl, dealValue: 8500, currency: "USD" },
   },
-  { name: "contract.sent", when: "A contract goes out for signature.", data: { dealId: "cmdeal8f2k0001", contractId: "cmcon2b9q0003", clientName: "Avery Chen", signLink: "https://app.sealme.net/sign/cmcon2b9q0003" } },
-  { name: "contract.viewed", when: "The client opens the contract for the first time.", data: { dealId: "cmdeal8f2k0001", contractId: "cmcon2b9q0003", clientName: "Avery Chen", viewedAt: iso } },
-  { name: "contract.signed", when: "Everyone who has to sign has signed.", data: { dealId: "cmdeal8f2k0001", contractId: "cmcon2b9q0003", clientName: "Avery Chen", signerName: "Avery Chen", signedAt: iso } },
-  { name: "contract.declined", when: "A signer declines and asks for changes.", data: { dealId: "cmdeal8f2k0001", contractId: "cmcon2b9q0003", signerName: "Jordan Patel", signerEmail: "jordan.patel@example.com", reason: "Payment terms need to be net 30.", declinedAt: iso } },
-  { name: "contract.expired", when: "A sent contract passes its expiry date unsigned.", data: { dealId: "cmdeal8f2k0001", contractId: "cmcon2b9q0003", sentAt: iso, expiredAt: iso } },
-  { name: "lead.created", when: "A lead is added: by hand, from a file, from HubSpot or Salesforce, or through the API.", data: { leadId: "cmlead5e6f0005", name: "Sam Rivera", company: "Acme Freight", title: "Head of Revenue Operations", email: "sam.rivera@example.com", phone: "+12025550161", stage: "new", source: "hubspot", owner: { name: "Dana Lopez", email: "dana@yourcompany.com" }, createdAt: iso } },
-  { name: "lead.converted", when: "A lead is turned into a deal.", data: { leadId: "cmlead5e6f0005", dealId: "cmdeal8f2k0001", clientId: "cmcli4h1x0002", name: "Sam Rivera", company: "Acme Freight", convertedAt: iso } },
+  { name: "contract.sent", when: "A contract goes out for signature.", data: { dealId: "cmdeal8f2k0001", contractId: "cmcon2b9q0003", clientName: "Avery Chen", signLink: "https://app.sealme.net/sign/cmcon2b9q0003", ...contractLinks } },
+  { name: "contract.viewed", when: "The client opens the contract for the first time.", data: { dealId: "cmdeal8f2k0001", contractId: "cmcon2b9q0003", clientName: "Avery Chen", viewedAt: iso, ...contractLinks } },
+  { name: "contract.signed", when: "Everyone who has to sign has signed.", data: { dealId: "cmdeal8f2k0001", contractId: "cmcon2b9q0003", clientName: "Avery Chen", signerName: "Avery Chen", signedAt: iso, ...contractLinks } },
+  { name: "contract.declined", when: "A signer declines and asks for changes.", data: { dealId: "cmdeal8f2k0001", contractId: "cmcon2b9q0003", signerName: "Jordan Patel", signerEmail: "jordan.patel@example.com", reason: "Payment terms need to be net 30.", declinedAt: iso, ...contractLinks } },
+  { name: "contract.expired", when: "A sent contract passes its expiry date unsigned.", data: { dealId: "cmdeal8f2k0001", contractId: "cmcon2b9q0003", sentAt: iso, expiredAt: iso, ...contractLinks } },
+  { name: "lead.created", when: "A lead is added: by hand, from a file, from HubSpot or Salesforce, or through the API.", data: { ...leadNow, stage: "new", source: "hubspot", owner: rep, createdAt: iso, leadUrl } },
+  {
+    name: "lead.updated",
+    when: "Something about a lead changes: its stage, its owner, contact details or what was learned on a call. changed lists the fields; previousStage is set when the stage moved. Fires alongside lead.converted, meeting.booked and call.completed when those change the lead.",
+    data: { ...leadNow, stage: "meeting", source: "api", owner: rep, createdAt: iso, changed: ["stage", "nextStep", "nextStepAt"], previousStage: "contacted", updatedAt: iso, leadUrl },
+  },
+  { name: "lead.converted", when: "A lead is turned into a deal.", data: { leadId: "cmlead5e6f0005", dealId: "cmdeal8f2k0001", clientId: "cmcli4h1x0002", name: "Sam Rivera", company: "Acme Freight", convertedAt: iso, leadUrl, ...deal } },
+  {
+    name: "call.completed",
+    when: "SealMe is done with a call: its notes are written (status processed, with the outcome), or it was set aside (status skipped: nobody picked up, too short, nothing recorded...). A call processed again later fires again with the same callId.",
+    data: {
+      callId: "cmcall3d4e0006",
+      leadId: "cmlead5e6f0005",
+      externalId: "hs-48213",
+      leadName: "Sam Rivera",
+      company: "Acme Freight",
+      dealId: null,
+      status: "processed",
+      kind: "cold",
+      outcome: "meeting_booked",
+      connected: true,
+      skipReason: null,
+      summary: "Sam runs RevOps for 40 reps. Contracts take a week after a call. Agreed to a demo Tuesday at 2pm.",
+      source: "phone",
+      toNumber: "+12025550161",
+      recorded: true,
+      durationSec: 312,
+      rep,
+      startedAt: iso,
+      endedAt: iso,
+      completedAt: iso,
+      leadUrl,
+    },
+  },
+  {
+    name: "meeting.booked",
+    when: "A cold call ends with a meeting, or someone puts a sales call with a lead on a rep's day by hand (source manual). date and time are in timeZone; either can be null when the call didn't pin it down.",
+    data: { leadId: leadNow.leadId, externalId: leadNow.externalId, leadName: leadNow.name, company: leadNow.company, title: leadNow.title, email: leadNow.email, phone: leadNow.phone, date: "2026-10-20", time: "14:00", timeZone: "America/New_York", rep, source: "call", callId: "cmcall3d4e0006", taskId: "cmtask7g8h0008", bookedAt: iso, leadUrl },
+  },
+  {
+    name: "task.completed",
+    when: "A task is marked done or skipped: by a person (completedBy), or because a processed call covered it (callId).",
+    data: {
+      taskId: "cmtask7g8h0008",
+      type: "cold_call",
+      status: "done",
+      leadId: "cmlead5e6f0005",
+      externalId: "hs-48213",
+      leadName: "Sam Rivera",
+      dealId: null,
+      assignee: rep,
+      dueDate: "2026-10-07",
+      dueTime: null,
+      timeZone: "America/New_York",
+      priority: "normal",
+      note: null,
+      callId: "cmcall3d4e0006",
+      completedBy: null,
+      completedAt: iso,
+      leadUrl,
+    },
+  },
 ];
 
 export const BASE_URL = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://app.sealme.net"}/api/v1`;

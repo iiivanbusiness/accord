@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { dispatchLeadsCreated } from "@/lib/webhooks";
+import { dispatchLeadsUpdated, leadChanges } from "@/lib/webhook-events";
 import { requireProspecting } from "@/lib/prospecting";
 import { normalizePhone } from "@/lib/phone";
 import { isLeadStage, LEAD_INTERESTS } from "@/lib/lead-stages";
@@ -77,12 +78,13 @@ export async function createLead(formData: FormData) {
 export async function updateLead(leadId: string, formData: FormData) {
   const workspace = await requireProspecting();
   const access = await leadAccess();
-  const existing = await prisma.lead.findFirst({ where: { id: leadId, workspaceId: workspace.id, ...access.where }, select: { id: true, ownerId: true } });
+  const existing = await prisma.lead.findFirst({ where: { id: leadId, workspaceId: workspace.id, ...access.where } });
   if (!existing) throw new Error("Lead not found");
 
   const fields = leadFieldsFrom(formData);
   const ownerId = access.canAssign ? await resolveOwner(workspace.id, text(formData, "ownerId")) : existing.ownerId;
   await prisma.lead.update({ where: { id: leadId }, data: { ...fields, ownerId } });
+  await dispatchLeadsUpdated(workspace.id, [leadChanges(leadId, existing, { ...fields, ownerId })]);
   revalidatePath("/leads");
   revalidatePath(`/leads/${leadId}`);
   redirect(`/leads/${leadId}?saved=1`);
@@ -92,6 +94,8 @@ export async function setLeadStage(leadId: string, stage: string) {
   const workspace = await requireProspecting();
   const access = await leadAccess();
   if (!isLeadStage(stage)) throw new Error("Unknown stage");
+  const before = await prisma.lead.findFirst({ where: { id: leadId, workspaceId: workspace.id, ...access.where }, select: { stage: true } });
+  if (!before) throw new Error("Lead not found");
   // convertedAt records the first time it became a customer (for /team);
   // moving it back out of "converted" clears it.
   const result = await prisma.lead.updateMany({
@@ -102,6 +106,7 @@ export async function setLeadStage(leadId: string, stage: string) {
   if (stage === "converted") {
     await prisma.lead.updateMany({ where: { id: leadId, workspaceId: workspace.id, convertedAt: null }, data: { convertedAt: new Date() } });
   }
+  await dispatchLeadsUpdated(workspace.id, [leadChanges(leadId, before, { stage })]);
   revalidatePath("/leads");
   revalidatePath(`/leads/${leadId}`);
 }

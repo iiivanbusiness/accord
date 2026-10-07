@@ -12,6 +12,7 @@ import { extractPlaceholderKeys } from "@/lib/contract";
 import { leadHistoryNote } from "@/lib/lead-history";
 import { clientCrmIds } from "@/lib/crm-leads";
 import { dispatchDealCreated, dispatchWebhookEvent } from "@/lib/webhooks";
+import { dispatchLeadsUpdated, leadChanges } from "@/lib/webhook-events";
 import { notifySlack } from "@/lib/slack";
 import { syncDealToHubspot } from "@/lib/hubspot";
 import { syncDealToSalesforce } from "@/lib/salesforce";
@@ -108,6 +109,7 @@ export async function convertLeadToDeal(leadId: string, input: ConvertInput): Pr
   after(async () => {
     try {
       await dispatchDealCreated(workspace.id, deal.id);
+      await dispatchLeadsUpdated(workspace.id, [leadChanges(lead.id, lead, { stage: "converted" })]);
       await dispatchWebhookEvent(workspace.id, "lead.converted", { leadId: lead.id, dealId: deal.id, clientId: deal.clientId, name: lead.name, company: lead.company, convertedAt: new Date().toISOString() });
       await notifySlack(workspace.id, { type: "deal.created", dealId: deal.id, clientName, service });
       await syncDealToHubspot(workspace.id, deal.id);

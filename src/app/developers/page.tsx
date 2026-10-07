@@ -241,6 +241,9 @@ export default function DevelopersPage() {
               <strong style={{ color: "var(--ink)" }}>Answer 2xx quickly</strong> (within 10 seconds) and do the work afterwards. Anything else (an error, a timeout, a redirect) is retried after 1 minute, 5 minutes, 30 minutes, 2, 6 and 12 hours: {MAX_WEBHOOK_ATTEMPTS} attempts over about a day. Failed deliveries can be sent again from Settings. Because of retries the same event can arrive twice, so skip an <code className="font-mono-tab">id</code> you&apos;ve already handled. Order isn&apos;t guaranteed.
             </p>
             <p>Endpoints must be public https URLs; private and local addresses are refused.</p>
+            <p>
+              Every event about a lead or a deal links to it in SealMe (<code className="font-mono-tab">leadUrl</code>, <code className="font-mono-tab">dealUrl</code>, and <code className="font-mono-tab">contractUrl</code> with a contract), and one about a deal carries its value as a number (<code className="font-mono-tab">dealValue</code>, <code className="font-mono-tab">currency</code>) next to the fee as written. A lead you added with an <code className="font-mono-tab">externalId</code> carries it in every event about it.
+            </p>
             <div className="flex flex-col gap-4">
               {EVENTS.map((ev) => (
                 <article key={ev.name} id={`event-${ev.name.replace(".", "-")}`} className="card flex scroll-mt-24 flex-col gap-2.5 p-4 sm:p-5">

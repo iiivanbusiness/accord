@@ -4,6 +4,7 @@ import { UNREACHED_OUTCOMES } from "@/lib/call-outcomes";
 import { normalizePhone } from "@/lib/phone";
 import { isValidDay } from "@/lib/tasks";
 import { dayInZone } from "@/lib/viewer-time";
+import { dispatchCallCompleted, dispatchLeadsUpdated, dispatchMeetingsBooked, dispatchTasksCompleted, leadChanges } from "@/lib/webhook-events";
 import type { Lead } from "@/generated/prisma/client";
 
 const STAGE_ORDER: Record<string, number> = { new: 0, contacted: 1, interested: 2, meeting: 3 };
@@ -86,32 +87,31 @@ export async function applyColdCall({ workspaceId, userId, lead, transcript, tim
     processedAt: now,
   };
 
-  const [savedCall] = await prisma.$transaction([
+  const leadData = {
+    summary: result.summary || lead.summary,
+    ...(stage ? { stage } : {}),
+    ...(reached
+      ? {
+          lastContactedAt: now,
+          ...(result.interest ? { interest: result.interest } : {}),
+          ...(result.isDecisionMaker !== null ? { isDecisionMaker: result.isDecisionMaker } : {}),
+          ...(result.painPoints ? { painPoints: result.painPoints } : {}),
+          ...(result.objections ? { objections: result.objections } : {}),
+          ...(result.nextStep ? { nextStep: result.nextStep, nextStepAt } : {}),
+          // Details someone typed in by hand are never overwritten.
+          ...(!lead.title && result.title ? { title: result.title } : {}),
+          ...(!lead.company && result.company ? { company: result.company } : {}),
+          ...(!lead.email && email ? { email } : {}),
+          ...(!lead.phone && normalizePhone(result.phone) ? { phone: normalizePhone(result.phone) } : {}),
+        }
+      : {}),
+  };
+
+  const saved = await prisma.$transaction([
     phoneCallId
       ? prisma.phoneCall.update({ where: { id: phoneCallId }, data: callData })
       : prisma.phoneCall.create({ data: { ...callData, workspaceId, userId, source, startedAt: now } }),
-    prisma.lead.update({
-      where: { id: lead.id },
-      data: {
-        summary: result.summary || lead.summary,
-        ...(stage ? { stage } : {}),
-        ...(reached
-          ? {
-              lastContactedAt: now,
-              ...(result.interest ? { interest: result.interest } : {}),
-              ...(result.isDecisionMaker !== null ? { isDecisionMaker: result.isDecisionMaker } : {}),
-              ...(result.painPoints ? { painPoints: result.painPoints } : {}),
-              ...(result.objections ? { objections: result.objections } : {}),
-              ...(result.nextStep ? { nextStep: result.nextStep, nextStepAt } : {}),
-              // Details someone typed in by hand are never overwritten.
-              ...(!lead.title && result.title ? { title: result.title } : {}),
-              ...(!lead.company && result.company ? { company: result.company } : {}),
-              ...(!lead.email && email ? { email } : {}),
-              ...(!lead.phone && normalizePhone(result.phone) ? { phone: normalizePhone(result.phone) } : {}),
-            }
-          : {}),
-      },
-    }),
+    prisma.lead.update({ where: { id: lead.id }, data: leadData }),
     ...(closable ? [prisma.task.update({ where: { id: closable.id }, data: { status: "done", completedAt: now } })] : []),
     ...(followUp
       ? [
@@ -132,5 +132,26 @@ export async function applyColdCall({ workspaceId, userId, lead, transcript, tim
       : []),
   ]);
 
-  return { outcome: result.outcome, stage, closedTask: closable?.type ?? null, followUp, costUsd: result.usage.costUsd, callId: savedCall.id };
+  const callId = saved[0].id;
+  const followUpTaskId = followUp ? (saved[saved.length - 1] as { id: string }).id : null;
+
+  await dispatchLeadsUpdated(workspaceId, [leadChanges(lead.id, lead, leadData)]);
+  await dispatchCallCompleted(workspaceId, callId);
+  if (closable) await dispatchTasksCompleted(workspaceId, [closable.id], { callId });
+  if (result.outcome === "meeting_booked") {
+    await dispatchMeetingsBooked(workspaceId, [
+      {
+        leadId: lead.id,
+        repId: userId,
+        date: nextStepAt ? result.nextStepDate : null,
+        time: nextStepAt ? result.nextStepTime : null,
+        timeZone,
+        source: "call",
+        callId,
+        taskId: followUp?.type === "sales_call" ? followUpTaskId : null,
+      },
+    ]);
+  }
+
+  return { outcome: result.outcome, stage, closedTask: closable?.type ?? null, followUp, costUsd: result.usage.costUsd, callId };
 }

@@ -8,6 +8,7 @@ import { isValidDay, isValidTime, isValidTimeZone, TASK_PRIORITIES, TASK_TYPES }
 import { dayInZone } from "@/lib/viewer-time";
 import { currentUserWithRole } from "@/lib/permissions";
 import { notifyTasksAssigned } from "@/lib/task-notify";
+import { dispatchLeadsUpdated, dispatchMeetingsBooked, dispatchTasksCompleted } from "@/lib/webhook-events";
 
 export type TaskInput = {
   assigneeId: string;
@@ -34,6 +35,11 @@ function clean(input: TaskInput) {
   };
 }
 
+// A sales call put on someone's day by hand is a booked meeting.
+function bookedByHand(leadId: string, taskId: string, repId: string, task: ReturnType<typeof clean>) {
+  return { leadId, taskId, repId, date: task.dueDate.toISOString().slice(0, 10), time: task.dueTime, timeZone: task.timezone, source: "manual" as const };
+}
+
 async function activeMember(workspaceId: string, userId: string): Promise<string | null> {
   const u = await prisma.user.findFirst({ where: { id: userId, workspaceId, deactivatedAt: null }, select: { id: true } });
   return u?.id ?? null;
@@ -54,17 +60,24 @@ export async function assignLeadTasks(input: TaskInput & { leadIds: string[]; ma
 
   const leads = await prisma.lead.findMany({
     where: { workspaceId: workspace.id, id: { in: input.leadIds }, AND: [access.where] },
-    select: { id: true },
+    select: { id: true, ownerId: true },
   });
   const ids = leads.map((l) => l.id);
   if (ids.length === 0) throw new Error("None of those leads are available");
 
-  await prisma.$transaction([
-    prisma.task.createMany({
+  const created = await prisma.$transaction(async (tx) => {
+    const rows = await tx.task.createManyAndReturn({
       data: ids.map((leadId) => ({ workspaceId: workspace.id, leadId, assigneeId, createdById: access.userId, ...task })),
-    }),
-    ...(input.makeOwner ? [prisma.lead.updateMany({ where: { id: { in: ids } }, data: { ownerId: assigneeId } })] : []),
-  ]);
+      select: { id: true, leadId: true },
+    });
+    if (input.makeOwner) await tx.lead.updateMany({ where: { id: { in: ids } }, data: { ownerId: assigneeId } });
+    return rows;
+  });
+
+  if (input.makeOwner) {
+    await dispatchLeadsUpdated(workspace.id, leads.filter((l) => l.ownerId !== assigneeId).map((l) => ({ leadId: l.id, changed: ["owner"], previousStage: null })));
+  }
+  if (task.type === "sales_call") await dispatchMeetingsBooked(workspace.id, created.map((t) => bookedByHand(t.leadId!, t.id, assigneeId, task)));
 
   if (assigneeId !== access.userId) {
     const actor = await currentUserWithRole();
@@ -88,7 +101,8 @@ export async function createLeadTask(leadId: string, input: TaskInput): Promise<
   const assigneeId = access.canAssign ? await activeMember(workspace.id, input.assigneeId) : access.userId;
   if (!assigneeId) throw new Error("Pick who it's for");
 
-  await prisma.task.create({ data: { workspaceId: workspace.id, leadId, assigneeId, createdById: access.userId, ...task } });
+  const created = await prisma.task.create({ data: { workspaceId: workspace.id, leadId, assigneeId, createdById: access.userId, ...task }, select: { id: true } });
+  if (task.type === "sales_call") await dispatchMeetingsBooked(workspace.id, [bookedByHand(leadId, created.id, assigneeId, task)]);
   if (assigneeId !== access.userId) {
     const actor = await currentUserWithRole();
     await notifyTasksAssigned({ workspaceId: workspace.id, assigneeId, actorName: actor.name, count: 1, type: task.type, dueDate: task.dueDate, dueTime: task.dueTime, lead });
@@ -102,10 +116,11 @@ export async function setTaskStatus(taskId: string, status: "open" | "done" | "s
   const workspace = await requireProspecting();
   const access = await leadAccess();
   if (!["open", "done", "skipped"].includes(status)) throw new Error("Unknown status");
-  const task = await prisma.task.findFirst({ where: { id: taskId, workspaceId: workspace.id }, select: { id: true, assigneeId: true, leadId: true } });
+  const task = await prisma.task.findFirst({ where: { id: taskId, workspaceId: workspace.id }, select: { id: true, assigneeId: true, leadId: true, status: true } });
   if (!task || (!access.canAssign && task.assigneeId !== access.userId)) throw new Error("Task not found");
 
   await prisma.task.update({ where: { id: task.id }, data: { status, completedAt: status === "open" ? null : new Date() } });
+  if (status !== "open" && task.status === "open") await dispatchTasksCompleted(workspace.id, [task.id], { userId: access.userId });
   if (task.leadId) revalidatePath(`/leads/${task.leadId}`);
   revalidatePath("/dashboard");
 }

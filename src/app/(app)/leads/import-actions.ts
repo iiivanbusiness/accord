@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { dispatchLeadsCreated } from "@/lib/webhooks";
+import { dispatchLeadsUpdated, leadChanges, type LeadChange } from "@/lib/webhook-events";
 import { requireProspecting } from "@/lib/prospecting";
 import { leadAccess } from "@/lib/lead-visibility";
 import { normalizePhone } from "@/lib/phone";
@@ -101,6 +102,7 @@ export async function importLeadsChunk(
   const toCreate: CleanRow[] = [];
   const seen = new Set<string>();
   let updated = 0;
+  const filled: LeadChange[] = [];
   for (const row of cleaned) {
     const key = row.email ?? row.phone;
     if (key && seen.has(key)) {
@@ -128,8 +130,10 @@ export async function importLeadsChunk(
       continue;
     }
     await prisma.lead.update({ where: { id: match.id }, data: fill });
+    filled.push(leadChanges(match.id, match, fill));
     updated++;
   }
+  await dispatchLeadsUpdated(workspace.id, filled);
 
   // Only managers hand leads out; a rep's imported leads are theirs.
   const evenIds = assignment?.mode === "even" ? [...new Set(assignment.ownerIds)].filter((id) => memberIds.has(id)) : [];

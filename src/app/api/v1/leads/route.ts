@@ -8,7 +8,7 @@ import { dispatchLeadsCreated } from "@/lib/webhooks";
 const PAGE_SIZE = 50;
 const NOT_ON = "Leads aren't turned on for this workspace";
 
-// GET /api/v1/leads?stage=&ownerEmail=&updatedSince=&cursor=
+// GET /api/v1/leads?stage=&ownerEmail=&externalId=&updatedSince=&cursor=
 export async function GET(req: Request) {
   const auth = await apiGuard(req);
   if (auth instanceof Response) return auth;
@@ -18,6 +18,7 @@ export async function GET(req: Request) {
   const stage = url.searchParams.get("stage");
   if (stage && !isLeadStage(stage)) return apiError(400, "stage must be one of new, contacted, interested, meeting, converted, lost");
   const ownerEmail = url.searchParams.get("ownerEmail")?.trim().toLowerCase() || null;
+  const externalId = url.searchParams.get("externalId")?.trim() || null;
   const cursor = url.searchParams.get("cursor");
   const since = parseIsoParam(url.searchParams.get("updatedSince"), "updatedSince");
   if ("error" in since) return apiError(400, since.error);
@@ -27,6 +28,7 @@ export async function GET(req: Request) {
       workspaceId: auth.workspaceId,
       ...(stage ? { stage } : {}),
       ...(ownerEmail ? { owner: { email: { equals: ownerEmail, mode: "insensitive" } } } : {}),
+      ...(externalId ? { externalId } : {}),
       ...(since.date ? { updatedAt: { gte: since.date } } : {}),
     },
     select: LEAD_API_SELECT,
@@ -39,8 +41,9 @@ export async function GET(req: Request) {
   return apiJson({ data: page.map(serializeLead), nextCursor: hasMore ? page[page.length - 1].id : null });
 }
 
-// POST /api/v1/leads: add a lead. A lead with the same email or phone
-// already here is a 409 carrying its id, so a sync can PATCH it instead.
+// POST /api/v1/leads: add a lead. A lead with the same externalId, email
+// or phone already here is a 409 carrying its id, so a sync can PATCH it
+// instead.
 export async function POST(req: Request) {
   const auth = await apiGuard(req, { write: true });
   if (auth instanceof Response) return auth;
@@ -52,6 +55,10 @@ export async function POST(req: Request) {
   if ("error" in parsed) return apiError(400, parsed.error);
   const { data } = parsed;
 
+  if (data.externalId) {
+    const duplicate = await prisma.lead.findFirst({ where: { workspaceId: auth.workspaceId, externalId: data.externalId }, select: { id: true } });
+    if (duplicate) return apiError(409, "A lead with this externalId already exists", { existingId: duplicate.id });
+  }
   if (data.email || data.phone) {
     const duplicate = await prisma.lead.findFirst({
       where: {
@@ -63,10 +70,20 @@ export async function POST(req: Request) {
     if (duplicate) return apiError(409, "A lead with this email or phone already exists", { existingId: duplicate.id });
   }
 
-  const lead = await prisma.lead.create({
-    data: { workspaceId: auth.workspaceId, source: "api", ...data, name: data.name as string },
-    select: LEAD_API_SELECT,
-  });
+  let lead;
+  try {
+    lead = await prisma.lead.create({
+      data: { workspaceId: auth.workspaceId, source: "api", ...data, name: data.name as string },
+      select: LEAD_API_SELECT,
+    });
+  } catch (err) {
+    // Two requests with the same externalId at once: the second one loses.
+    if ((err as { code?: string }).code === "P2002" && data.externalId) {
+      const existing = await prisma.lead.findFirst({ where: { workspaceId: auth.workspaceId, externalId: data.externalId }, select: { id: true } });
+      return apiError(409, "A lead with this externalId already exists", { existingId: existing?.id ?? null });
+    }
+    throw err;
+  }
   await dispatchLeadsCreated(auth.workspaceId, [lead.id]);
   return apiJson(serializeLead(lead), 201);
 }

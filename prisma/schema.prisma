@@ -1153,6 +1153,9 @@ model Lead {
   salesforceRecordId   String?
   salesforceRecordType String? // Lead | Contact
   externalOwnerEmail   String? // owner as the CRM had it, kept even when no SealMe user matches
+  // The id the lead has in whatever system sent it through the API (an
+  // agency's dialer or CRM), so they can find and update it by their own id.
+  externalId           String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1163,6 +1166,7 @@ model Lead {
 
   @@unique([workspaceId, hubspotContactId])
   @@unique([workspaceId, salesforceRecordId])
+  @@unique([workspaceId, externalId])
   @@index([workspaceId, ownerId])
   @@index([workspaceId, stage])
   @@index([workspaceId, email])

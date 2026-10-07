@@ -22,6 +22,7 @@ type LeadInput = {
   nextStepAt?: Date | null;
   ownerId?: string | null;
   convertedAt?: Date | null;
+  externalId?: string | null;
 };
 
 // Reads the lead fields a request sent. Only keys that are present are
@@ -73,6 +74,15 @@ export async function parseLeadInput(workspaceId: string, body: Record<string, u
     if (nextStepAt && !/^\d{4}-\d{2}-\d{2}$/.test(nextStepAt)) return { error: "\"nextStepAt\" must be a date like 2026-10-31" };
     data.nextStepAt = nextStepAt ? new Date(`${nextStepAt}T00:00:00Z`) : null;
     if (data.nextStepAt && Number.isNaN(data.nextStepAt.getTime())) return { error: "\"nextStepAt\" isn't a real date" };
+  }
+
+  // Their own id for the lead. A number is fine too; it's kept as text.
+  if (has("externalId")) {
+    const v = body.externalId;
+    if (v !== null && typeof v !== "string" && typeof v !== "number") return { error: "\"externalId\" must be a string" };
+    const id = v === null ? null : String(v).trim();
+    if (id !== null && id.length > 200) return { error: "\"externalId\" can be up to 200 characters" };
+    data.externalId = id || null;
   }
 
   const ownerEmail = str("ownerEmail", 200);

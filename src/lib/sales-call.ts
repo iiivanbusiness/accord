@@ -7,6 +7,7 @@ import { autoGenerateAndSendContract } from "@/lib/auto-send";
 import { createNotification } from "@/lib/notifications";
 import { sendContractReadyEmail } from "@/lib/email";
 import { dispatchWebhookEvent } from "@/lib/webhooks";
+import { dispatchCallCompleted, dispatchLeadsUpdated, dispatchTasksCompleted, leadChanges } from "@/lib/webhook-events";
 import { reportError } from "@/lib/error-report";
 import { recordAiUsage } from "@/lib/ai-usage";
 
@@ -78,15 +79,18 @@ export async function applySalesCall(callId: string, options: { draftOnly?: bool
   });
 
   const now = new Date();
+  const closing = await prisma.task.findMany({ where: { leadId: lead.id, assigneeId: user.id, status: "open", type: "sales_call" }, select: { id: true } });
+  const leadData = { stage: "converted", convertedAt: lead.convertedAt ?? now, convertedClientId: made.clientId, convertedDealId: made.dealId, lastContactedAt: now };
   await prisma.$transaction([
     prisma.phoneCall.update({ where: { id: call.id }, data: { status: "processed", mode: "sales", templateId, dealId: made.dealId, summary: made.summary, connected: true, processedAt: now } }),
     prisma.phoneCall.updateMany({ where: { leadId: lead.id, dealId: null }, data: { dealId: made.dealId } }),
-    prisma.lead.update({
-      where: { id: lead.id },
-      data: { stage: "converted", convertedAt: lead.convertedAt ?? now, convertedClientId: made.clientId, convertedDealId: made.dealId, lastContactedAt: now },
-    }),
-    prisma.task.updateMany({ where: { leadId: lead.id, assigneeId: user.id, status: "open", type: "sales_call" }, data: { status: "done", completedAt: now } }),
+    prisma.lead.update({ where: { id: lead.id }, data: leadData }),
+    prisma.task.updateMany({ where: { id: { in: closing.map((t) => t.id) }, status: "open" }, data: { status: "done", completedAt: now } }),
   ]);
+
+  await dispatchLeadsUpdated(workspace.id, [leadChanges(lead.id, lead, leadData)]);
+  await dispatchCallCompleted(workspace.id, call.id);
+  await dispatchTasksCompleted(workspace.id, closing.map((t) => t.id), { callId: call.id });
 
   await dispatchWebhookEvent(workspace.id, "lead.converted", { leadId: lead.id, dealId: made.dealId, clientId: made.clientId, name: lead.name, company: lead.company, convertedAt: now.toISOString() }).catch((err) =>
     reportError(err, "lead.converted webhook after a sales call", { dealId: made.dealId }),

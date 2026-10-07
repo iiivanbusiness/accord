@@ -9,6 +9,9 @@ export function parseFee(feeDisplay: string): number {
   const match = feeDisplay.match(/[\d.,]+/);
   if (!match) return 0;
   let numStr = match[0];
+  // "$8.5k", "$1.2M", "2 million": the word after the number scales it.
+  const after = feeDisplay.slice((match.index ?? 0) + numStr.length);
+  const scale = /^\s?(k|thousand)\b/i.test(after) ? 1_000 : /^\s?(m|mm|mil|million)\b/i.test(after) ? 1_000_000 : 1;
 
   const lastComma = numStr.lastIndexOf(",");
   const lastDot = numStr.lastIndexOf(".");
@@ -31,6 +34,25 @@ export function parseFee(feeDisplay: string): number {
     numStr = isGrouping ? numStr.replace(/\./g, "") : numStr;
   }
 
-  const parsed = parseFloat(numStr);
+  const parsed = parseFloat(numStr) * scale;
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+const CURRENCY_CODES = ["USD", "EUR", "GBP", "CAD", "AUD", "NZD", "CHF", "SEK", "NOK", "DKK", "PLN", "RSD", "JPY", "INR", "MXN", "BRL", "ZAR", "SGD", "AED"];
+
+// The currency a fee is written in, as an ISO code, when the fee says so
+// ("$", "€", "CA$", "EUR"...). A bare "$" is taken as US dollars; null
+// when there's no sign at all.
+export function feeCurrency(feeDisplay: string): string | null {
+  const code = feeDisplay.toUpperCase().match(new RegExp(`\\b(${CURRENCY_CODES.join("|")})\\b`));
+  if (code) return code[1];
+  if (/(C|CA)\$/.test(feeDisplay)) return "CAD";
+  if (/(A|AU)\$/.test(feeDisplay)) return "AUD";
+  if (/NZ\$/.test(feeDisplay)) return "NZD";
+  if (feeDisplay.includes("€")) return "EUR";
+  if (feeDisplay.includes("£")) return "GBP";
+  if (feeDisplay.includes("¥")) return "JPY";
+  if (feeDisplay.includes("₹")) return "INR";
+  if (feeDisplay.includes("$")) return "USD";
+  return null;
 }

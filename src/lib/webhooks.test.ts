@@ -47,6 +47,9 @@ vi.mock("@/lib/db", () => {
   };
   return {
     prisma: {
+      deal: {
+        findMany: async ({ where }: { where: { id: { in: string[] } } }) => [{ id: "deal_1", feeDisplay: "$8.5k a month" }].filter((d) => where.id.in.includes(d.id)),
+      },
       webhookEndpoint: {
         findMany: async ({ where }: { where: { workspaceId: string; enabled: boolean } }) => db.endpoints.filter((e) => e.workspaceId === where.workspaceId && e.enabled === where.enabled),
       },
@@ -91,7 +94,7 @@ vi.mock("@/lib/outbound-url", () => ({ checkPublicHttpsUrl: async (url: string) 
 // Outside a request after() throws; the code then runs the work inline.
 vi.mock("next/server", () => ({ after: () => { throw new Error("outside request"); } }));
 
-import { attemptDelivery, dispatchWebhookEvent, MAX_WEBHOOK_ATTEMPTS, resendWebhookDelivery, retryDueWebhookDeliveries, sendTestWebhook } from "./webhooks";
+import { attemptDelivery, dispatchWebhookEvent, dispatchWebhookEvents, MAX_WEBHOOK_ATTEMPTS, resendWebhookDelivery, retryDueWebhookDeliveries, sendTestWebhook } from "./webhooks";
 
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
@@ -121,6 +124,32 @@ describe("dispatchWebhookEvent", () => {
     expect(init.headers["X-SealMe-Attempt"]).toBe("1");
     expect(init.redirect).toBe("manual");
     expect(db.deliveries[0]).toMatchObject({ status: "delivered", attempts: 1, responseStatus: 200, error: null });
+  });
+
+  it("links the lead and deal and adds the deal's value as a number", async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://app.example.com");
+    fetchMock.mockResolvedValue(new Response("ok", { status: 200 }));
+    await dispatchWebhookEvent("w1", "deal.created", { dealId: "deal_1", leadId: "lead_1", contractId: "con_1" });
+    const { data } = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(data).toMatchObject({
+      leadUrl: "https://app.example.com/leads/lead_1",
+      dealUrl: "https://app.example.com/deals/deal_1",
+      contractUrl: "https://app.example.com/deals/deal_1/contract",
+      feeDisplay: "$8.5k a month",
+      dealValue: 8500,
+      currency: "USD",
+    });
+    vi.unstubAllEnvs();
+  });
+
+  it("only builds the events when someone is listening", async () => {
+    const build = vi.fn(async () => [{ leadId: "lead_1" }]);
+    await dispatchWebhookEvents("w1", "task.completed", build);
+    expect(build).not.toHaveBeenCalled();
+    fetchMock.mockResolvedValue(new Response("ok", { status: 200 }));
+    await dispatchWebhookEvents("w1", "lead.created", build);
+    expect(build).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("skips endpoints that aren't subscribed or are paused", async () => {

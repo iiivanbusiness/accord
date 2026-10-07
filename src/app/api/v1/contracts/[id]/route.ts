@@ -24,5 +24,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     signerName: contract.signerName,
     renewalDate: contract.renewalDate?.toISOString() ?? null,
     autoRenews: contract.autoRenews,
+    url: `${process.env.NEXT_PUBLIC_APP_URL ?? "https://app.sealme.net"}/deals/${contract.dealId}/contract`,
   });
 }

@@ -17,6 +17,14 @@ describe("parseLeadInput", () => {
     const r = await parseLeadInput("w", { title: null, ownerEmail: null }, { requireName: false });
     expect("data" in r && r.data).toEqual({ title: null, ownerId: null });
   });
+  it("keeps their own id as text, and null clears it", async () => {
+    const a = await parseLeadInput("w", { name: "A", externalId: 48213 }, { requireName: true });
+    expect("data" in a && a.data.externalId).toBe("48213");
+    const b = await parseLeadInput("w", { externalId: null }, { requireName: false });
+    expect("data" in b && b.data).toEqual({ externalId: null });
+    const c = await parseLeadInput("w", { name: "A", externalId: { id: 1 } }, { requireName: true });
+    expect("error" in c && c.error).toMatch(/externalId/);
+  });
   it("explains what's wrong", async () => {
     const cases: [Record<string, unknown>, RegExp][] = [
       [{}, /name.*required/],

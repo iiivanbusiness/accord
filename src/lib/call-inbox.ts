@@ -10,6 +10,7 @@ import { DUAL_CHANNEL_LISTEN_PARAMS, RECORDING_LISTEN_PARAMS, transcriptFromChan
 import { classifyCallKind } from "@/lib/call-kind";
 import { createNotification } from "@/lib/notifications";
 import { isValidTimeZone } from "@/lib/tasks";
+import { dispatchCallCompleted } from "@/lib/webhook-events";
 
 // Calls shorter than this aren't worth a model call: nobody picked up, or
 // the line dropped.
@@ -91,6 +92,7 @@ export async function runCallProcessing(callId: string, timeZone: string, option
       call = { ...call, ...(await transcribePhoneRecording(call.id, call.telnyxRecordingId, call.durationSec, Boolean(call.telnyxClientLegId))) };
       if (!call.transcript) {
         await prisma.phoneCall.update({ where: { id: callId }, data: { status: "skipped", connected: false, extracted: { skipped: "no_speech" }, processedAt: new Date() } });
+        await dispatchCallCompleted(call.workspaceId, callId);
         return;
       }
     }
@@ -100,6 +102,7 @@ export async function runCallProcessing(callId: string, timeZone: string, option
         where: { id: callId },
         data: { status: "skipped", connected: false, extracted: { skipped: skip }, processedAt: new Date() },
       });
+      await dispatchCallCompleted(call.workspaceId, callId);
       return;
     }
     const { lead, userId, transcript } = call;
