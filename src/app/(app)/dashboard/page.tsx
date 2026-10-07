@@ -12,7 +12,7 @@ import GlowRingStat from "@/components/dashboard/GlowRingStat";
 import DashboardGrid from "@/components/dashboard/DashboardGrid";
 import { currentUserWithRole } from "@/lib/permissions";
 import { normalizeDashboard } from "@/lib/dashboard-widgets";
-import { saveDashboardLayout, saveDashboardLines } from "./actions";
+import { hideGetStarted, saveDashboardLayout, saveDashboardLines } from "./actions";
 import { myDayLines } from "./your-day";
 import { teamLines } from "./team-today";
 import { calendarLine, dealLines, notificationsLine } from "./more-lines";
@@ -21,6 +21,9 @@ import { cookieTimeZone } from "@/lib/viewer-time";
 import { openAtStart, resolveLines, type LineId } from "@/lib/dashboard-lines";
 import DashboardLines from "@/components/DashboardLines";
 import TaskDigestToggle from "@/components/TaskDigestToggle";
+import GetStarted from "@/components/dashboard/GetStarted";
+import { getStartedSteps } from "@/lib/get-started";
+import { isTelnyxConfigured } from "@/lib/telnyx";
 import { setTaskDigestEmail } from "@/app/(app)/preferences-actions";
 
 function timeAgo(date: Date): string {
@@ -74,7 +77,7 @@ export default async function DashboardPage() {
   // team's day first, a rep their own next call.
   const prospecting = (await prisma.workspace.findUnique({ where: { id: workspaceId }, select: { prospectingEnabled: true } }))?.prospectingEnabled ?? false;
   let subtitle = "Everything happening across your workspace";
-  let linesBlock: React.ReactNode = null;
+  let linesBlock: (notice: boolean) => React.ReactNode = () => null;
   if (prospecting) {
     const role = (await leadAccess(user)).canAssign ? "manager" : "rep";
     const prefs = resolveLines(user.dashboardLines, role);
@@ -89,14 +92,14 @@ export default async function DashboardPage() {
     ]);
     const lines = [...day.lines, ...team, ...dealsLines, ...calendar, ...notifications];
     subtitle = `${new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: tz }).format(now)} · ${day.progress}`;
-    linesBlock = (
+    linesBlock = (notice) => (
       <div className="mb-8">
         <DashboardLines
           role={role}
           lines={lines}
           prefs={prefs}
           initialOpen={openAtStart(prefs, Object.fromEntries(lines.map((l) => [l.id, l.tone])))}
-          notice={day.notice}
+          notice={notice ? day.notice : null}
           customizeExtra={<TaskDigestToggle enabled={user.taskDigestEmail} action={setTaskDigestEmail} />}
           saveAction={saveDashboardLines}
         />
@@ -157,6 +160,37 @@ export default async function DashboardPage() {
   const newClientsPct = clientCount > 0 ? Math.round((newClientsThisMonth / clientCount) * 100) : 0;
 
   const recentDeals = deals.slice(0, 15);
+
+  // "Get started" until every step this person can do is done, or they hide it.
+  let getStarted: React.ReactNode = null;
+  let phoneInGuide = false;
+  if (!user.getStartedHiddenAt) {
+    const canManageWorkspace = Boolean(user.role?.canManageWorkspace);
+    const canManageTeam = Boolean(user.role?.canManageTeam);
+    const [crm, teammates, hasLeads] = await Promise.all([
+      canManageWorkspace ? prisma.workspace.findUnique({ where: { id: workspaceId }, select: { hubspotAccessToken: true, salesforceRefreshToken: true } }) : null,
+      canManageTeam ? prisma.user.count({ where: { workspaceId, deactivatedAt: null, id: { not: user.id } } }) : 0,
+      prospecting ? leadAccess(user).then((a) => prisma.lead.findFirst({ where: { workspaceId, ...a.where }, select: { id: true } })).then(Boolean) : false,
+    ]);
+    const steps = getStartedSteps({
+      hasDeal: deals.length > 0,
+      hasSentContract: deals.some((d) => d.status === "sent" || d.status === "signed"),
+      readyDealId: deals.find((d) => d.status === "ready" || d.status === "pending_approval" || d.status === "changes_requested")?.id ?? null,
+      prospecting,
+      hasLeads,
+      phoneCalls: isTelnyxConfigured(),
+      hasPhone: Boolean(user.phoneVerifiedAt),
+      canManageWorkspace,
+      crmConnected: Boolean(crm?.hubspotAccessToken || crm?.salesforceRefreshToken),
+      canManageTeam,
+      hasTeammate: teammates > 0,
+    });
+    if (steps.some((s) => !s.done)) {
+      getStarted = <GetStarted steps={steps} hideAction={hideGetStarted} />;
+      // The guide already asks for the phone number; once is enough.
+      phoneInGuide = steps.some((s) => s.id === "phone" && !s.done);
+    }
+  }
 
   // Folders-by-status — reuses the `deals` array already fetched above
   // (dealVisibilityFilter already applied to it), no new query. Always all
@@ -379,7 +413,9 @@ export default async function DashboardPage() {
       </div>
     </div>
 
-    {linesBlock}
+    {getStarted}
+
+    {linesBlock(!phoneInGuide)}
 
     <DashboardGrid widgets={widgets} saved={normalizeDashboard(user.dashboardLayout)} saveAction={saveDashboardLayout} />
     </>

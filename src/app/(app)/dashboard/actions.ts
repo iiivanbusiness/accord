@@ -28,3 +28,10 @@ export async function saveDashboardLines(lines: SavedLines | null): Promise<void
   });
   revalidatePath("/dashboard");
 }
+
+// Puts "Get started" away for the signed-in person.
+export async function hideGetStarted(): Promise<void> {
+  const user = await currentUserWithRole();
+  await prisma.user.update({ where: { id: user.id }, data: { getStartedHiddenAt: new Date() } });
+  revalidatePath("/dashboard");
+}

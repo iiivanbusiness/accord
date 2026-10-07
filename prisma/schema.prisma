@@ -271,6 +271,8 @@ model User {
   // Their Dashboard lines: which show, in what order, which start open
   // (see src/lib/dashboard-lines.ts). Null means their role's default.
   dashboardLines  Json?
+  // When they closed "Get started" at the top of the Dashboard.
+  getStartedHiddenAt DateTime?
 
   // SCIM provisioning (Okta/Azure AD/Entra pushing user lifecycle events).
   // scimExternalId is the IdP's own id for this person, kept so a later

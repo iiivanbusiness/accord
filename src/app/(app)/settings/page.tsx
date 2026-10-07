@@ -197,7 +197,7 @@ export default async function SettingsPage({
       </div>
     </div>
 
-    <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
+    <div id="team" className="glass-card glass-card-solid card-hover mb-4 max-w-[600px] scroll-mt-24">
       <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
         <h2 className="text-[15px] font-medium">Team</h2>
       </div>
@@ -396,7 +396,7 @@ export default async function SettingsPage({
     )}
 
     {canManageWorkspacePerm && (
-      <div className="glass-card glass-card-solid card-hover mb-4 max-w-[600px]">
+      <div id="crm" className="glass-card glass-card-solid card-hover mb-4 max-w-[600px] scroll-mt-24">
         <div className="border-b px-[22px] py-4" style={{ borderColor: "var(--hairline)" }}>
           <h2 className="text-[15px] font-medium">HubSpot</h2>
           <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>
