@@ -16,6 +16,10 @@ const TARGET_STAGE: Record<string, string> = {
   not_interested: "lost",
 };
 
+// A lead made from a call before anyone knows who it was with ("New lead
+// from this call" in the Calls inbox); the call fills in the real name.
+export const NEW_LEAD_NAME = "New lead from a call";
+
 // The stage a call's outcome moves a lead to, if any. Stage only moves
 // forward (or to lost), and a converted lead stays put.
 export function stageAfterOutcome(current: string, outcome: string): string | null {
@@ -88,6 +92,7 @@ export async function applyColdCall({ workspaceId, userId, lead, transcript, tim
     toNumber: lead.phone,
     transcript,
     summary: result.summary || null,
+    notes: result.notes,
     extracted: result.raw as object,
     aiInputTokens: result.usage.inputTokens,
     aiOutputTokens: result.usage.outputTokens,
@@ -95,6 +100,7 @@ export async function applyColdCall({ workspaceId, userId, lead, transcript, tim
   };
 
   const leadData = {
+    ...(lead.name === NEW_LEAD_NAME && result.contactName ? { name: result.contactName.slice(0, 200) } : {}),
     summary: result.summary || lead.summary,
     ...(stage ? { stage } : {}),
     ...(reached

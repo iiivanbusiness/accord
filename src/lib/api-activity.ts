@@ -257,6 +257,7 @@ export const CALL_API_SELECT = {
   outcome: true,
   connected: true,
   summary: true,
+  notes: true,
   toNumber: true,
   recorded: true,
   durationSec: true,
@@ -280,6 +281,7 @@ type CallRow = {
   outcome: string | null;
   connected: boolean;
   summary: string | null;
+  notes: string | null;
   toNumber: string | null;
   recorded: boolean;
   durationSec: number | null;
@@ -309,6 +311,7 @@ export function serializeCall(c: CallRow) {
     connected: c.connected,
     skipReason: typeof skipped === "string" ? skipped : null,
     summary: c.summary,
+    notes: c.notes,
     source: c.source,
     toNumber: c.toNumber,
     recorded: c.recorded,

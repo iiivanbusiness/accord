@@ -14,6 +14,7 @@ export type ColdCallResult = {
   outcome: CallOutcome;
   connected: boolean;
   summary: string;
+  notes: string | null; // the write-up, one "- " line per point
   contactName: string | null;
   title: string | null;
   company: string | null;
@@ -40,7 +41,7 @@ type LeadContext = {
 };
 
 const SYSTEM =
-  "You read the transcript of a sales rep's cold call to a prospect and record what a CRM needs. " +
+  "You read the transcript of a sales rep's call with a prospect (usually a cold call, sometimes a first meeting) and record what a CRM needs. " +
   "Only record what the transcript actually says; never invent names, numbers or dates. " +
   "If nobody picked up, or it went to voicemail, say so and leave the prospect fields empty. " +
   "Pain points and objections: merge what's already on file with anything new from this call into one short list each, newest first, separated by semicolons. " +
@@ -67,7 +68,7 @@ export async function extractColdCall(transcript: string, lead: LeadContext, tod
 
   const response = await client.messages.create({
     model: MODEL,
-    max_tokens: 1500,
+    max_tokens: 2500,
     system: SYSTEM,
     messages: [{ role: "user", content: `${context}\n\nTranscript:\n${transcript}` }],
     tools: [
@@ -84,6 +85,11 @@ export async function extractColdCall(transcript: string, lead: LeadContext, tod
                 "meeting_booked: a meeting or demo was scheduled. interested: they want to hear more but nothing is booked. follow_up: they asked to be contacted later. not_interested: they declined. wrong_person: not the right contact. voicemail: went to voicemail. no_answer: nobody picked up.",
             },
             summary: { type: "string", description: "2-3 neutral sentences on what happened on the call, for the rep's teammates." },
+            notes: {
+              type: "string",
+              description:
+                "The write-up of the call a team would keep or send on to a client: 4 to 10 short lines, each starting with \"- \", covering who they are, what was discussed, what they need, numbers and dates that came up, decisions, and next steps with who does what. Empty if nobody picked up or it went to voicemail.",
+            },
             contactName: { type: "string", description: "The prospect's full name if said on the call, else empty." },
             title: { type: "string", description: "Their job title if said, else empty." },
             company: { type: "string", description: "Their company if said, else empty." },
@@ -126,6 +132,8 @@ export async function extractColdCall(transcript: string, lead: LeadContext, tod
     outcome,
     connected: outcome !== "voicemail" && outcome !== "no_answer",
     summary: text(input.summary) ?? "",
+    // The model sometimes writes the line breaks out as "\n".
+    notes: text(input.notes)?.replace(/\\n/g, "\n") ?? null,
     contactName: text(input.contactName),
     title: text(input.title),
     company: text(input.company),

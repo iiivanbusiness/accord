@@ -21,8 +21,9 @@ type PendingCall = {
 const PREVIEW_LINES = 4;
 const MATCHES_SHOWN = 8;
 
-// One call in the Calls inbox: pick who it was with, then Process or
-// Discard. SealMe works out whether it was a cold or a sales call.
+// One call in the Calls inbox: say what it should become (notes only, or
+// notes and a contract), pick who it was with (or let the call make a new
+// lead), then Process or Discard.
 export default function PendingCallCard({
   call,
   leads,
@@ -36,13 +37,16 @@ export default function PendingCallCard({
 }) {
   const router = useRouter();
   const [leadId, setLeadId] = useState(call.leadId ?? "");
+  // Most calls only need notes; a contract is the exception.
+  const [need, setNeed] = useState<"notes" | "contract">(call.mode === "sales" ? "contract" : "notes");
+  const isNew = leadId === "new";
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const selected = leads.find((l) => l.id === leadId) ?? null;
+  const selected = isNew ? { id: "new", name: "New lead from this call", detail: "SealMe fills in who it was from the call" } : (leads.find((l) => l.id === leadId) ?? null);
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = q ? leads.filter((l) => l.name.toLowerCase().includes(q) || l.detail.toLowerCase().includes(q)) : leads;
@@ -96,6 +100,24 @@ export default function PendingCallCard({
       {!processing && (
         <>
           <div className="flex flex-wrap items-end gap-2.5">
+            <div className="flex-none">
+              <span className="mb-1 block text-[12px]" style={{ color: "var(--ink-muted)" }}>What you need</span>
+              <div className="flex rounded-full p-[3px] text-[12.5px]" style={{ background: "var(--surface-2)" }} role="radiogroup" aria-label="What you need">
+                {(["notes", "contract"] as const).map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    role="radio"
+                    aria-checked={need === n}
+                    onClick={() => setNeed(n)}
+                    className="rounded-full px-3 py-1.5 font-medium"
+                    style={need === n ? { background: "var(--surface-1)", color: "var(--ink)", boxShadow: "0 0 0 1px var(--hairline)" } : { color: "var(--ink-muted)" }}
+                  >
+                    {n === "notes" ? "Notes only" : "Notes and contract"}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="relative min-w-[220px] flex-1">
               <label className="mb-1 block text-[12px]" style={{ color: "var(--ink-muted)" }}>Lead</label>
               {selected && !open ? (
@@ -126,8 +148,20 @@ export default function PendingCallCard({
                   className="input w-full"
                 />
               )}
-              {open && matches.length > 0 && (
+              {open && (
                 <div className="absolute left-0 right-0 z-10 mt-1 overflow-hidden rounded-[12px] border shadow-lg" style={{ background: "var(--surface-1)", borderColor: "var(--hairline)" }}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setLeadId("new");
+                      setOpen(false);
+                    }}
+                    className="block w-full truncate px-3 py-2 text-left text-[13px] font-medium hover:bg-[var(--canvas)]"
+                    style={{ color: "var(--accent-blue)", borderBottom: matches.length ? "1px solid var(--hairline-soft)" : undefined }}
+                  >
+                    + New lead from this call
+                  </button>
                   {matches.map((l) => (
                     <button
                       key={l.id}
@@ -150,8 +184,8 @@ export default function PendingCallCard({
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              disabled={pending || !leadId}
-              onClick={() => run(() => processAction({ leadId, ...(call.mode === "cold" || call.mode === "sales" ? { mode: call.mode } : {}) }))}
+              disabled={pending || !leadId || (isNew && need === "contract")}
+              onClick={() => run(() => processAction({ leadId, mode: need === "notes" ? "notes" : "sales" }))}
               className="btn btn-primary btn-sm"
             >
               {pending ? "Working…" : call.status === "failed" ? "Process again" : "Process"}
@@ -159,7 +193,13 @@ export default function PendingCallCard({
             <button type="button" disabled={pending} onClick={() => run(discardAction)} className="btn btn-secondary btn-sm">
               Discard
             </button>
-            {!leadId && <span className="text-[12px]" style={{ color: "var(--ink-muted)" }}>Pick a lead to process this call.</span>}
+            {!leadId && <span className="text-[12px]" style={{ color: "var(--ink-muted)" }}>Pick the lead, or make a new one from the call.</span>}
+            {isNew && need === "contract" && <span className="text-[12px]" style={{ color: "var(--ink-muted)" }}>For a contract, pick the lead it&apos;s for.</span>}
+            {leadId && !(isNew && need === "contract") && (
+              <span className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
+                {need === "notes" ? "SealMe writes the notes on the lead and sets up the next step. No contract." : "SealMe writes the notes and drafts the contract for you to check."}
+              </span>
+            )}
           </div>
         </>
       )}

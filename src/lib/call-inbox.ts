@@ -116,7 +116,8 @@ export async function runCallProcessing(callId: string, timeZone: string, option
     // highlights.
     const { usage } = await meterAiUsage(async () => {
       let mode = picked;
-      const sorted = mode !== "cold" && mode !== "sales";
+      // "notes" is notes only, never a contract: no sorting needed.
+      const sorted = mode !== "cold" && mode !== "sales" && mode !== "notes";
       if (sorted) {
         const { kind } = await classifyCallKind(transcript);
         await prisma.phoneCall.update({ where: { id: callId }, data: { mode: kind } });

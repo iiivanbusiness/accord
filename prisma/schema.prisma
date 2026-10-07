@@ -150,10 +150,10 @@ model Workspace {
   salesforceInstanceUrl    String?
   salesforceAccountEmail   String?
 
-  // Leads, tasks, and phone calls ship dark: only workspaces a platform
-  // admin turns on in /admin see them, until they're finished and the
-  // current App Store build has been reviewed. See src/lib/prospecting.ts.
-  prospectingEnabled Boolean @default(false)
+  // Leads, tasks, and phone calls. On for every workspace since 2026-10-07;
+  // a platform admin can still turn them off for one in /admin. See
+  // src/lib/prospecting.ts.
+  prospectingEnabled Boolean @default(true)
   // What happens when a rep calls a number in an all-party consent state
   // (or one we can't place): "skip" calls it without SealMe on the line,
   // "announce" records with a disclosure. Only an Owner can pick "announce".
@@ -1294,6 +1294,9 @@ model PhoneCall {
   durationSec Int?
   transcript  String?
   summary     String?
+  // The write-up of the call: what was discussed, what they need, decisions
+  // and next steps, a line each. What a team shares with the client.
+  notes       String?
   extracted   Json?
 
   // Usage, so the real cost per call can be checked against the bills.

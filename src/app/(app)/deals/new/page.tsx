@@ -69,6 +69,17 @@ export default async function NewDealPage({
       <ModeTab href="/deals/new?mode=manual" active={isManual}>Enter manually</ModeTab>
     </div>
 
+    {/* Everything here makes a deal and a contract; a call that only needs notes goes to Calls. */}
+    {isTranscript && (
+      <div className="mb-5 max-w-[560px] text-[13px]" style={{ color: "var(--ink-muted)" }}>
+        Only need notes, no contract?{" "}
+        <Link href="/calls" className="font-medium" style={{ color: "var(--accent-blue)" }}>
+          Add the recording in Calls
+        </Link>
+        , and SealMe writes up the call on the lead.
+      </div>
+    )}
+
     {error && (
       <div className="chip chip-warn mb-4 max-w-[560px] w-full justify-start px-4 py-2.5 text-[12.5px]">
         {error}

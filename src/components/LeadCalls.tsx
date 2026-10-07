@@ -13,9 +13,44 @@ export type LeadCall = {
   who: string | null;
   outcome: string | null;
   summary: string | null;
+  notes: string | null;
   transcript: string | null;
   source: string;
 };
+
+// The call's write-up, one point a line, with a copy button for sending it on.
+function CallNotes({ notes }: { notes: string }) {
+  const [copied, setCopied] = useState(false);
+  const lines = notes.split(/\n|\\n/).map((l) => l.replace(/^\s*[-•]\s*/, "").trim()).filter(Boolean);
+  return (
+    <div className="rounded-[10px] px-3 py-2.5" style={{ background: "var(--canvas)" }}>
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="text-[11.5px] font-semibold uppercase" style={{ letterSpacing: "0.5px", color: "var(--ink-muted)" }}>Notes</span>
+        <button
+          type="button"
+          onClick={() => {
+            navigator.clipboard
+              ?.writeText(lines.map((l) => `- ${l}`).join("\n"))
+              .then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              })
+              .catch(() => {});
+          }}
+          className="text-[12px] font-medium"
+          style={{ color: "var(--accent-blue)" }}
+        >
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+      <ul className="flex list-disc flex-col gap-1 pl-4 text-[13px] leading-snug">
+        {lines.map((l, i) => (
+          <li key={i} className="break-words">{l}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 function describe(r: ColdCallSummary): string {
   const parts = [`Logged as ${CALL_OUTCOME_LABEL[r.outcome] ?? r.outcome}.`];
@@ -114,6 +149,7 @@ export default function LeadCalls({
                 </span>
               </div>
               {c.summary && <div className="break-words text-[13px]">{c.summary}</div>}
+              {c.notes && <CallNotes notes={c.notes} />}
               {c.transcript && (
                 <details className="text-[12.5px]">
                   <summary className="cursor-pointer select-none" style={{ color: "var(--ink-muted)" }}>Transcript</summary>

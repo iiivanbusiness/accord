@@ -52,7 +52,7 @@ export default async function LeadPage({
     }),
     prisma.phoneCall.findMany({
       where: { leadId: id, workspaceId: workspace.id, status: "processed" },
-      select: { id: true, startedAt: true, outcome: true, summary: true, transcript: true, source: true, user: { select: { name: true } } },
+      select: { id: true, startedAt: true, outcome: true, summary: true, notes: true, transcript: true, source: true, user: { select: { name: true } } },
       orderBy: { startedAt: "desc" },
       take: 50,
     }),
@@ -108,7 +108,7 @@ export default async function LeadPage({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="order-2 flex min-w-0 flex-col gap-4 lg:order-1">
         <LeadCalls
-          calls={calls.map((c) => ({ id: c.id, at: c.startedAt.toISOString(), who: c.user?.name ?? null, outcome: c.outcome, summary: c.summary, transcript: c.transcript, source: c.source }))}
+          calls={calls.map((c) => ({ id: c.id, at: c.startedAt.toISOString(), who: c.user?.name ?? null, outcome: c.outcome, summary: c.summary, notes: c.notes, transcript: c.transcript, source: c.source }))}
           processAction={processColdCallTranscript.bind(null, lead.id)}
         />
         {/* Folded: calls fill most of this in, and it's what you need least
