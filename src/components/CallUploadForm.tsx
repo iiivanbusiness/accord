@@ -177,7 +177,7 @@ export default function CallUploadForm({
               {stage.kind === "ready" && (
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[12px]" style={{ color: "var(--ink-muted)" }}>
                   <span>
-                    Transcript ready · {formatDuration(stage.seconds)} of audio{stage.turns ? ` · ${stage.turns} turns` : ""}
+                    Transcript ready · {formatDuration(stage.seconds)} of audio{stage.turns ? ` · ${stage.turns} ${stage.turns === 1 ? "turn" : "turns"}` : ""}
                   </span>
                   <button type="button" onClick={() => recordingInput.current?.click()} className="font-medium" style={{ color: "var(--accent-blue)" }}>
                     Use a different file
