@@ -4,7 +4,7 @@ export const metadata = {
   title: "Support - SealMe",
 };
 
-const SUPPORT_EMAIL = "hello@sealme.net";
+const SUPPORT_EMAIL = "ivan@sealme.net";
 
 export default function SupportPage() {
   return (

@@ -24,7 +24,7 @@ export async function embedTamperEvidentSignature(pdfBuffer: Buffer, opts: { sig
   const withPlaceholder = plainAddPlaceholder({
     pdfBuffer,
     reason: "Signed via SealMe",
-    contactInfo: "hello@sealme.net",
+    contactInfo: "ivan@sealme.net",
     name: opts.signerName,
     location: "",
     signingTime: opts.signedAt,

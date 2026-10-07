@@ -4,7 +4,7 @@ export const metadata = {
   title: "Terms of Service - SealMe",
 };
 
-const LAST_UPDATED = "September 25, 2026";
+const LAST_UPDATED = "October 7, 2026";
 
 export default function TermsPage() {
   return (
@@ -130,7 +130,7 @@ export default function TermsPage() {
           </Section>
 
           <Section title="14. Contact">
-            <p>Questions about these Terms can be sent to <span style={{ color: "var(--ink)" }}>hello@sealme.net</span>.</p>
+            <p>Questions about these Terms can be sent to <span style={{ color: "var(--ink)" }}>ivan@sealme.net</span>.</p>
           </Section>
         </div>
       </main>

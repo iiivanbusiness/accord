@@ -4,7 +4,7 @@ export const metadata = {
   title: "Privacy Policy - SealMe",
 };
 
-const LAST_UPDATED = "October 6, 2026";
+const LAST_UPDATED = "October 7, 2026";
 
 export default function PrivacyPage() {
   return (
@@ -170,7 +170,7 @@ export default function PrivacyPage() {
 
           <Section title="15. Contact">
             <p>
-              For privacy questions or data requests, contact <span style={{ color: "var(--ink)" }}>hello@sealme.net</span>.
+              For privacy questions or data requests, contact <span style={{ color: "var(--ink)" }}>ivan@sealme.net</span>.
             </p>
           </Section>
         </div>

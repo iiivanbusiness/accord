@@ -57,7 +57,7 @@ export async function POST(req: Request) {
   if (!workspace) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   if (workspace.aiChatMessagesUsedThisMonth >= workspace.aiChatMessagesLimit) {
     return NextResponse.json(
-      { error: "This workspace has used this month's AI chat messages. They reset on the 1st. For help now, email hello@sealme.net." },
+      { error: "This workspace has used this month's AI chat messages. They reset on the 1st. For help now, email ivan@sealme.net." },
       { status: 429 }
     );
   }

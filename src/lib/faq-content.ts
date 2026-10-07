@@ -272,7 +272,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
       },
       {
         question: "Is there a limit on this chat?",
-        answer: "Each workspace has a monthly allowance of AI chat messages that resets on the 1st. You can always reach a person at hello@sealme.net.",
+        answer: "Each workspace has a monthly allowance of AI chat messages that resets on the 1st. You can always reach a person at ivan@sealme.net.",
       },
     ],
   },
