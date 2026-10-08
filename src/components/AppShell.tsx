@@ -17,6 +17,9 @@ import TimezoneSync from "./TimezoneSync";
 import AiDisclosureModal from "./AiDisclosureModal";
 import FaqChatWidget from "./FaqChatWidget";
 import NotificationBell from "./NotificationBell";
+import GuideTip from "./GuideTip";
+import { Suspense } from "react";
+import Link from "next/link";
 import { getUnreadNotifications } from "@/app/(app)/notifications/actions";
 
 const NAV_ICONS: Record<string, () => React.ReactNode> = {
@@ -71,6 +74,10 @@ export default async function AppShell({ children }: { children: React.ReactNode
         </div>
         <span className="truncate text-[13px] font-medium" style={{ color: "var(--ink)" }}>{workspaceName}</span>
       </div>
+      {/* Brings the setup guide back after it was hidden. */}
+      <Link href="/dashboard?guide=open#setup" className="rounded-[10px] px-3 py-2 text-[13px] font-medium" style={{ color: "var(--ink-muted)" }}>
+        Setup guide
+      </Link>
       <form
         action={async () => {
           "use server";
@@ -116,7 +123,12 @@ export default async function AppShell({ children }: { children: React.ReactNode
           <EmailVerifyBanner />
           <LocalCaptureBanner />
 
-          <main className="mx-auto w-full max-w-[1180px] flex-1 px-3.5 pt-2 md:px-6">{children}</main>
+          <main className="mx-auto w-full max-w-[1180px] flex-1 px-3.5 pt-2 md:px-6">
+            <Suspense fallback={null}>
+              <GuideTip />
+            </Suspense>
+            {children}
+          </main>
           <AppFooter />
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, Suspense } from "react";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -17,6 +17,7 @@ import { hideGetStarted, saveDashboardLayout } from "./actions";
 import { leadAccess } from "@/lib/lead-visibility";
 import { cookieTimeZone } from "@/lib/viewer-time";
 import GetStarted from "@/components/dashboard/GetStarted";
+import GuideTip from "@/components/GuideTip";
 import { getStartedSteps } from "@/lib/get-started";
 import { todaySection } from "./today";
 import { isTelnyxConfigured } from "@/lib/telnyx";
@@ -61,7 +62,7 @@ const STATUS_CHIP: Record<string, string> = {
   signed: "chip-success",
 };
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ todo?: string; queue?: string }> }) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ todo?: string; queue?: string; guide?: string }> }) {
   const now = new Date();
   const [workspaceId, session, user] = await Promise.all([requireWorkspaceId(), auth(), currentUserWithRole()]);
   const firstName = session?.user?.name?.trim().split(/\s+/)[0] ?? null;
@@ -129,23 +130,28 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   const recentDeals = deals.slice(0, 15);
 
-  // "Get started" until every step this person can do is done, or they hide it.
+  // The setup guide until every step this person can do is done, or they
+  // hide it. "Setup guide" in the menu (?guide=open) brings it back.
   let getStarted: React.ReactNode = null;
   let phoneInGuide = false;
-  if (!user.getStartedHiddenAt) {
+  const reopened = (await searchParams).guide === "open";
+  if (!user.getStartedHiddenAt || reopened) {
     const canManageWorkspace = Boolean(user.role?.canManageWorkspace);
     const canManageTeam = Boolean(user.role?.canManageTeam);
-    const [crm, teammates, hasLeads] = await Promise.all([
+    const [crm, teammates, lastCall] = await Promise.all([
       canManageWorkspace ? prisma.workspace.findUnique({ where: { id: workspaceId }, select: { hubspotAccessToken: true, salesforceRefreshToken: true } }) : null,
       canManageTeam ? prisma.user.count({ where: { workspaceId, deactivatedAt: null, id: { not: user.id } } }) : 0,
-      prospecting ? leadAccess(user).then((a) => prisma.lead.findFirst({ where: { workspaceId, ...a.where }, select: { id: true } })).then(Boolean) : false,
+      prospecting
+        ? prisma.phoneCall.findFirst({ where: { workspaceId, userId: user.id, status: "processed" }, select: { leadId: true }, orderBy: { processedAt: "desc" } })
+        : null,
     ]);
     const steps = getStartedSteps({
       hasDeal: deals.length > 0,
       hasSentContract: deals.some((d) => d.status === "sent" || d.status === "signed"),
       readyDealId: deals.find((d) => d.status === "ready" || d.status === "pending_approval" || d.status === "changes_requested")?.id ?? null,
       prospecting,
-      hasLeads,
+      hasCall: Boolean(lastCall),
+      callLeadId: lastCall?.leadId ?? null,
       phoneCalls: isTelnyxConfigured(),
       hasPhone: Boolean(user.phoneVerifiedAt),
       canManageWorkspace,
@@ -391,7 +397,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
     {getStarted}
 
-    {todayBlock}
+    {/* The setup guide's "Check your to-do list" lands here. */}
+    {todayBlock && (
+      <div id="todo" className="scroll-mt-4">
+        <Suspense fallback={null}>
+          <GuideTip at="todo" />
+        </Suspense>
+        {todayBlock}
+      </div>
+    )}
 
     {/* Keyed, since the grid puts each one in a list next to its resize handle. */}
     <DashboardGrid
