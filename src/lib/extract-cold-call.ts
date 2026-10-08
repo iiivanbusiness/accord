@@ -46,6 +46,8 @@ const SYSTEM =
   "If nobody picked up, or it went to voicemail, say so and leave the prospect fields empty. " +
   "Pain points and objections: merge what's already on file with anything new from this call into one short list each, newest first, separated by semicolons. " +
   "Next step dates: resolve relative days (\"next Tuesday\", \"tomorrow\") using the calendar given below. " +
+  "Outcome: meeting_booked only when a specific next meeting or demo was put on the calendar on this call, with its day agreed. " +
+  "A pilot or trial, ongoing check-ins, sending a contract or proposal, or \"let's talk again\" without a set day is not a booked meeting; when unsure, pick interested. " +
   "Write everything in English, in plain sentences without em dashes.";
 
 export async function extractColdCall(transcript: string, lead: LeadContext, today: string): Promise<ColdCallResult> {
@@ -82,7 +84,7 @@ export async function extractColdCall(transcript: string, lead: LeadContext, tod
               type: "string",
               enum: [...CALL_OUTCOMES],
               description:
-                "meeting_booked: a meeting or demo was scheduled. interested: they want to hear more but nothing is booked. follow_up: they asked to be contacted later. not_interested: they declined. wrong_person: not the right contact. voicemail: went to voicemail. no_answer: nobody picked up.",
+                "meeting_booked: a specific next meeting or demo was scheduled on this call, with its day agreed. interested: they want to move forward or hear more (a pilot, a trial, a proposal or contract to send, check-ins to set up) but no meeting with a set day was booked. follow_up: they asked to be contacted later. not_interested: they declined. wrong_person: not the right contact. voicemail: went to voicemail. no_answer: nobody picked up.",
             },
             summary: { type: "string", description: "2-3 neutral sentences on what happened on the call, for the rep's teammates." },
             notes: {
