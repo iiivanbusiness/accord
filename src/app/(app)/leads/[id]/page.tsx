@@ -10,6 +10,9 @@ import { workspaceCampaigns } from "@/lib/campaigns";
 import SubmitButton from "@/components/SubmitButton";
 import LeadTasks from "@/components/LeadTasks";
 import LeadCalls from "@/components/LeadCalls";
+import LeadOverview from "@/components/LeadOverview";
+import MergeLeadCard from "@/components/MergeLeadCard";
+import { overviewFromCall } from "@/lib/lead-overview";
 import ConvertLeadButton from "@/components/ConvertLeadButton";
 import DeleteLeadButton from "@/components/DeleteLeadButton";
 import LeadCallButton from "@/components/LeadCallButton";
@@ -18,6 +21,7 @@ import { createLeadTask, deleteTask, setTaskStatus } from "../task-actions";
 import { processColdCallTranscript } from "../call-actions";
 import { convertLeadToDeal } from "../convert-actions";
 import { startLeadCall } from "../phone-actions";
+import { mergeLeadInto, moveCallToLead, searchLeadsToJoin } from "../merge-actions";
 
 // Processing a pasted call transcript (an action on this page) waits on
 // Claude; give it room beyond the default.
@@ -39,7 +43,8 @@ export default async function LeadPage({
   const { created, saved } = await searchParams;
 
   const access = await leadAccess();
-  const [lead, members, tasks, calls, templates, campaigns] = await Promise.all([
+  const processed = { leadId: id, workspaceId: workspace.id, status: "processed" };
+  const [lead, members, tasks, calls, templates, campaigns, newest, callStats] = await Promise.all([
     prisma.lead.findFirst({ where: { id, workspaceId: workspace.id, ...access.where }, include: { owner: { select: { id: true, name: true } } } }),
     access.canAssign
       ? prisma.user.findMany({ where: { workspaceId: workspace.id, deactivatedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } })
@@ -58,8 +63,12 @@ export default async function LeadPage({
     }),
     prisma.contractTemplate.findMany({ where: { workspaceId: workspace.id }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     workspaceCampaigns(workspace.id),
+    // "Where things stand" is kept with the newest call (lib/lead-overview.ts).
+    prisma.phoneCall.findFirst({ where: processed, select: { extracted: true }, orderBy: { startedAt: "desc" } }),
+    prisma.phoneCall.aggregate({ where: processed, _count: true, _min: { startedAt: true } }),
   ]);
   if (!lead) notFound();
+  const overview = callStats._count >= 2 ? overviewFromCall(newest?.extracted) : null;
   const convertedDeal = lead.convertedDealId
     ? await prisma.deal.findFirst({ where: { id: lead.convertedDealId, workspaceId: workspace.id, trashedAt: null }, select: { id: true } })
     : null;
@@ -107,9 +116,16 @@ export default async function LeadPage({
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="order-2 flex min-w-0 flex-col gap-4 lg:order-1">
+        {overview && callStats._min.startedAt && (
+          <LeadOverview overview={overview} calls={callStats._count} since={callStats._min.startedAt.toISOString()} />
+        )}
         <LeadCalls
+          lead={{ name: lead.name, company: lead.company }}
+          overview={overview}
           calls={calls.map((c) => ({ id: c.id, at: c.startedAt.toISOString(), who: c.user?.name ?? null, outcome: c.outcome, summary: c.summary, notes: c.notes, transcript: c.transcript, source: c.source }))}
           processAction={processColdCallTranscript.bind(null, lead.id)}
+          searchLeads={searchLeadsToJoin.bind(null, lead.id)}
+          moveAction={moveCallToLead}
         />
         {/* Folded: calls fill most of this in, and it's what you need least
             before a call. */}
@@ -174,6 +190,13 @@ export default async function LeadPage({
             createAction={createLeadTask.bind(null, lead.id)}
             statusAction={setTaskStatus}
             deleteAction={deleteTask}
+          />
+
+          <MergeLeadCard
+            leadName={lead.name}
+            calls={callStats._count}
+            searchLeads={searchLeadsToJoin.bind(null, lead.id)}
+            mergeAction={mergeLeadInto.bind(null, lead.id)}
           />
 
           {access.canAssign && <DeleteLeadButton action={deleteLead.bind(null, lead.id)} />}

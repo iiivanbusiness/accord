@@ -310,7 +310,7 @@ function LeadPicker({ search }: { search: (q: string) => Promise<LeadOption[]> }
             </div>
           )}
           <span className="text-[12px]" style={{ color: "var(--ink-muted)" }}>
-            No lead picked: SealMe makes a new one and fills in who it was from the call.
+            No lead picked: SealMe finds the client from the call, or makes a new lead.
           </span>
         </>
       )}

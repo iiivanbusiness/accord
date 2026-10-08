@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import LocalDateTime from "@/components/LocalDateTime";
+import LeadJoinPicker, { type JoinPick } from "@/components/LeadJoinPicker";
 import { CALL_OUTCOME_CHIP, CALL_OUTCOME_LABEL } from "@/lib/call-outcomes";
 import { LEAD_STAGE_LABEL } from "@/lib/lead-stages";
 import { formatTaskDue, TASK_TYPE_LABEL } from "@/lib/tasks";
@@ -18,30 +20,55 @@ export type LeadCall = {
   source: string;
 };
 
+export function noteLines(notes: string): string[] {
+  return notes.split(/\n|\\n/).map((l) => l.replace(/^\s*[-•]\s*/, "").trim()).filter(Boolean);
+}
+
+export function CopyButton({ text, label = "Copy", className = "text-[12px] font-medium" }: { text: () => string; label?: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        navigator.clipboard
+          ?.writeText(text())
+          .then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          })
+          .catch(() => {});
+      }}
+      className={className}
+      style={{ color: "var(--accent-blue)" }}
+    >
+      {copied ? "Copied" : label}
+    </button>
+  );
+}
+
+function day(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+// Everything on file for the client, oldest call first, ready to paste
+// into an email or a report.
+export function allNotesText(lead: { name: string; company: string | null }, overview: string | null, calls: LeadCall[]): string {
+  const head = [lead.company ? `${lead.name}, ${lead.company}` : lead.name];
+  if (overview) head.push("", "Where things stand", ...noteLines(overview).map((l) => `- ${l}`));
+  const blocks = [...calls].reverse().map((c) =>
+    [day(c.at), c.summary, ...(c.notes ? noteLines(c.notes).map((l) => `- ${l}`) : [])].filter(Boolean).join("\n"),
+  );
+  return [head.join("\n"), ...blocks].join("\n\n");
+}
+
 // The call's write-up, one point a line, with a copy button for sending it on.
 function CallNotes({ notes }: { notes: string }) {
-  const [copied, setCopied] = useState(false);
-  const lines = notes.split(/\n|\\n/).map((l) => l.replace(/^\s*[-•]\s*/, "").trim()).filter(Boolean);
+  const lines = noteLines(notes);
   return (
     <div className="rounded-[10px] px-3 py-2.5" style={{ background: "var(--canvas)" }}>
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <span className="text-[11.5px] font-semibold uppercase" style={{ letterSpacing: "0.5px", color: "var(--ink-muted)" }}>Notes</span>
-        <button
-          type="button"
-          onClick={() => {
-            navigator.clipboard
-              ?.writeText(lines.map((l) => `- ${l}`).join("\n"))
-              .then(() => {
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1500);
-              })
-              .catch(() => {});
-          }}
-          className="text-[12px] font-medium"
-          style={{ color: "var(--accent-blue)" }}
-        >
-          {copied ? "Copied" : "Copy"}
-        </button>
+        <CopyButton text={() => lines.map((l) => `- ${l}`).join("\n")} />
       </div>
       <ul className="flex list-disc flex-col gap-1 pl-4 text-[13px] leading-snug">
         {lines.map((l, i) => (
@@ -64,14 +91,25 @@ function describe(r: ColdCallSummary): string {
 }
 
 // The lead's call history, plus "Add transcript": paste a cold call and
-// the lead updates itself from what was said.
+// the lead updates itself from what was said. A call on the wrong lead can
+// be moved to the right one.
 export default function LeadCalls({
+  lead,
+  overview,
   calls,
   processAction,
+  searchLeads,
+  moveAction,
 }: {
+  lead: { name: string; company: string | null };
+  overview: string | null;
   calls: LeadCall[];
   processAction: (transcript: string) => Promise<ColdCallSummary>;
+  searchLeads: (q: string) => Promise<JoinPick[]>;
+  moveAction: (callId: string, leadId: string) => Promise<{ leadId: string }>;
 }) {
+  const router = useRouter();
+  const [moving, setMoving] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -101,13 +139,18 @@ export default function LeadCalls({
 
   return (
     <div className="card flex flex-col gap-3 p-5 sm:p-6">
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-[14px] font-medium">Calls</div>
-        {!adding && (
-          <button type="button" onClick={() => { setAdding(true); setNotice(null); }} className="btn btn-secondary btn-sm">
-            + Add transcript
-          </button>
-        )}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-[14px] font-medium">
+          Calls{calls.length > 1 && <span className="font-normal" style={{ color: "var(--ink-muted)" }}> · {calls.length}</span>}
+        </div>
+        <div className="flex items-center gap-3">
+          {calls.some((c) => c.notes || c.summary) && <CopyButton text={() => allNotesText(lead, overview, calls)} label="Copy all notes" className="text-[12.5px] font-medium" />}
+          {!adding && (
+            <button type="button" onClick={() => { setAdding(true); setNotice(null); }} className="btn btn-secondary btn-sm">
+              + Add transcript
+            </button>
+          )}
+        </div>
       </div>
 
       {notice && <div className="chip chip-success w-full justify-start whitespace-normal px-3 py-2 text-[12.5px] leading-snug" role="status">{notice}</div>}
@@ -147,7 +190,25 @@ export default function LeadCalls({
                   <LocalDateTime iso={c.at} options={{ month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }} />
                   {c.who ? ` · ${c.who}` : ""}
                 </span>
+                {moving !== c.id && (
+                  <button type="button" onClick={() => setMoving(c.id)} className="ml-auto text-[12px] font-medium" style={{ color: "var(--ink-muted)" }}>
+                    Move to another lead
+                  </button>
+                )}
               </div>
+              {moving === c.id && (
+                <LeadJoinPicker
+                  search={searchLeads}
+                  newOption="+ New lead from this call"
+                  confirmText={(pick) => (pick === "new" ? "Move this call to a new lead, filled in from the call?" : `Move this call to ${pick.name}${pick.company ? ` at ${pick.company}` : ""}?`)}
+                  confirmLabel="Move call"
+                  onConfirm={async (pick) => {
+                    const { leadId } = await moveAction(c.id, pick === "new" ? "new" : pick.id);
+                    router.push(`/leads/${leadId}`);
+                  }}
+                  onCancel={() => setMoving(null)}
+                />
+              )}
               {c.summary && <div className="break-words text-[13px]">{c.summary}</div>}
               {c.notes && <CallNotes notes={c.notes} />}
               {c.transcript && (

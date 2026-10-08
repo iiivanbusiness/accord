@@ -82,6 +82,16 @@ export default function LeadsFilterBar({ owners, showOwnerFilter, campaigns = []
           ))}
         </select>
       )}
+      <select
+        value={searchParams.get("sort") ?? ""}
+        onChange={(e) => updateParam("sort", e.target.value)}
+        className="input flex-1 sm:w-[170px] sm:flex-none"
+        style={{ fontSize: "13px", padding: "7px 11px" }}
+        aria-label="Sort"
+      >
+        <option value="">Recently updated</option>
+        <option value="lastcall">Last call first</option>
+      </select>
       {hasFilters && (
         <button
           type="button"

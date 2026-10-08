@@ -41,7 +41,7 @@ function formatDay(date: Date): string {
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; q?: string; stage?: string; owner?: string; campaign?: string; deleted?: string }>;
+  searchParams: Promise<{ tab?: string; q?: string; stage?: string; owner?: string; campaign?: string; sort?: string; deleted?: string }>;
 }) {
   const workspace = await requireProspecting();
   const user = await currentUserWithRole();
@@ -54,6 +54,8 @@ export default async function LeadsPage({
   // a manager's view.
   const tab = access.canViewAll ? (params.tab ?? "") : "";
   const { q, stage, owner, campaign } = params;
+  // "Last call": the clients talked to most recently first.
+  const byLastCall = params.sort === "lastcall";
 
   // AND, not a spread: the visibility rule and the search are both ORs.
   const where = {
@@ -93,9 +95,11 @@ export default async function LeadsPage({
         nextStepAt: true,
         campaign: true,
         updatedAt: true,
+        lastContactedAt: true,
         owner: { select: { name: true } },
+        _count: { select: { phoneCalls: { where: { status: "processed" } } } },
       },
-      orderBy: { updatedAt: "desc" },
+      orderBy: byLastCall ? [{ lastContactedAt: { sort: "desc", nulls: "last" } }, { updatedAt: "desc" }] : { updatedAt: "desc" },
       take: 500,
     }),
     access.canViewAll || access.canAssign
@@ -187,11 +191,13 @@ export default async function LeadsPage({
                 owner: lead.owner?.name ?? "Unassigned",
                 next,
                 updated: timeAgo(lead.updatedAt),
+                calls: lead._count.phoneCalls,
+                lastCall: lead.lastContactedAt ? lead.lastContactedAt.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null,
               };
             })}
           />
           {leads.length === 500 && (
-            <div className="mt-2 text-[12px]" style={{ color: "var(--ink-muted)" }}>Showing the 500 most recently updated. Search or filter to narrow it down.</div>
+            <div className="mt-2 text-[12px]" style={{ color: "var(--ink-muted)" }}>Showing the first 500. Search or filter to narrow it down.</div>
           )}
         </>
       )}

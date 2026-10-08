@@ -36,7 +36,8 @@ export default function PendingCallCard({
   discardAction: () => Promise<void>;
 }) {
   const router = useRouter();
-  const [leadId, setLeadId] = useState(call.leadId ?? "");
+  // Notes only: SealMe finds the client's lead from the call by default.
+  const [leadId, setLeadId] = useState(call.leadId ?? (call.mode === "sales" ? "" : "new"));
   // Most calls only need notes; a contract is the exception.
   const [need, setNeed] = useState<"notes" | "contract">(call.mode === "sales" ? "contract" : "notes");
   const isNew = leadId === "new";
@@ -46,7 +47,7 @@ export default function PendingCallCard({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const selected = isNew ? { id: "new", name: "New lead from this call", detail: "SealMe fills in who it was from the call" } : (leads.find((l) => l.id === leadId) ?? null);
+  const selected = isNew ? { id: "new", name: "Find it from the call", detail: "the client's lead, or a new one" } : (leads.find((l) => l.id === leadId) ?? null);
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = q ? leads.filter((l) => l.name.toLowerCase().includes(q) || l.detail.toLowerCase().includes(q)) : leads;
@@ -160,7 +161,7 @@ export default function PendingCallCard({
                     className="block w-full truncate px-3 py-2 text-left text-[13px] font-medium hover:bg-[var(--canvas)]"
                     style={{ color: "var(--accent-blue)", borderBottom: matches.length ? "1px solid var(--hairline-soft)" : undefined }}
                   >
-                    + New lead from this call
+                    + Find it from the call
                   </button>
                   {matches.map((l) => (
                     <button

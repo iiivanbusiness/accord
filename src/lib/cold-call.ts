@@ -5,6 +5,8 @@ import { normalizePhone } from "@/lib/phone";
 import { isValidDay } from "@/lib/tasks";
 import { dayInZone } from "@/lib/viewer-time";
 import { dispatchCallCompleted, dispatchLeadsUpdated, dispatchMeetingsBooked, dispatchTasksCompleted, leadChanges } from "@/lib/webhook-events";
+import { findLeadForCall, mergeList } from "@/lib/lead-match";
+import { refreshLeadOverview } from "@/lib/lead-overview";
 import type { Lead } from "@/generated/prisma/client";
 
 const STAGE_ORDER: Record<string, number> = { new: 0, contacted: 1, interested: 2, meeting: 3 };
@@ -36,6 +38,11 @@ export type ColdCallSummary = {
   followUp: { type: string; date: string; time: string | null } | null;
   costUsd: number;
   callId: string; // the saved call, for logging it to the lead's CRM
+  // The lead the call ended up on: the one given, or the lead already on
+  // file it turned out to be with (matched true).
+  leadId: string;
+  leadName: string;
+  matched: boolean;
 };
 
 type ApplyColdCall = {
@@ -57,15 +64,39 @@ type ApplyColdCall = {
 // history, the lead's fields and stage are updated, the rep's open call
 // task on this lead is marked done, and an agreed next step becomes a task
 // on its day. Used by "Add transcript" on a lead and by the Calls inbox.
-export async function applyColdCall({ workspaceId, userId, lead, transcript, timeZone, phoneCallId, source = "paste" }: ApplyColdCall): Promise<ColdCallSummary> {
+export async function applyColdCall({ workspaceId, userId, lead: given, transcript, timeZone, phoneCallId, source = "paste" }: ApplyColdCall): Promise<ColdCallSummary> {
   const today = dayInZone(new Date(), timeZone);
-  const result = await extractColdCall(transcript, lead, today);
+  const result = await extractColdCall(transcript, given, today);
   const now = new Date();
   const reached = !UNREACHED_OUTCOMES.has(result.outcome);
 
-  const stage = stageAfterOutcome(lead.stage, result.outcome);
-
   const email = result.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(result.email) ? result.email.toLowerCase() : null;
+
+  // A call that made its own placeholder lead may turn out to be with
+  // someone already on file (a second call with the same client). Then it
+  // goes on that lead, and the placeholder goes away: one lead per client.
+  const match =
+    given.name === NEW_LEAD_NAME && reached
+      ? await findLeadForCall({
+          workspaceId,
+          userId,
+          excludeId: given.id,
+          placeholderName: NEW_LEAD_NAME,
+          probe: { name: result.contactName, company: result.company, email, phone: normalizePhone(result.phone) },
+          call: [result.contactName && `Prospect: ${result.contactName}${result.title ? `, ${result.title}` : ""}${result.company ? ` at ${result.company}` : ""}`, result.summary, result.notes]
+            .filter(Boolean)
+            .join("\n"),
+        })
+      : null;
+  const lead = match ?? given;
+  // The model only saw the empty placeholder, so its lists hold just this
+  // call; the lead's own lists are kept alongside.
+  if (match) {
+    result.painPoints = mergeList(result.painPoints, match.painPoints);
+    result.objections = mergeList(result.objections, match.objections);
+  }
+
+  const stage = stageAfterOutcome(lead.stage, result.outcome);
   const nextStepAt = result.nextStepDate && isValidDay(result.nextStepDate) ? new Date(`${result.nextStepDate}T00:00:00Z`) : null;
 
   const closable = await prisma.task.findFirst({
@@ -79,7 +110,12 @@ export async function applyColdCall({ workspaceId, userId, lead, transcript, tim
   let followUp: ColdCallSummary["followUp"] = null;
   if (nextStepAt && result.nextStepDate! > today && ["meeting_booked", "interested", "follow_up"].includes(result.outcome)) {
     const type = result.outcome === "meeting_booked" ? "sales_call" : "follow_up";
-    const exists = await prisma.task.findFirst({ where: { leadId: lead.id, assigneeId: userId, status: "open", type, dueDate: nextStepAt }, select: { id: true } });
+    // The task this call closes doesn't count: a call that confirms the same
+    // next step leaves it on the list.
+    const exists = await prisma.task.findFirst({
+      where: { leadId: lead.id, assigneeId: userId, status: "open", type, dueDate: nextStepAt, ...(closable ? { id: { not: closable.id } } : {}) },
+      select: { id: true },
+    });
     if (!exists) followUp = { type, date: result.nextStepDate!, time: result.nextStepTime };
   }
 
@@ -126,6 +162,7 @@ export async function applyColdCall({ workspaceId, userId, lead, transcript, tim
       : prisma.phoneCall.create({ data: { ...callData, workspaceId, userId, source, startedAt: now } }),
     prisma.lead.update({ where: { id: lead.id }, data: leadData }),
     ...(closable ? [prisma.task.update({ where: { id: closable.id }, data: { status: "done", completedAt: now } })] : []),
+    ...(match ? [prisma.lead.deleteMany({ where: { id: given.id, name: NEW_LEAD_NAME, phoneCalls: { none: {} }, tasks: { none: {} }, callIntents: { none: {} } } })] : []),
     ...(followUp
       ? [
           prisma.task.create({
@@ -166,5 +203,18 @@ export async function applyColdCall({ workspaceId, userId, lead, transcript, tim
     ]);
   }
 
-  return { outcome: result.outcome, stage, closedTask: closable?.type ?? null, followUp, costUsd: result.usage.costUsd, callId };
+  // Where things stand across the lead's calls, now that there's one more.
+  await refreshLeadOverview(lead.id);
+
+  return {
+    outcome: result.outcome,
+    stage,
+    closedTask: closable?.type ?? null,
+    followUp,
+    costUsd: result.usage.costUsd,
+    callId,
+    leadId: lead.id,
+    leadName: (leadData.name as string | undefined) ?? lead.name,
+    matched: Boolean(match),
+  };
 }

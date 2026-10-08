@@ -107,7 +107,9 @@ export async function extractColdCall(transcript: string, lead: LeadContext, tod
             nextStepDate: { type: "string", description: "Date of the next step as YYYY-MM-DD, empty if none was agreed." },
             nextStepTime: { type: "string", description: "Time of the next step as 24-hour HH:MM if one was agreed, else empty." },
           },
-          required: ["outcome", "summary", "isDecisionMaker", "interest"],
+          // Notes are the point for a team that only wants the write-up, so the
+          // model can't skip them (they come back empty for a voicemail).
+          required: ["outcome", "summary", "notes", "isDecisionMaker", "interest"],
         },
       },
     ],

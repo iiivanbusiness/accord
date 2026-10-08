@@ -127,15 +127,16 @@ export async function runCallProcessing(callId: string, timeZone: string, option
         // SealMe decided this was a sales call: the contract waits for the rep.
         await applySalesCall(callId, { draftOnly: sorted });
       } else {
-        await applyColdCall({ workspaceId, userId, lead, transcript, timeZone, phoneCallId: callId });
+        // The call can land on a lead already on file instead of the one it came with.
+        const saved = await applyColdCall({ workspaceId, userId, lead, transcript, timeZone, phoneCallId: callId });
         if (options.auto && userId) {
           await createNotification({
             workspaceId,
             userId,
             type: "call.saved",
-            title: `Notes from your call with ${lead.name} are saved`,
+            title: `Notes from your call with ${saved.leadName} are saved`,
             body: "Check them, and fix anything SealMe heard wrong.",
-            linkUrl: `/leads/${lead.id}`,
+            linkUrl: `/leads/${saved.leadId}`,
           }).catch((err) => reportError(err, "Call saved notification", { callId }));
         }
       }

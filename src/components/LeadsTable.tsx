@@ -17,6 +17,8 @@ export type LeadRow = {
   owner: string;
   next: string;
   updated: string;
+  calls: number; // written-up calls with this lead
+  lastCall: string | null; // day of the last call that reached them
 };
 
 type AssignInput = TaskDraft & { timezone: string; leadIds: string[]; makeOwner: boolean };
@@ -93,7 +95,11 @@ export default function LeadsTable({
                 </div>
                 <span className={`chip flex-none ${lead.stageChip}`}>{lead.stageLabel}</span>
               </div>
-              {lead.next && <div className="truncate text-[12px]" style={{ color: "var(--ink-muted)" }}>Next: {lead.next}</div>}
+              {(lead.calls > 0 || lead.next) && (
+                <div className="truncate text-[12px]" style={{ color: "var(--ink-muted)" }}>
+                  {[lead.calls > 0 ? `${lead.calls} ${lead.calls === 1 ? "call" : "calls"}${lead.lastCall ? `, last ${lead.lastCall}` : ""}` : null, lead.next ? `Next: ${lead.next}` : null].filter(Boolean).join(" · ")}
+                </div>
+              )}
             </Link>
           </div>
         ))}
@@ -114,6 +120,7 @@ export default function LeadsTable({
                   { label: "Lead", show: "" },
                   { label: "Company", show: SHOW.company },
                   { label: "Stage", show: "" },
+                  { label: "Calls", show: "" },
                   { label: "Interest", show: "" },
                   ...(showOwner ? [{ label: "Owner", show: SHOW.owner }] : []),
                   { label: "Next step", show: SHOW.next },
@@ -153,6 +160,16 @@ export default function LeadsTable({
                     </td>
                     <td className={cell} style={border}>
                       <span className={`chip whitespace-nowrap ${lead.stageChip}`}>{lead.stageLabel}</span>
+                    </td>
+                    <td className={`whitespace-nowrap ${cell}`} style={muted}>
+                      {lead.calls > 0 ? (
+                        <>
+                          <div className="tabular-nums" style={{ color: "var(--ink)" }}>{lead.calls}</div>
+                          {lead.lastCall && <div className="text-[12px]">Last {lead.lastCall}</div>}
+                        </>
+                      ) : (
+                        "-"
+                      )}
                     </td>
                     <td className={`whitespace-nowrap ${cell}`} style={muted}>{lead.interest}</td>
                     {showOwner && (

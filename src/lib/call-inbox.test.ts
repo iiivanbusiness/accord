@@ -113,6 +113,8 @@ describe("Calls inbox", () => {
     const call = { id: "call3", status: "processing", mode: "auto", workspaceId: "w1", userId: "u1", lead: { id: "l1", name: "Dana" }, transcript: "Speaker 1: Hi Dana.\nSpeaker 2: Hi.", telnyxRecordingId: null, durationSec: 120 };
     phoneCall.update.mockClear();
     notify.mockResolvedValue(undefined);
+    // The notification points at the lead the call ended up on.
+    cold.mockResolvedValue({ leadId: "l1", leadName: "Dana", matched: false });
 
     phoneCall.findUnique.mockResolvedValue(call);
     classify.mockResolvedValue({ kind: "cold", inputTokens: 900, outputTokens: 1 });
