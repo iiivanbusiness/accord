@@ -13,20 +13,26 @@ type LeadOption = { id: string; name: string; company: string | null };
 // audio (transcribed by Deepgram, then shown for a check) or paste the
 // transcript / load it from a text file. Then either the deal terms are
 // read and a contract drafted, or (Notes only) the call is written up on a
-// lead and nothing else.
+// lead and nothing else. On the Notes page it's notes only (notesOnly:
+// `action` writes the call up, no templates, no choice to make), and
+// `back` is where the person lands after.
 export default function CallUploadForm({
   templates,
   action,
   notesAction,
   searchLeads,
+  notesOnly = false,
+  back,
 }: {
   templates: { id: string; name: string }[];
   action: (formData: FormData) => Promise<void>;
   notesAction?: (formData: FormData) => Promise<void>;
   searchLeads?: (q: string) => Promise<LeadOption[]>;
+  notesOnly?: boolean;
+  back?: string;
 }) {
   const [need, setNeed] = useState<"contract" | "notes">("contract");
-  const notes = need === "notes" && Boolean(notesAction);
+  const notes = notesOnly || (need === "notes" && Boolean(notesAction));
   const [source, setSource] = useState<"recording" | "text">("recording");
   const [transcript, setTranscript] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -68,7 +74,7 @@ export default function CallUploadForm({
     const raw = await f.text();
     const isCaptions = /\.(vtt|srt)$/i.test(f.name) || raw.trimStart().startsWith("WEBVTT");
     setTranscript(isCaptions ? transcriptFromCaptionFile(raw) : raw.trim());
-    setTextFileNote(`Loaded ${f.name}. Check it below, then pick a template.`);
+    setTextFileNote(`Loaded ${f.name}. Check it below${notes ? "" : ", then pick a template"}.`);
   }
 
   const busy = stage.kind === "uploading" || stage.kind === "transcribing";
@@ -88,10 +94,11 @@ export default function CallUploadForm({
   );
 
   return (
-    <form action={notes ? notesAction : action} className="card flex max-w-[560px] flex-col gap-4 p-6">
+    <form action={notes && !notesOnly ? notesAction : action} className="card flex max-w-[560px] flex-col gap-4 p-6">
       <input type="hidden" name="source" value={source === "recording" ? "recording" : "text"} />
       <input type="hidden" name="seconds" value={seconds} />
-      {notesAction && (
+      {back && <input type="hidden" name="back" value={back} />}
+      {notesAction && !notesOnly && (
         <div className="flex flex-col gap-1.5">
           <span className="text-[13px] font-medium">What you need</span>
           <div className="flex rounded-full p-[3px] text-[13px]" style={{ background: "var(--surface-2)" }} role="radiogroup" aria-label="What you need">

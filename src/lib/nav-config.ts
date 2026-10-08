@@ -12,6 +12,7 @@ export type NavGroup = { label: string; items: NavItem[]; collapsible?: boolean 
 const ITEM = {
   leads: { href: "/leads", label: "Leads" },
   calls: { href: "/calls", label: "Calls" },
+  notes: { href: "/notes", label: "Notes" },
   deals: { href: "/deals", label: "Deals" },
   dashboard: { href: "/dashboard", label: "Dashboard" },
   calendar: { href: "/calendar", label: "Calendar" },
@@ -31,7 +32,9 @@ export function navGroupsFor({ prospecting, admin, manager = false }: { prospect
   return [
     { label: "", items: [ITEM.dashboard, ITEM.calendar] },
     ...(prospecting ? [{ label: "Prospecting", items: [ITEM.leads, ITEM.calls] }] : []),
-    { label: "Closing", items: [ITEM.deals, ITEM.clients, ITEM.templates] },
+    // Notes first: the write-up of a sales meeting, for teams that want
+    // only that. It needs leads, so it's there with prospecting.
+    { label: "Closing", items: [...(prospecting ? [ITEM.notes] : []), ITEM.deals, ITEM.clients, ITEM.templates] },
     // Folded until opened (or until you're on one of its pages), so the
     // everyday sections fit a laptop screen without scrolling.
     { label: "Workspace", items: workspace, collapsible: true },
@@ -57,6 +60,7 @@ const SCREEN_LABELS: { test: (path: string) => boolean; label: string }[] = [
   { test: (p) => p === "/today", label: "Today" },
   { test: (p) => p === "/team", label: "Team" },
   { test: (p) => p === "/calls", label: "Calls" },
+  { test: (p) => p === "/notes", label: "Notes" },
   { test: (p) => p === "/deals/new", label: "Start a call" },
   { test: (p) => /^\/deals\/[^/]+\/contract$/.test(p), label: "Contract review" },
   { test: (p) => /^\/deals\/[^/]+\/send$/.test(p), label: "Send contract" },

@@ -158,7 +158,8 @@ export async function createNotesFromTranscript(formData: FormData) {
   });
   const timeZone = await cookieTimeZone();
   after(() => runCallProcessing(call.id, timeZone));
-  redirect("/calls");
+  // From the Notes page, back there: the call shows as being written up.
+  redirect(formData.get("back") === "/notes" ? "/notes?added=1" : "/calls");
 }
 
 // Desktop-app-only: starts a deal backed by a locally-recorded call instead

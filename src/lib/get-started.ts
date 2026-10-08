@@ -63,9 +63,9 @@ export function getStartedSteps(i: GetStartedInput): GetStartedStep[] {
     {
       id: "call",
       title: "Add your first call",
-      hint: "In Calls, drop a recording or video of a call, keep Notes only and press Process. SealMe writes the notes.",
-      cta: "Go to Calls",
-      href: "/calls?guide=calls",
+      hint: "In Notes, drop a recording or video of a call, or paste its transcript, and press Write up the call.",
+      cta: "Go to Notes",
+      href: "/notes?guide=notes",
       done: i.hasCall || i.hasDeal,
     },
     {

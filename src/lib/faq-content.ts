@@ -43,6 +43,7 @@ export function appNavigationText(prospecting = false): string {
         "Leads: the lead list with search and filters, Import (paste, CSV or Excel) and + Add lead at the top. Select leads and click Assign to give them to a rep. " +
         "Open a lead to call it, add a cold call transcript, or Convert to deal.\n\n" +
         "Calls: calls that need a look (Pending) and every call SealMe handled (History).\n\n" +
+        "Notes (under Closing): add a recording, video or transcript of a call and get only the notes and next step, no contract. Below it, every client that has notes, newest call first; each one opens that client's lead with all their calls.\n\n" +
         "Team (under Workspace, managers only): each rep's tasks, calls and results, and moving tasks between reps.\n\n" +
         "Your phone number: on the Settings page, its own section, where you add and verify the number SealMe rings when you tap Call.\n\n"
       : "") +

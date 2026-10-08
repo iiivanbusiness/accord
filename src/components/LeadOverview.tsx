@@ -1,6 +1,7 @@
 "use client";
 
-import { CopyButton, noteLines } from "@/components/LeadCalls";
+import { CopyButton } from "@/components/LeadCalls";
+import { noteLines } from "@/lib/note-lines";
 
 // "Where things stand" across all of a lead's calls, above the calls
 // themselves, so a second or fifth conversation starts from the full picture.

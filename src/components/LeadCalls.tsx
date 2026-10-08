@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import LocalDateTime from "@/components/LocalDateTime";
 import LeadJoinPicker, { type JoinPick } from "@/components/LeadJoinPicker";
+import { noteLines } from "@/lib/note-lines";
 import { CALL_OUTCOME_CHIP, CALL_OUTCOME_LABEL } from "@/lib/call-outcomes";
 import { LEAD_STAGE_LABEL } from "@/lib/lead-stages";
 import { formatTaskDue, TASK_TYPE_LABEL } from "@/lib/tasks";
@@ -20,9 +21,6 @@ export type LeadCall = {
   source: string;
 };
 
-export function noteLines(notes: string): string[] {
-  return notes.split(/\n|\\n/).map((l) => l.replace(/^\s*[-•]\s*/, "").trim()).filter(Boolean);
-}
 
 export function CopyButton({ text, label = "Copy", className = "text-[12px] font-medium" }: { text: () => string; label?: string; className?: string }) {
   const [copied, setCopied] = useState(false);

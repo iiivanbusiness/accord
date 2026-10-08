@@ -14,6 +14,13 @@ type Tip = { title: string; body: string; seen?: string; inline?: boolean };
 function tipFor(guide: string, pathname: string): Tip | null {
   const onLead = /^\/leads\/(?!new$|import$)[^/]+$/.test(pathname);
   switch (guide) {
+    case "notes":
+      return pathname === "/notes"
+        ? {
+            title: "Notes: the write-up of any call",
+            body: "Drop a recording or video of a call, or paste its transcript, and press Write up the call. You get the notes and the next step, no contract. Every client you have notes on is listed here, newest first, and each call with them lands on the same file.",
+          }
+        : null;
     case "calls":
       return pathname === "/calls"
         ? {

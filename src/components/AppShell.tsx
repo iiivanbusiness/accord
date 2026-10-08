@@ -28,6 +28,7 @@ const NAV_ICONS: Record<string, () => React.ReactNode> = {
   "/today": TodayIcon,
   "/leads": LeadsIcon,
   "/calls": CallsIcon,
+  "/notes": NotesIcon,
   "/team": TeamIcon,
   "/calendar": CalendarIcon,
   "/analytics": AnalyticsIcon,
@@ -202,6 +203,16 @@ function TodayIcon() {
     <svg {...iconProps()}>
       <circle cx="10" cy="10" r="3.2" />
       <path d="M10 2.6v1.8M10 15.6v1.8M2.6 10h1.8M15.6 10h1.8M4.8 4.8l1.3 1.3M13.9 13.9l1.3 1.3M4.8 15.2l1.3-1.3M13.9 6.1l1.3-1.3" />
+    </svg>
+  );
+}
+
+function NotesIcon() {
+  return (
+    <svg {...iconProps()}>
+      <path d="M5.5 2.8h6.2l3.8 3.8v9.6c0 .6-.4 1-1 1H5.5c-.6 0-1-.4-1-1V3.8c0-.6.4-1 1-1Z" />
+      <path d="M11.5 2.9v3.9h3.9" />
+      <path d="M7.4 10.3h5.2M7.4 13.3h3.6" />
     </svg>
   );
 }
