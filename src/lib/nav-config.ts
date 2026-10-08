@@ -3,11 +3,12 @@ export type NavItem = { href: string; label: string };
 // page you're on is in it).
 export type NavGroup = { label: string; items: NavItem[]; collapsible?: boolean };
 
-// The sidebar: the few pages someone uses every day, then "More" for the
-// rest. Reps live in the Dashboard (their day), Leads, Calls and Deals;
-// without prospecting (leads, tasks, calls) the everyday pages are the
-// deal ones. Admin only
-// for platform admins, Team for people who assign the work.
+// The sidebar, in sections by kind of work: the day (Dashboard, Calendar)
+// on top, then Prospecting (finding and calling clients), Closing (deals,
+// clients and the contracts they're built from), and Workspace (how it's
+// going, the team and the settings). Without prospecting there's no
+// Prospecting section. Team is for people who assign the work, Admin for
+// platform admins.
 const ITEM = {
   leads: { href: "/leads", label: "Leads" },
   calls: { href: "/calls", label: "Calls" },
@@ -26,13 +27,14 @@ export const ADMIN_ITEM: NavItem = { href: "/admin", label: "Admin" };
 export function navGroupsFor({ prospecting, admin, manager = false }: { prospecting: boolean; admin: boolean; manager?: boolean }): NavGroup[] {
   // The Dashboard is the day (a rep's tasks, or the team's for managers),
   // so there's no separate Today.
-  const everyday = prospecting ? [ITEM.dashboard, ITEM.leads, ITEM.calls, ITEM.deals] : [ITEM.dashboard, ITEM.deals, ITEM.calendar, ITEM.clients];
-  const more = prospecting
-    ? [ITEM.calendar, ITEM.clients, ITEM.templates, ITEM.analytics, ...(manager ? [ITEM.team] : []), ITEM.feedback, ITEM.settings]
-    : [ITEM.templates, ITEM.analytics, ITEM.feedback, ITEM.settings];
+  const workspace = [ITEM.analytics, ...(prospecting && manager ? [ITEM.team] : []), ITEM.settings, ITEM.feedback, ...(admin ? [ADMIN_ITEM] : [])];
   return [
-    { label: "", items: everyday },
-    { label: "More", items: admin ? [...more, ADMIN_ITEM] : more, collapsible: true },
+    { label: "", items: [ITEM.dashboard, ITEM.calendar] },
+    ...(prospecting ? [{ label: "Prospecting", items: [ITEM.leads, ITEM.calls] }] : []),
+    { label: "Closing", items: [ITEM.deals, ITEM.clients, ITEM.templates] },
+    // Folded until opened (or until you're on one of its pages), so the
+    // everyday sections fit a laptop screen without scrolling.
+    { label: "Workspace", items: workspace, collapsible: true },
   ];
 }
 

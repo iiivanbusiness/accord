@@ -80,17 +80,18 @@ export default function SidebarNav({ groups, expandAll = false }: { groups: Side
       {groups.map((group, gi) => (
         <div key={group.label || gi} className={`flex flex-col gap-1 ${gi > 0 ? "mt-3.5" : ""}`}>
           {group.collapsible && !expandAll ? (
+            // Looks like the other section labels, with a chevron to fold it.
             <button
               type="button"
               onClick={() => toggle(group.label)}
               aria-expanded={isOpen(group)}
-              className="flex h-[35px] items-center gap-2.5 rounded-[10px] px-3 text-left text-[13.5px] font-medium"
+              className="flex h-[24px] items-center gap-1 rounded-[8px] px-3 text-left text-[10.5px] font-medium uppercase tracking-[0.08em]"
               style={{ color: "var(--ink-muted)" }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="flex-none transition-transform duration-150" style={{ transform: isOpen(group) ? "rotate(90deg)" : undefined }}>
+              <span style={{ opacity: 0.75 }}>{group.label}</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="flex-none transition-transform duration-150" style={{ transform: isOpen(group) ? "rotate(90deg)" : undefined, opacity: 0.75 }}>
                 <path d="M9 6l6 6-6 6" />
               </svg>
-              {group.label}
             </button>
           ) : (
             group.label && (

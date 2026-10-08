@@ -32,11 +32,10 @@ export function faqCategoriesFor(prospecting: boolean): FaqCategory[] {
 // account content, so it stays fine under the no-account-access rule.
 export function appNavigationText(prospecting = false): string {
   const sidebar = navGroupsFor({ prospecting, admin: false })
-    .flatMap((g) => g.items)
-    .map((item) => `${item.label} (${item.href})`)
-    .join(", ");
+    .map((g) => `${g.label ? `${g.label}: ` : ""}${g.items.map((item) => `${item.label} (${item.href})`).join(", ")}`)
+    .join("; ");
   return (
-    `Left sidebar, top to bottom: ${sidebar}. Everything after the first four sits under More, which opens with a tap.\n\n` +
+    `Left sidebar, top to bottom, in sections: ${sidebar}. On a phone, the bottom bar has the main four and the menu button opens the rest.\n\n` +
     (prospecting
       ? "Dashboard: a Today card at the top with one folder per thing (Team today for managers, Next up, Your day, Waiting on you, " +
         "Notifications, Deals, Hand out work for managers, Calendar), each with a colored dot for how urgent it is. Tap a folder to open it; " +
@@ -44,7 +43,7 @@ export function appNavigationText(prospecting = false): string {
         "Leads: the lead list with search and filters, Import (paste, CSV or Excel) and + Add lead at the top. Select leads and click Assign to give them to a rep. " +
         "Open a lead to call it, add a cold call transcript, or Convert to deal.\n\n" +
         "Calls: calls that need a look (Pending) and every call SealMe handled (History).\n\n" +
-        "Team (under More, managers only): each rep's tasks, calls and results, and moving tasks between reps.\n\n" +
+        "Team (under Workspace, managers only): each rep's tasks, calls and results, and moving tasks between reps.\n\n" +
         "Your phone number: on the Settings page, its own section, where you add and verify the number SealMe rings when you tap Call.\n\n"
       : "") +
     "Deals: click Deals in the sidebar, or go to /deals. Table and Board views, filterable by status and owner. " +
@@ -103,7 +102,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
       {
         question: "How do I see how my team is doing?",
         answer:
-          "Managers have a Team today folder on the Dashboard with each rep's calls, meetings and tasks done, and who's behind. The Team page, under More in the sidebar, has more detail and lets you move tasks from one rep to another.",
+          "Managers have a Team today folder on the Dashboard with each rep's calls, meetings and tasks done, and who's behind. The Team page, under Workspace in the sidebar, has more detail and lets you move tasks from one rep to another.",
       },
       {
         question: "How do I turn a lead into a deal?",
