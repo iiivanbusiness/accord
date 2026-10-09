@@ -1,6 +1,17 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin";
+import { formatMinutes, formatUsd, isTestEmail, NO_USAGE, NOT_TEST_EMAIL, totalUsage, usageBy } from "@/lib/admin-usage";
 import { applyPlanChange, dismissUpgradeRequest, setProspectingEnabled } from "./actions";
+
+function startOfMonth(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
+// Someone who joined in the last two days is flagged as new.
+function isRecent(date: Date): boolean {
+  return Date.now() - date.getTime() < 2 * 24 * 60 * 60 * 1000;
+}
 
 function timeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -16,25 +27,49 @@ function timeAgo(date: Date): string {
 // The admin tables have to fit beside the sidebar at any window width,
 // not just full screen: lower-priority columns drop out as the window
 // narrows instead of pushing the Prospecting switch off the edge.
+// When someone signed up is in New sign-ups, so it isn't repeated here.
 const COLUMN_SHOW = {
   owner: "hidden lg:table-cell",
-  plan: "hidden xl:table-cell",
-  calls: "hidden md:table-cell",
-  deals: "hidden lg:table-cell",
-  signedUp: "hidden 2xl:table-cell",
-  lastActivity: "hidden xl:table-cell",
+  plan: "hidden 2xl:table-cell",
+  minutes: "hidden xl:table-cell",
+  cost: "hidden lg:table-cell",
+  deals: "hidden xl:table-cell",
+  lastActivity: "hidden 2xl:table-cell",
 };
 
 const WORKSPACE_COLUMNS = [
   { label: "Workspace", show: "" },
   { label: "Owner", show: COLUMN_SHOW.owner },
   { label: "Plan", show: COLUMN_SHOW.plan },
-  { label: "Calls used", show: COLUMN_SHOW.calls },
+  { label: "Calls written up", show: "" },
+  { label: "Minutes", show: COLUMN_SHOW.minutes },
+  { label: "Cost", show: COLUMN_SHOW.cost },
   { label: "Deals", show: COLUMN_SHOW.deals },
-  { label: "Signed up", show: COLUMN_SHOW.signedUp },
   { label: "Last activity", show: COLUMN_SHOW.lastActivity },
   { label: "Prospecting", show: "" },
 ];
+
+// New sign-ups: who joined, how, whether they came back, and what they've used.
+const SIGNUP_SHOW = {
+  workspace: "hidden xl:table-cell",
+  how: "hidden 2xl:table-cell",
+  lastIn: "hidden xl:table-cell",
+  minutes: "hidden lg:table-cell",
+  cost: "hidden xl:table-cell",
+};
+
+const SIGNUP_COLUMNS = [
+  { label: "Person", show: "" },
+  { label: "Workspace", show: SIGNUP_SHOW.workspace },
+  { label: "Joined", show: "" },
+  { label: "How", show: SIGNUP_SHOW.how },
+  { label: "Last sign-in", show: SIGNUP_SHOW.lastIn },
+  { label: "Calls written up", show: "" },
+  { label: "Minutes", show: SIGNUP_SHOW.minutes },
+  { label: "Cost", show: SIGNUP_SHOW.cost },
+];
+
+const SIGNUPS_SHOWN = 50;
 
 const PROFILE_SHOW = {
   role: "hidden lg:table-cell",
@@ -88,13 +123,14 @@ const AUDIT_ACTION_CHIP: Record<string, string> = {
   "workspace.created": "chip-success",
 };
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="card p-5">
       <div className="text-[11px] font-medium uppercase tracking-wide" style={{ color: "var(--ink-muted)" }}>
         {label}
       </div>
       <div className="font-mono-tab mt-2 text-[26px] font-medium">{value}</div>
+      {sub && <div className="mt-0.5 text-[12px]" style={{ color: "var(--ink-muted)" }}>{sub}</div>}
     </div>
   );
 }
@@ -102,7 +138,8 @@ function StatCard({ label, value }: { label: string; value: string }) {
 export default async function AdminPage() {
   await requireAdmin();
 
-  const [workspaces, pendingRequests, onboardingProfiles, auditLogs] = await Promise.all([
+  const monthStart = startOfMonth();
+  const [workspaces, pendingRequests, onboardingProfiles, auditLogs, newUsers, byWorkspace, byWorkspaceMonth, byUser] = await Promise.all([
     // Sandboxes belong to a customer's workspace; they aren't customers.
     prisma.workspace.findMany({
       where: { sandboxOfId: null },
@@ -123,7 +160,29 @@ export default async function AdminPage() {
       orderBy: { createdAt: "desc" },
       take: 100,
     }),
+    prisma.user.findMany({
+      where: { workspace: { sandboxOfId: null }, NOT: NOT_TEST_EMAIL },
+      select: { id: true, name: true, email: true, createdAt: true, workspaceId: true, workspace: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+      take: SIGNUPS_SHOWN,
+    }),
+    usageBy("workspaceId"),
+    usageBy("workspaceId", monthStart),
+    usageBy("userId"),
   ]);
+
+  // Whether someone started their workspace (its first person) or was invited.
+  const founderOf = new Map(
+    workspaces.map((w) => [w.id, [...w.users].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0]?.id ?? null]),
+  );
+  const lastSignIns = await prisma.auditLog.groupBy({
+    by: ["actorEmail"],
+    where: { action: "login.success", actorEmail: { in: newUsers.map((u) => u.email) } },
+    _max: { createdAt: true },
+  });
+  const lastSignIn = new Map(lastSignIns.map((r) => [r.actorEmail, r._max.createdAt]));
+  const usageAll = totalUsage(byWorkspace);
+  const usageMonth = totalUsage(byWorkspaceMonth);
 
   const activity = await Promise.all(
     workspaces.map((w) =>
@@ -131,7 +190,7 @@ export default async function AdminPage() {
     )
   );
 
-  const totalUsers = workspaces.reduce((sum, w) => sum + w.users.length, 0);
+  const totalUsers = workspaces.reduce((sum, w) => sum + w.users.filter((u) => !isTestEmail(u.email)).length, 0);
   const totalDeals = activity.reduce((sum, a) => sum + a._count, 0);
   const totalCallsUsed = workspaces.reduce((sum, w) => sum + w.callsUsedThisMonth, 0);
 
@@ -144,11 +203,71 @@ export default async function AdminPage() {
       </div>
     </div>
 
-    <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-      <StatCard label="Workspaces" value={String(workspaces.length)} />
-      <StatCard label="Signed-up users" value={String(totalUsers)} />
-      <StatCard label="Deals platform-wide" value={String(totalDeals)} />
-      <StatCard label="Calls used this month" value={String(totalCallsUsed)} />
+    <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+      <StatCard label="Workspaces" value={String(workspaces.length)} sub={`${totalDeals.toLocaleString("en-US")} deals, ${totalCallsUsed} calls used this month`} />
+      <StatCard label="Signed-up users" value={String(totalUsers)} sub={`${newUsers.filter((u) => isRecent(u.createdAt)).length} in the last 2 days`} />
+      <StatCard label="Calls written up" value={usageAll.calls.toLocaleString("en-US")} sub={`${usageMonth.calls.toLocaleString("en-US")} this month`} />
+      <StatCard label="Minutes transcribed" value={formatMinutes(usageAll.sttSeconds)} sub={`${formatMinutes(usageMonth.sttSeconds)} this month`} />
+      <StatCard label="Usage cost" value={formatUsd(usageAll.costUsd)} sub={`${formatUsd(usageMonth.costUsd)} this month`} />
+    </div>
+
+    <div className="card mb-6 overflow-hidden">
+      <div className="border-b px-5 py-4" style={{ borderColor: "var(--hairline)" }}>
+        <h2 className="text-[15px] font-medium">New sign-ups</h2>
+        <div className="mt-0.5 text-[12.5px]" style={{ color: "var(--ink-muted)" }}>
+          Newest first, with what each person has used: calls written up into notes, minutes transcribed, and what it cost. Last {SIGNUPS_SHOWN}
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr>
+              {SIGNUP_COLUMNS.map((col) => (
+                <th
+                  key={col.label}
+                  className={`whitespace-nowrap border-b px-4 py-3 text-left text-[12px] font-medium uppercase tracking-wide ${col.show}`}
+                  style={{ color: "var(--ink-muted)", borderColor: "var(--hairline)" }}
+                >
+                  {col.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {newUsers.map((u) => {
+              const used = byUser.get(u.id) ?? NO_USAGE;
+              const signedIn = lastSignIn.get(u.email);
+              const cell = "border-b px-4 py-3.5 text-[13px]";
+              const border = { borderColor: "var(--hairline-soft)" };
+              const muted = { ...border, color: "var(--ink-muted)" };
+              return (
+                <tr key={u.id} className="row-hover transition-colors">
+                  <td className={cell} style={border}>
+                    <div className="max-w-[180px] truncate font-medium" title={u.name}>{u.name}</div>
+                    <div className="max-w-[180px] truncate text-[12px]" style={{ color: "var(--ink-muted)" }} title={u.email}>{u.email}</div>
+                  </td>
+                  <td className={`${cell} ${SIGNUP_SHOW.workspace}`} style={muted}>
+                    <div className="max-w-[160px] truncate" title={u.workspace.name}>{u.workspace.name}</div>
+                  </td>
+                  <td className={`whitespace-nowrap ${cell}`} style={muted}>
+                    {isRecent(u.createdAt) && <span className="chip chip-success mr-1.5">New</span>}
+                    <span title={u.createdAt.toISOString()}>{u.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                  </td>
+                  <td className={`whitespace-nowrap ${cell} ${SIGNUP_SHOW.how}`} style={muted}>
+                    {founderOf.get(u.workspaceId) === u.id ? "Started a workspace" : "Invited"}
+                  </td>
+                  <td className={`whitespace-nowrap ${cell} ${SIGNUP_SHOW.lastIn}`} style={muted}>
+                    {signedIn ? timeAgo(signedIn) : "-"}
+                  </td>
+                  <td className={`font-mono-tab ${cell}`} style={border}>{used.calls}</td>
+                  <td className={`font-mono-tab ${cell} ${SIGNUP_SHOW.minutes}`} style={border}>{formatMinutes(used.sttSeconds)}</td>
+                  <td className={`font-mono-tab ${cell} ${SIGNUP_SHOW.cost}`} style={border}>{formatUsd(used.costUsd)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
 
     {pendingRequests.length > 0 && (
@@ -259,16 +378,22 @@ export default async function AdminPage() {
                     <div className="max-w-[160px] truncate" title={w.name}>{w.name}</div>
                   </td>
                   <td className={`${cell} ${COLUMN_SHOW.owner}`} style={muted}>
-                    <div className="max-w-[180px] truncate" title={w.users[0]?.email}>{w.users[0]?.email ?? "-"}</div>
+                    <div className="max-w-[170px] truncate" title={w.users[0]?.email}>{w.users[0]?.email ?? "-"}</div>
                   </td>
                   <td className={`${cell} ${COLUMN_SHOW.plan}`} style={border}>{w.plan}</td>
-                  <td className={`font-mono-tab whitespace-nowrap ${cell} ${COLUMN_SHOW.calls}`} style={border}>
-                    {w.callsUsedThisMonth} / {w.callsLimit}
+                  <td className={`font-mono-tab whitespace-nowrap ${cell}`} style={border}>
+                    {(byWorkspace.get(w.id) ?? NO_USAGE).calls}
+                    {(byWorkspaceMonth.get(w.id)?.calls ?? 0) > 0 && (
+                      <div className="text-[12px]" style={{ color: "var(--ink-muted)" }}>{byWorkspaceMonth.get(w.id)!.calls} this month</div>
+                    )}
+                  </td>
+                  <td className={`font-mono-tab whitespace-nowrap ${cell} ${COLUMN_SHOW.minutes}`} style={border}>
+                    {formatMinutes((byWorkspace.get(w.id) ?? NO_USAGE).sttSeconds)}
+                  </td>
+                  <td className={`font-mono-tab whitespace-nowrap ${cell} ${COLUMN_SHOW.cost}`} style={border}>
+                    {formatUsd((byWorkspace.get(w.id) ?? NO_USAGE).costUsd)}
                   </td>
                   <td className={`font-mono-tab ${cell} ${COLUMN_SHOW.deals}`} style={border}>{stats._count}</td>
-                  <td className={`whitespace-nowrap ${cell} ${COLUMN_SHOW.signedUp}`} style={muted}>
-                    {w.createdAt.toLocaleDateString()}
-                  </td>
                   <td className={`whitespace-nowrap ${cell} ${COLUMN_SHOW.lastActivity}`} style={muted}>
                     {stats._max.updatedAt ? timeAgo(stats._max.updatedAt) : "-"}
                   </td>
