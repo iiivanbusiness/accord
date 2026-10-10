@@ -386,6 +386,27 @@ export async function sendPasswordResetEmail(options: { to: string; resetUrl: st
   });
 }
 
+// A new person in SealMe, to the founder: who, which workspace, how they
+// got in, and how many real people that makes.
+export async function sendSignupAlertEmail(options: { to: string; name: string; email: string; workspaceName: string; how: string; peopleSoFar: number; adminUrl: string }): Promise<void> {
+  const name = escapeHtml(options.name);
+  const email = escapeHtml(options.email);
+  await sendSystemEmail({
+    to: [options.to],
+    subject: `New sign-up: ${options.name === options.email ? options.email : `${options.name} (${options.email})`}`,
+    bodyHtml: `
+      <p style="margin:0 0 6px;font-size:16px;font-weight:600;">${name}</p>
+      <p style="margin:0 0 14px;color:#6e6e73;">${email}</p>
+      <p style="margin:0 0 4px;"><strong>Workspace:</strong> ${escapeHtml(options.workspaceName)}</p>
+      <p style="margin:0 0 4px;"><strong>How:</strong> ${escapeHtml(options.how)}</p>
+      <p style="margin:0 0 18px;"><strong>People in SealMe so far:</strong> ${options.peopleSoFar}</p>
+      <a href="${options.adminUrl}" style="display:inline-block;padding:11px 20px;background:#1d1d1f;color:#ffffff;text-decoration:none;border-radius:100px;font-weight:600;font-size:14px;">
+        Open Admin
+      </a>
+    `,
+  });
+}
+
 // Cross-tenant platform failures — sent to ADMIN_EMAILS, not any one workspace's
 // team, so problems surface before a customer has to report them.
 export async function sendAdminAlertEmail(options: { subject: string; details: string }): Promise<void> {

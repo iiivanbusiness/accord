@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin";
-import { formatMinutes, formatUsd, isTestEmail, NO_USAGE, NOT_TEST_EMAIL, totalUsage, usageBy } from "@/lib/admin-usage";
+import { formatMinutes, formatUsd, NO_USAGE, totalUsage, usageBy } from "@/lib/admin-usage";
+import { isTestEmail, NOT_TEST_EMAIL } from "@/lib/test-emails";
 import { applyPlanChange, dismissUpgradeRequest, setProspectingEnabled } from "./actions";
 
 function startOfMonth(): Date {

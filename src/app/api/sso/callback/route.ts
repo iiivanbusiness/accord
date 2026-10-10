@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { mintSessionCookie, ssoCallbackUrl, verifyIdToken, verifySsoState } from "@/lib/sso";
 import { logAudit } from "@/lib/audit";
+import { notifySignup } from "@/lib/signup-alert";
 
 function loginError(message: string): NextResponse {
   return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/login?error=${encodeURIComponent(message)}`);
@@ -74,6 +75,7 @@ export async function GET(req: Request) {
       data: { workspaceId: workspace.id, name: claims.name, email: claims.email, passwordHash: null, emailVerifiedAt: new Date() },
     });
     await logAudit({ workspaceId: workspace.id, actorEmail: claims.email, action: "teammate.sso_provisioned" });
+    notifySignup({ name: claims.name, email: claims.email, workspaceName: workspace.name, how: "Joined with company single sign-on" });
   }
 
   if (user.deactivatedAt) {

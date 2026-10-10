@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { STT_USD_PER_MINUTE } from "@/lib/call-inbox";
+import { NOT_TEST_EMAIL } from "@/lib/test-emails";
 
 // What testers have used, for the platform admin: calls written up (notes),
 // minutes transcribed and what that cost us (transcription, models and
@@ -8,16 +9,6 @@ export type Usage = { calls: number; notes: number; sttSeconds: number; costUsd:
 
 export const NO_USAGE: Usage = { calls: 0, notes: 0, sttSeconds: 0, costUsd: 0 };
 
-// Made-up people: the demo reps in a workspace (@example.com) and the
-// disposable test accounts (@example.test). Left out so the numbers are
-// real testers only.
-const TEST_DOMAINS = ["@example.com", "@example.test"];
-
-export function isTestEmail(email: string): boolean {
-  return TEST_DOMAINS.some((d) => email.toLowerCase().endsWith(d));
-}
-
-export const NOT_TEST_EMAIL = TEST_DOMAINS.map((d) => ({ email: { endsWith: d } }));
 
 type Sums = { _count: { _all: number; notes: number }; _sum: { sttSeconds: number | null; aiCostUsd: number | null; telnyxCostUsd: number | null } };
 

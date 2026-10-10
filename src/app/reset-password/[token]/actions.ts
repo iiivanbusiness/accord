@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
 import { logAudit } from "@/lib/audit";
+import { notifySignup } from "@/lib/signup-alert";
 
 // Also finishes a teammate invite (joining): the same one-time link, plus
 // their name, and the invite email they opened proves the address.
@@ -29,6 +30,10 @@ export async function resetPassword(token: string, joining: boolean, formData: F
   });
   await prisma.passwordResetToken.update({ where: { id: resetToken.id }, data: { usedAt: new Date() } });
   await logAudit({ workspaceId: user.workspaceId, actorEmail: user.email, action: joining ? "teammate.joined" : "password.reset" });
+  if (joining && !current.emailVerifiedAt) {
+    const joined = await prisma.workspace.findUnique({ where: { id: user.workspaceId }, select: { name: true } });
+    notifySignup({ name: user.name, email: user.email, workspaceName: joined?.name ?? "", how: "Joined by invite, with a password" });
+  }
 
   redirect(joining ? "/login?joined=1" : "/login?reset=1");
 }

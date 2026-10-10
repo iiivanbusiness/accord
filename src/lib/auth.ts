@@ -10,6 +10,7 @@ import { attachOnboardingProfile } from "@/lib/onboarding";
 import { createOwnerRole } from "@/lib/permissions";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { logAudit } from "@/lib/audit";
+import { notifySignup } from "@/lib/signup-alert";
 import { verifyTotpCode, consumeBackupCode, type BackupCode } from "@/lib/two-factor";
 
 const findSessionAccount = cache((email: string) =>
@@ -110,11 +111,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           });
           await attachOnboardingProfile(workspace.id);
           await logAudit({ workspaceId: workspace.id, actorEmail: email, action: "workspace.created", metadata: { provider: "google" } });
+          notifySignup({ name, email, workspaceName: workspace.name, how: "Started a workspace with Google" });
         } else if (!user.emailVerifiedAt) {
           // An invited teammate has no password, so Google is their only way
           // in — every sign-in already re-confirms the address with Google,
           // so there's no separate "click a link" step for them to do.
           user = await prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: new Date() } });
+          // Their first time in: an invite accepted.
+          const joined = await prisma.workspace.findUnique({ where: { id: user.workspaceId }, select: { name: true } });
+          notifySignup({ name: (profile.name as string | undefined) ?? user.name, email, workspaceName: joined?.name ?? "", how: "Joined by invite, with Google" });
         }
 
         // Deactivated via SCIM (or manually) — leave workspaceId unset rather
